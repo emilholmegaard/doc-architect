@@ -6,7 +6,7 @@ on:
       java-version:
         required: false
         type: string
-        default: '17'
+        default: '21'
       run-tests:
         required: false
         type: boolean
@@ -46,7 +46,9 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: application-jar
-          path: target/*.jar
+          path: |
+            doc-architect-core/target/*.jar
+            doc-architect-cli/target/*.jar
           retention-days: 7
       
       - name: Upload test results
