@@ -130,4 +130,16 @@ mvn clean package -DskipTests
 - ✅ Utilities: FileUtils (glob matching), IdGenerator (SHA-256 deterministic IDs)
 - ✅ Complete unit test coverage (31 tests passing)
 
-**Next:** Phase 2 - Implement concrete scanners (Maven, Gradle) and generators (Mermaid, Markdown)
+## Phase 2 Complete ✅
+
+**CLI Application with Picocli:**
+
+- ✅ Picocli-based CLI with 6 subcommands
+- ✅ Global options: `--verbose`, `--quiet`
+- ✅ `init` command: Project detection + YAML config generation (fully functional)
+- ✅ `list` command: ServiceLoader discovery for scanners/generators/renderers
+- ✅ `scan`, `generate`, `validate`, `diff` commands: Stubs for future phases
+- ✅ Maven Shade Plugin: Fat JAR creation with SPI merging
+- ✅ GitHub Actions: Updated to Java 21, fixed multi-module paths
+
+**Next:** Phase 3 - Implement concrete scanners (Maven dependencies, REST API detection)
