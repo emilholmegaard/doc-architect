@@ -1,0 +1,4 @@
+# DiagramGenerator implementations should be registered here
+# Example:
+# com.example.MermaidGenerator
+# com.example.PlantUmlGenerator

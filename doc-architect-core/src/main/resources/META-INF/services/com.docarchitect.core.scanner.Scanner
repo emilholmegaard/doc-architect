@@ -1,0 +1,4 @@
+# Scanner implementations should be registered here
+# Example:
+# com.example.MavenDependencyScanner
+# com.example.SpringRestApiScanner
