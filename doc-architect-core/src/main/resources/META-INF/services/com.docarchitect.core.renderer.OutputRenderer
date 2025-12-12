@@ -1,0 +1,4 @@
+# OutputRenderer implementations should be registered here
+# Example:
+# com.example.FileSystemRenderer
+# com.example.ConfluenceRenderer
