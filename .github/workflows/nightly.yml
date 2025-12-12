@@ -140,7 +140,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
       
       - name: Run Grype scanner
-        uses: anchore/scan-action@v3
+        uses: anchore/scan-action@v7
         id: grype
         with:
           image: ${{ env.DOCKER_IMAGE }}:nightly
