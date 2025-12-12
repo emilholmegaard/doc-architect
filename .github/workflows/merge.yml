@@ -1,0 +1,29 @@
+name: Merge to Main
+
+on:
+  push:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    name: Build & Test
+    uses: ./.github/workflows/build.yml
+    with:
+      run-tests: true
+  
+  docker:
+    name: Docker Build & Push
+    needs: build
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      push-image: true
+      image-tag: ${{ github.ref_name }}
+    secrets: inherit
+  
+  scan:
+    name: Security Scan
+    needs: docker
+    uses: ./.github/workflows/docker-security-scan.yml
+    with:
+      image-tag: ${{ github.ref_name }}
+      fail-on-critical: false

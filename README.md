@@ -151,6 +151,8 @@ DocArchitect supports lightweight CI/CD mode for detecting significant changes:
       --fail-on-breaking-changes
 ```
 
+For full CI/CD setup with security scanning, see [docs/ci-cd-setup.md](docs/ci-cd-setup.md).
+
 ## Extending DocArchitect
 
 ### Adding a Custom Scanner
@@ -173,6 +175,8 @@ See [docs/extending.md](docs/extending.md) for details.
 # Build Docker image
 docker build -t doc-architect .
 ```
+
+See [docs/testing.md](docs/testing.md) for comprehensive testing guide.
 
 ## License
 

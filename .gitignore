@@ -1,2 +1,50 @@
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# Build
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.war
+*.ear
+
+# Logs
+*.log
+logs/
+
+# Testing
+*.tmp
+*.bak
+coverage/
+test-output/
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+dependency-reduced-pom.xml
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Local
 CLAUDE.local.md
 .claude
+
+# Security
+*.pem
+*.key
+*.crt
+secrets/

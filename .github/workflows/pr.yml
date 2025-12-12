@@ -1,0 +1,19 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    name: Build & Test
+    uses: ./.github/workflows/build.yml
+    with:
+      run-tests: true
+  
+  docker:
+    name: Docker Build
+    needs: build
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      push-image: false
