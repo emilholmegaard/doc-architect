@@ -185,7 +185,7 @@ jobs:
       
       - name: Create issue if vulnerabilities found
         if: steps.vuln-check.outputs.critical != '0'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const critical = '${{ steps.vuln-check.outputs.critical }}';
