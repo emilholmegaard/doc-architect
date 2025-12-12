@@ -1,4 +1,6 @@
-# Scanner implementations should be registered here
-# Example:
-# com.example.MavenDependencyScanner
-# com.example.SpringRestApiScanner
+# Scanner implementations
+com.docarchitect.core.scanner.impl.MavenDependencyScanner
+com.docarchitect.core.scanner.impl.GradleDependencyScanner
+com.docarchitect.core.scanner.impl.SpringRestApiScanner
+com.docarchitect.core.scanner.impl.JpaEntityScanner
+com.docarchitect.core.scanner.impl.KafkaScanner
