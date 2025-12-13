@@ -71,7 +71,7 @@ doc-architect/
 - **Unit tests:** For all utility classes and core logic (JUnit 5 + AssertJ)
 - **Coverage:** ≥60% for core module (enforced by JaCoCo)
 - **Test naming:** `methodName_withCondition_expectedResult`
-- **No integration tests yet:** Phase 1 focuses on core infrastructure
+- **Integration tests:** If there are any types of integration, there should be an integration tests, also to test the SPI
 
 Example:
 

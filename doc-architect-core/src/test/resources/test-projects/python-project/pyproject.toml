@@ -1,0 +1,11 @@
+[project]
+name = "test-python-project"
+version = "1.0.0"
+dependencies = [
+    "django>=4.2.0",
+    "celery==5.3.4",
+]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+redis = "^5.0.0"
