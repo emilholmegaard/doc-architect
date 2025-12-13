@@ -29,7 +29,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: Run integration tests
         run: mvn verify -DskipUnitTests
         continue-on-error: true
@@ -56,18 +56,18 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: Code coverage report
         run: mvn jacoco:report
         continue-on-error: true
-      
+
       - name: Static analysis
         run: |
           if grep -q spotbugs pom.xml 2>/dev/null; then
             mvn spotbugs:check
           fi
         continue-on-error: true
-      
+
       - name: Checkstyle
         run: |
           if grep -q checkstyle pom.xml 2>/dev/null; then
@@ -89,7 +89,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: OWASP Dependency Check
         run: |
           mvn org.owasp:dependency-check-maven:check \
@@ -113,7 +113,7 @@ jobs:
       push-image: true
       image-tag: weekly
     secrets: inherit
-  
+
   docker-scan:
     name: Comprehensive Security Scan
     needs: docker
@@ -159,7 +159,7 @@ jobs:
             anchore/syft:latest \
             ${{ env.DOCKER_IMAGE }}:weekly \
             -o json > sbom.json
-      
+
       - name: Upload SBOM
         uses: actions/upload-artifact@v5
         with:
@@ -199,7 +199,7 @@ jobs:
               
               - **Critical**: ${critical}
               - **High**: ${high}
-              
+
               [View Details](https://github.com/${context.repo.owner}/${context.repo.repo}/security/code-scanning)
               
               *Weekly scan on ${new Date().toISOString()}*`,
@@ -229,7 +229,7 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: Build
         run: mvn clean package -DskipTests
       
