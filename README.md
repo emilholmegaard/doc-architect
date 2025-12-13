@@ -31,41 +31,41 @@ docker run -v $(pwd):/workspace -v $(pwd)/docs:/output doc-architect scan
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      DocArchitect CLI (Picocli)                      │
+│                      DocArchitect CLI (Picocli)                     │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
+│                                                                     │
 │  ┌──────────────┐    ┌───────────────────┐    ┌──────────────────┐  │
-│  │   Scanners   │───▶│ ArchitectureModel │───▶│    Generators    │  │
+│  │   Scanners   │─ ─▶│ ArchitectureModel │───▶│    Generators   │  │
 │  │  (Scanner)   │    │  (Intermediate)   │    │(DiagramGenerator)│  │
 │  └──────────────┘    └───────────────────┘    └──────────────────┘  │
-│         │                                              │             │
-│         ▼                                              ▼             │
+│         │                                              │            │
+│         ▼                                              ▼            │
 │  ┌──────────────┐                            ┌──────────────────┐   │
 │  │ ServiceLoader│                            │  OutputRenderer  │   │
 │  │   (SPI)      │                            │                  │   │
 │  └──────────────┘                            └──────────────────┘   │
-│                                                                      │
-├──────────────────────────────────────────────────────────────────────┤
-│                          Scanner Categories                          │
-├──────────────────────────────────────────────────────────────────────┤
-│  Dependencies:        │  APIs:              │  Messaging:            │
-│  • Maven (pom.xml)    │  • Spring MVC       │  • Kafka               │
-│  • Gradle             │  • JAX-RS           │  • RabbitMQ            │
-│  • npm/yarn           │  • FastAPI          │  • Azure Service Bus   │
-│  • pip/poetry         │  • Flask            │  • Avro Schemas        │
-│  • NuGet (.csproj)    │  • ASP.NET Core     │  • AsyncAPI specs      │
-│  • Go modules         │  • Express.js       │                        │
-│                       │  • GraphQL          │                        │
-│                       │  • gRPC/Protobuf    │                        │
-├───────────────────────┼─────────────────────┼────────────────────────┤
-│  Database:            │  Structure:         │  Integration:          │
-│  • JPA/Hibernate      │  • Module detection │  • Sokrates scope      │
-│  • SQLAlchemy         │  • Service bounds   │    file generation     │
-│  • Django ORM         │  • Layer analysis   │  • OpenAPI export      │
-│  • Entity Framework   │                     │  • AsyncAPI export     │
-│  • Mongoose           │                     │                        │
-│  • SQL migrations     │                     │                        │
-└───────────────────────┴─────────────────────┴────────────────────────┘
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                          Scanner Categories                         │
+├─────────────────────────────────────────────────────────────────────┤
+│  Dependencies:        │  APIs:              │  Messaging:           │
+│  • Maven (pom.xml)    │  • Spring MVC       │  • Kafka              │
+│  • Gradle             │  • JAX-RS           │  • RabbitMQ           │
+│  • npm/yarn           │  • FastAPI          │  • Azure Service Bus  │
+│  • pip/poetry         │  • Flask            │  • Avro Schemas       │
+│  • NuGet (.csproj)    │  • ASP.NET Core     │  • AsyncAPI specs     │
+│  • Go modules         │  • Express.js       │                       │
+│                       │  • GraphQL          │                       │
+│                       │  • gRPC/Protobuf    │                       │
+├───────────────────────┼─────────────────────┼───────────────────────┤
+│  Database:            │  Structure:         │  Integration:         │
+│  • JPA/Hibernate      │  • Module detection │  • Sokrates scope     │
+│  • SQLAlchemy         │  • Service bounds   │    file generation    │
+│  • Django ORM         │  • Layer analysis   │  • OpenAPI export     │
+│  • Entity Framework   │                     │  • AsyncAPI export    │
+│  • Mongoose           │                     │                       │
+│  • SQL migrations     │                     │                       │
+└───────────────────────┴─────────────────────┴───────────────────────┘
 ```
 
 ## Configuration
