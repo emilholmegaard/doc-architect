@@ -15,6 +15,9 @@ jobs:
     name: Docker Build & Push
     needs: build
     uses: ./.github/workflows/docker-build.yml
+    permissions:
+      contents: read
+      packages: write
     with:
       push-image: true
       image-tag: ${{ github.ref_name }}

@@ -1,0 +1,28 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // String notation
+    implementation 'org.springframework.boot:spring-boot-starter-web:3.2.0'
+
+    // Map notation
+    implementation group: 'com.google.guava', name: 'guava', version: '32.1.3-jre'
+
+    // Kotlin function notation
+    testImplementation('org.junit.jupiter:junit-jupiter:5.10.0')
+
+    // CompileOnly (maps to provided)
+    compileOnly 'org.projectlombok:lombok:1.18.30'
+
+    // Runtime only
+    runtimeOnly 'com.h2database:h2:2.2.224'
+}

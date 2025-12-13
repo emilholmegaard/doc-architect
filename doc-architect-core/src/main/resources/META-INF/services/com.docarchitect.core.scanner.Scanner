@@ -13,3 +13,8 @@ com.docarchitect.core.scanner.impl.FastAPIScanner
 com.docarchitect.core.scanner.impl.FlaskScanner
 com.docarchitect.core.scanner.impl.SQLAlchemyScanner
 com.docarchitect.core.scanner.impl.DjangoOrmScanner
+
+# .NET Scanners
+com.docarchitect.core.scanner.impl.NuGetDependencyScanner
+com.docarchitect.core.scanner.impl.AspNetCoreApiScanner
+com.docarchitect.core.scanner.impl.EntityFrameworkScanner

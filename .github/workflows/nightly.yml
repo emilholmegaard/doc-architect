@@ -2,8 +2,7 @@ name: Weekly Build
 
 on:
   schedule:
-    # Run every Monday at 2 AM UTC
-    - cron: '0 2 * * 1'
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
   workflow_dispatch:
 
 env:
@@ -197,12 +196,12 @@ jobs:
               repo: context.repo.repo,
               title: `🚨 Security Alert: ${critical} Critical Vulnerabilities (Weekly)`,
               body: `## Weekly Security Scan Results
-
+              
               - **Critical**: ${critical}
               - **High**: ${high}
 
               [View Details](https://github.com/${context.repo.owner}/${context.repo.repo}/security/code-scanning)
-
+              
               *Weekly scan on ${new Date().toISOString()}*`,
               labels: ['security', 'critical', 'weekly']
             });

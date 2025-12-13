@@ -71,7 +71,7 @@ doc-architect/
 - **Unit tests:** For all utility classes and core logic (JUnit 5 + AssertJ)
 - **Coverage:** ≥60% for core module (enforced by JaCoCo)
 - **Test naming:** `methodName_withCondition_expectedResult`
-- **No integration tests yet:** Phase 1 focuses on core infrastructure
+- **Integration tests:** If there are any types of integration, there should be an integration tests, also to test the SPI
 
 Example:
 
@@ -93,7 +93,7 @@ void generate_withValidInput_returnsDeterministicId() {
 - **Complete Javadoc:** All public interfaces, classes, methods, and records
 - **Interface documentation:** Explain purpose, usage, registration, and provide code examples
 - **Record documentation:** Document each parameter in compact form
-- **No ADRs yet:** Will be added when architectural decisions are made
+- **ADRs:** Add architectural decisions when there is a real decision, somehtin changes, new structures are made, the infrastructure or performance are affected.
 
 ---
 
@@ -171,4 +171,17 @@ mvn clean package -DskipTests
 - ✅ All scanners compile successfully
 - ✅ Complete Javadoc with documented regex patterns
 
-**Next:** Phase 5 - Implement diagram generators (Mermaid, PlantUML)
+## Phase 5 Complete ✅
+
+**.NET Scanners (3/3):**
+
+- ✅ NuGet Dependency Scanner: Jackson XML for .csproj (SDK-style and legacy), packages.config, Directory.Build.props
+- ✅ ASP.NET Core API Scanner: Regex-based attribute extraction ([HttpGet], [HttpPost], [FromBody], [FromQuery])
+- ✅ Entity Framework Scanner: DbContext DbSet detection, navigation properties (ICollection, List), relationship mapping
+- ✅ Hybrid parsing strategy: XML for project files, regex for C# source
+- ✅ Support for both .NET Framework and .NET Core/.NET 5+
+- ✅ SPI registration for all 3 scanners
+- ✅ All scanners compile successfully
+- ✅ Complete Javadoc with documented regex patterns
+
+**Next:** Phase 6 - Implement diagram generators (Mermaid, PlantUML)
