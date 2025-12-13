@@ -1,8 +1,9 @@
-name: Nightly Build
+name: Weekly Build
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    # Run every Monday at 2 AM UTC
+    - cron: '0 2 * * 1'
   workflow_dispatch:
 
 env:
@@ -23,15 +24,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: Run integration tests
-        run: ./mvnw verify -DskipUnitTests
+        run: mvn verify -DskipUnitTests
         continue-on-error: true
       
       - name: Upload integration test results
@@ -50,28 +51,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: Code coverage report
-        run: ./mvnw jacoco:report
+        run: mvn jacoco:report
         continue-on-error: true
-      
+
       - name: Static analysis
         run: |
           if grep -q spotbugs pom.xml 2>/dev/null; then
-            ./mvnw spotbugs:check
+            mvn spotbugs:check
           fi
         continue-on-error: true
-      
+
       - name: Checkstyle
         run: |
           if grep -q checkstyle pom.xml 2>/dev/null; then
-            ./mvnw checkstyle:check
+            mvn checkstyle:check
           fi
         continue-on-error: true
   
@@ -83,16 +84,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
       
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: OWASP Dependency Check
         run: |
-          ./mvnw org.owasp:dependency-check-maven:check \
+          mvn org.owasp:dependency-check-maven:check \
             -DfailBuildOnCVSS=7 \
             -DsuppressionFile=.github/dependency-check-suppressions.xml
         continue-on-error: true
@@ -111,9 +112,9 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     with:
       push-image: true
-      image-tag: nightly
+      image-tag: weekly
     secrets: inherit
-  
+
   docker-scan:
     name: Comprehensive Security Scan
     needs: docker
@@ -128,7 +129,7 @@ jobs:
       - name: Run Trivy scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.DOCKER_IMAGE }}:nightly
+          image-ref: ${{ env.DOCKER_IMAGE }}:weekly
           format: 'sarif'
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
@@ -143,7 +144,7 @@ jobs:
         uses: anchore/scan-action@v7
         id: grype
         with:
-          image: ${{ env.DOCKER_IMAGE }}:nightly
+          image: ${{ env.DOCKER_IMAGE }}:weekly
           fail-build: false
           severity-cutoff: high
       
@@ -157,13 +158,13 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             anchore/syft:latest \
-            ${{ env.DOCKER_IMAGE }}:nightly \
+            ${{ env.DOCKER_IMAGE }}:weekly \
             -o json > sbom.json
-      
+
       - name: Upload SBOM
         uses: actions/upload-artifact@v5
         with:
-          name: sbom-nightly
+          name: sbom-weekly
           path: sbom.json
           retention-days: 90
       
@@ -175,7 +176,7 @@ jobs:
             aquasec/trivy image \
             --format json \
             --severity CRITICAL,HIGH \
-            ${{ env.DOCKER_IMAGE }}:nightly > scan-results.json
+            ${{ env.DOCKER_IMAGE }}:weekly > scan-results.json
           
           CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' scan-results.json)
           HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' scan-results.json)
@@ -194,16 +195,16 @@ jobs:
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `🚨 Security Alert: ${critical} Critical Vulnerabilities (Nightly)`,
-              body: `## Nightly Security Scan Results
-              
+              title: `🚨 Security Alert: ${critical} Critical Vulnerabilities (Weekly)`,
+              body: `## Weekly Security Scan Results
+
               - **Critical**: ${critical}
               - **High**: ${high}
-              
+
               [View Details](https://github.com/${context.repo.owner}/${context.repo.repo}/security/code-scanning)
-              
-              *Nightly scan on ${new Date().toISOString()}*`,
-              labels: ['security', 'critical', 'nightly']
+
+              *Weekly scan on ${new Date().toISOString()}*`,
+              labels: ['security', 'critical', 'weekly']
             });
   
   codeql:
@@ -223,15 +224,15 @@ jobs:
           languages: java
           queries: security-extended,security-and-quality
       
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
-      
+
       - name: Build
-        run: ./mvnw clean package -DskipTests
+        run: mvn clean package -DskipTests
       
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
