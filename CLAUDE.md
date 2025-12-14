@@ -184,4 +184,19 @@ mvn clean package -DskipTests
 - ✅ All scanners compile successfully
 - ✅ Complete Javadoc with documented regex patterns
 
-**Next:** Phase 6 - Implement diagram generators (Mermaid, PlantUML)
+## Phase 6 Complete ✅
+
+**Additional Scanners (6/6):**
+
+- ✅ GraphQL Schema Scanner: Regex-based extraction of types, queries, mutations from .graphql/.gql files
+- ✅ Avro Schema Scanner: Jackson JSON parsing for Avro schema definitions (.avsc), message flow detection
+- ✅ SQL Migration Scanner: Regex-based CREATE TABLE extraction from .sql migration files (Flyway, golang-migrate)
+- ✅ npm Dependency Scanner: Jackson JSON parsing for package.json, dependencies/devDependencies/peerDependencies
+- ✅ Go Module Scanner: Regex-based go.mod parsing, require block extraction, semantic versioning support
+- ✅ Express.js API Scanner: Regex-based route extraction (app.get, router.post, etc.) from JS/TS files
+- ✅ SPI registration for all 6 scanners
+- ✅ All scanners compile successfully
+- ✅ 145 tests passing (36 new tests for Phase 6 scanners)
+- ✅ Complete Javadoc with documented parsing strategies
+
+**Next:** Phase 7 - Implement diagram generators (Mermaid, PlantUML)
