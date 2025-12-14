@@ -34,6 +34,8 @@
         <snakeyaml.version>2.3</snakeyaml.version>
         <javaparser.version>3.25.8</javaparser.version>
         <jackson.version>2.18.2</jackson.version>
+        <graphql-java.version>21.3</graphql-java.version>
+        <avro.version>1.11.3</avro.version>
 
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
@@ -68,6 +70,20 @@
                 <groupId>com.github.javaparser</groupId>
                 <artifactId>javaparser-core</artifactId>
                 <version>${javaparser.version}</version>
+            </dependency>
+
+            <!-- GraphQL Schema Parser -->
+            <dependency>
+                <groupId>com.graphql-java</groupId>
+                <artifactId>graphql-java</artifactId>
+                <version>${graphql-java.version}</version>
+            </dependency>
+
+            <!-- Apache Avro Schema Parser -->
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>${avro.version}</version>
             </dependency>
 
             <!-- Jackson XML/YAML -->

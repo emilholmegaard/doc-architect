@@ -6,7 +6,8 @@ import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.scanner.Scanner;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
-import com.docarchitect.core.util.IdGenerator;
+import graphql.language.*;
+import graphql.parser.Parser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,20 +15,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Scanner for GraphQL schema definitions in .graphql and .gql files.
  *
- * <p>This scanner parses GraphQL schema files using regex patterns to extract type definitions,
+ * <p>This scanner parses GraphQL schema files using the graphql-java library to extract type definitions,
  * queries, and mutations. It converts GraphQL types into {@link DataEntity} records and
  * GraphQL operations (queries/mutations) into {@link ApiEndpoint} records.
  *
  * <p><b>Parsing Strategy:</b>
  * <ol>
  *   <li>Locate .graphql and .gql files using pattern matching</li>
- *   <li>Parse schema using regex patterns for types, queries, and mutations</li>
+ *   <li>Parse schema using graphql-java Parser (robust AST-based parsing)</li>
  *   <li>Extract type definitions → DataEntity records</li>
  *   <li>Extract Query fields → ApiEndpoint records (type=GRAPHQL)</li>
  *   <li>Extract Mutation fields → ApiEndpoint records (type=GRAPHQL)</li>
@@ -83,22 +82,7 @@ import java.util.regex.Pattern;
 public class GraphQLScanner implements Scanner {
 
     private static final Logger log = LoggerFactory.getLogger(GraphQLScanner.class);
-
-    // Regex patterns for GraphQL parsing
-    private static final Pattern TYPE_PATTERN = Pattern.compile(
-        "type\\s+(\\w+)\\s*\\{([^}]+)\\}",
-        Pattern.MULTILINE | Pattern.DOTALL
-    );
-
-    private static final Pattern INPUT_TYPE_PATTERN = Pattern.compile(
-        "input\\s+(\\w+)\\s*\\{([^}]+)\\}",
-        Pattern.MULTILINE | Pattern.DOTALL
-    );
-
-    private static final Pattern FIELD_PATTERN = Pattern.compile(
-        "^\\s*(\\w+)(?:\\(([^)]*)\\))?\\s*:\\s*([^\\s]+)",
-        Pattern.MULTILINE
-    );
+    private final Parser parser = new Parser();
 
     @Override
     public String getId() {
@@ -175,7 +159,7 @@ public class GraphQLScanner implements Scanner {
     }
 
     /**
-     * Parses a single GraphQL schema file and extracts types and operations.
+     * Parses a single GraphQL schema file using graphql-java Parser and extracts types and operations.
      *
      * @param schemaFile path to GraphQL schema file
      * @param apiEndpoints list to add discovered API endpoints
@@ -187,62 +171,111 @@ public class GraphQLScanner implements Scanner {
         String content = Files.readString(schemaFile);
         String componentId = schemaFile.getFileName().toString().replace(".graphql", "").replace(".gql", "");
 
-        // Remove comments
-        content = content.replaceAll("#[^\n]*", "");
+        // Parse GraphQL schema using graphql-java library
+        Document document = parser.parseDocument(content);
 
-        // Extract type definitions (including Query and Mutation types)
-        Matcher typeMatcher = TYPE_PATTERN.matcher(content);
-        while (typeMatcher.find()) {
-            String typeName = typeMatcher.group(1);
-            String typeBody = typeMatcher.group(2);
-
-            if ("Query".equals(typeName)) {
-                // Extract query operations as API endpoints
-                extractOperations(typeBody, componentId, "query", apiEndpoints);
-            } else if ("Mutation".equals(typeName)) {
-                // Extract mutation operations as API endpoints
-                extractOperations(typeBody, componentId, "mutation", apiEndpoints);
-            } else {
-                // Extract as data entity
-                extractTypeAsEntity(typeName, typeBody, componentId, dataEntities);
+        // Process all definitions in the document
+        for (Definition<?> definition : document.getDefinitions()) {
+            if (definition instanceof ObjectTypeDefinition objectType) {
+                processObjectType(objectType, componentId, apiEndpoints, dataEntities);
+            } else if (definition instanceof InputObjectTypeDefinition inputType) {
+                processInputType(inputType, componentId, dataEntities);
             }
-        }
-
-        // Extract input types as data entities
-        Matcher inputMatcher = INPUT_TYPE_PATTERN.matcher(content);
-        while (inputMatcher.find()) {
-            String typeName = inputMatcher.group(1);
-            String typeBody = inputMatcher.group(2);
-            extractTypeAsEntity(typeName, typeBody, componentId, dataEntities);
         }
     }
 
     /**
-     * Extracts GraphQL operations (queries or mutations) as API endpoints.
+     * Processes a GraphQL object type definition.
+     * Query and Mutation types are extracted as API endpoints, others as data entities.
      *
-     * @param operationBody body of the Query or Mutation type
+     * @param objectType object type definition from AST
      * @param componentId component ID
-     * @param operationType "query" or "mutation"
+     * @param apiEndpoints list to add discovered endpoints
+     * @param dataEntities list to add discovered entities
+     */
+    private void processObjectType(ObjectTypeDefinition objectType, String componentId,
+                                   List<ApiEndpoint> apiEndpoints, List<DataEntity> dataEntities) {
+        String typeName = objectType.getName();
+
+        if ("Query".equals(typeName)) {
+            extractOperations(objectType.getFieldDefinitions(), componentId, "query", apiEndpoints);
+        } else if ("Mutation".equals(typeName)) {
+            extractOperations(objectType.getFieldDefinitions(), componentId, "mutation", apiEndpoints);
+        } else if ("Subscription".equals(typeName)) {
+            extractOperations(objectType.getFieldDefinitions(), componentId, "subscription", apiEndpoints);
+        } else {
+            extractTypeAsEntity(typeName, objectType.getFieldDefinitions(), componentId, dataEntities);
+        }
+    }
+
+    /**
+     * Processes a GraphQL input type definition as a data entity.
+     *
+     * @param inputType input type definition from AST
+     * @param componentId component ID
+     * @param dataEntities list to add discovered entities
+     */
+    private void processInputType(InputObjectTypeDefinition inputType, String componentId,
+                                  List<DataEntity> dataEntities) {
+        String typeName = inputType.getName();
+        List<DataEntity.Field> fields = new ArrayList<>();
+
+        for (InputValueDefinition inputValue : inputType.getInputValueDefinitions()) {
+            String fieldName = inputValue.getName();
+            Type<?> fieldType = inputValue.getType();
+
+            boolean nullable = !(fieldType instanceof NonNullType);
+            String cleanType = extractTypeName(fieldType);
+
+            DataEntity.Field field = new DataEntity.Field(
+                fieldName,
+                cleanType,
+                nullable,
+                null
+            );
+            fields.add(field);
+        }
+
+        DataEntity entity = new DataEntity(
+            componentId,
+            typeName,
+            "graphql-input",
+            fields,
+            null,
+            "GraphQL input type: " + typeName
+        );
+
+        dataEntities.add(entity);
+        log.debug("Found GraphQL input type: {} with {} fields", typeName, fields.size());
+    }
+
+    /**
+     * Extracts GraphQL operations (queries, mutations, subscriptions) as API endpoints.
+     *
+     * @param fieldDefinitions field definitions from Query/Mutation/Subscription type
+     * @param componentId component ID
+     * @param operationType "query", "mutation", or "subscription"
      * @param apiEndpoints list to add discovered endpoints
      */
-    private void extractOperations(String operationBody, String componentId, String operationType,
+    private void extractOperations(List<FieldDefinition> fieldDefinitions, String componentId, String operationType,
                                    List<ApiEndpoint> apiEndpoints) {
-        Matcher fieldMatcher = FIELD_PATTERN.matcher(operationBody);
-
-        while (fieldMatcher.find()) {
-            String fieldName = fieldMatcher.group(1);
-            String arguments = fieldMatcher.group(2); // May be null if no arguments
-            String returnType = fieldMatcher.group(3);
+        for (FieldDefinition field : fieldDefinitions) {
+            String fieldName = field.getName();
+            String returnType = extractTypeName(field.getType());
 
             // Build request schema from arguments
-            String requestSchema = arguments != null ? arguments.trim() : null;
+            String requestSchema = field.getInputValueDefinitions().isEmpty() ? null :
+                field.getInputValueDefinitions().stream()
+                    .map(arg -> arg.getName() + ": " + extractTypeName(arg.getType()))
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse(null);
 
             // Determine ApiType based on operation type
             ApiType apiType = switch (operationType.toLowerCase()) {
                 case "query" -> ApiType.GRAPHQL_QUERY;
                 case "mutation" -> ApiType.GRAPHQL_MUTATION;
                 case "subscription" -> ApiType.GRAPHQL_SUBSCRIPTION;
-                default -> ApiType.GRAPHQL_QUERY; // Default to query
+                default -> ApiType.GRAPHQL_QUERY;
             };
 
             ApiEndpoint endpoint = new ApiEndpoint(
@@ -265,30 +298,28 @@ public class GraphQLScanner implements Scanner {
      * Extracts a GraphQL type definition as a data entity.
      *
      * @param typeName type name
-     * @param typeBody type body with field definitions
+     * @param fieldDefinitions field definitions from type
      * @param componentId component ID
      * @param dataEntities list to add discovered entities
      */
-    private void extractTypeAsEntity(String typeName, String typeBody, String componentId,
+    private void extractTypeAsEntity(String typeName, List<FieldDefinition> fieldDefinitions, String componentId,
                                      List<DataEntity> dataEntities) {
         List<DataEntity.Field> fields = new ArrayList<>();
-        Matcher fieldMatcher = FIELD_PATTERN.matcher(typeBody);
 
-        while (fieldMatcher.find()) {
-            String fieldName = fieldMatcher.group(1);
-            String fieldType = fieldMatcher.group(3);
+        for (FieldDefinition field : fieldDefinitions) {
+            String fieldName = field.getName();
+            Type<?> fieldType = field.getType();
 
-            // Determine if field is nullable (! means non-null in GraphQL)
-            boolean nullable = !fieldType.endsWith("!");
-            String cleanType = fieldType.replaceAll("!", "").replaceAll("[\\[\\]]", "");
+            boolean nullable = !(fieldType instanceof NonNullType);
+            String cleanType = extractTypeName(fieldType);
 
-            DataEntity.Field field = new DataEntity.Field(
+            DataEntity.Field entityField = new DataEntity.Field(
                 fieldName,
                 cleanType,
                 nullable,
                 null
             );
-            fields.add(field);
+            fields.add(entityField);
         }
 
         // Try to find ID field for primary key
@@ -309,5 +340,23 @@ public class GraphQLScanner implements Scanner {
 
         dataEntities.add(entity);
         log.debug("Found GraphQL type: {} with {} fields", typeName, fields.size());
+    }
+
+    /**
+     * Recursively extracts the type name from a GraphQL Type object,
+     * handling NonNullType and ListType wrappers.
+     *
+     * @param type GraphQL type from AST
+     * @return clean type name (e.g., "String", "User", "[User]")
+     */
+    private String extractTypeName(Type<?> type) {
+        if (type instanceof NonNullType nonNullType) {
+            return extractTypeName(nonNullType.getType());
+        } else if (type instanceof ListType listType) {
+            return "[" + extractTypeName(listType.getType()) + "]";
+        } else if (type instanceof TypeName typeName) {
+            return typeName.getName();
+        }
+        return "Unknown";
     }
 }

@@ -29,6 +29,18 @@
             <artifactId>javaparser-core</artifactId>
         </dependency>
 
+        <!-- GraphQL Schema Parser -->
+        <dependency>
+            <groupId>com.graphql-java</groupId>
+            <artifactId>graphql-java</artifactId>
+        </dependency>
+
+        <!-- Apache Avro Schema Parser -->
+        <dependency>
+            <groupId>org.apache.avro</groupId>
+            <artifactId>avro</artifactId>
+        </dependency>
+
         <!-- Jackson XML/YAML/TOML -->
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
