@@ -31,7 +31,14 @@ class ScannersMetadataTest {
             // .NET scanners
             new NuGetDependencyScanner(),
             new AspNetCoreApiScanner(),
-            new EntityFrameworkScanner()
+            new EntityFrameworkScanner(),
+            // Phase 6 scanners
+            new GraphQLScanner(),
+            new AvroSchemaScanner(),
+            new SqlMigrationScanner(),
+            new NpmDependencyScanner(),
+            new GoModScanner(),
+            new ExpressScanner()
         );
     }
 

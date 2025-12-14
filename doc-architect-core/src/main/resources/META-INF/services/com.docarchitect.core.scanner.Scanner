@@ -18,3 +18,11 @@ com.docarchitect.core.scanner.impl.DjangoOrmScanner
 com.docarchitect.core.scanner.impl.NuGetDependencyScanner
 com.docarchitect.core.scanner.impl.AspNetCoreApiScanner
 com.docarchitect.core.scanner.impl.EntityFrameworkScanner
+
+# Additional Scanners (Phase 6)
+com.docarchitect.core.scanner.impl.GraphQLScanner
+com.docarchitect.core.scanner.impl.AvroSchemaScanner
+com.docarchitect.core.scanner.impl.SqlMigrationScanner
+com.docarchitect.core.scanner.impl.NpmDependencyScanner
+com.docarchitect.core.scanner.impl.GoModScanner
+com.docarchitect.core.scanner.impl.ExpressScanner
