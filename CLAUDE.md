@@ -199,4 +199,160 @@ mvn clean package -DskipTests
 - ✅ 145 tests passing (36 new tests for Phase 6 scanners)
 - ✅ Complete Javadoc with documented parsing strategies
 
-**Next:** Phase 7 - Implement diagram generators (Mermaid, PlantUML)
+---
+
+## Lessons Learned & Prevention
+
+After completing Phases 1-6 (19 scanners across 5 ecosystems), we discovered critical architectural issues that accumulated during rapid feature development. This section documents what went wrong and how to prevent it.
+
+### What Went Wrong
+
+#### 1. Test Coverage Neglect (Critical)
+
+- **Issue:** Coverage dropped from 100% (Phase 1) → 1% (Phase 6)
+- **Root Cause:** Added 145 tests but ZERO functional tests, only metadata validation
+- **Impact:** 54 regex patterns with zero validation, no parser logic tested, silent failures possible
+- **Evidence:** JaCoCo report showed 136/7,891 instructions covered (1%)
+
+#### 2. CI/CD Not Enforcing Quality (Critical)
+
+- **Issue:** `continue-on-error: true` in build.yml allowed broken tests to pass
+- **Root Cause:** Workaround added during Phase 3, never removed
+- **Impact:** PRs merged with failing tests, quality gates bypassed
+- **Evidence:** GitHub Actions showing red icons but builds marked "successful"
+
+#### 3. Missing Code Review Checklist (High)
+
+- **Issue:** No Definition of Done enforcing test coverage
+- **Root Cause:** PR template lacked test coverage verification step
+- **Impact:** 13 scanners merged with zero functional tests
+- **Evidence:** All Python scanners (Phase 4) have zero test coverage
+
+#### 4. Incremental Technical Debt Accumulation (High)
+
+- **Issue:** ~900 LOC of boilerplate duplicated across 19 scanners
+- **Root Cause:** No refactoring between phases, "ship features fast" mindset
+- **Impact:** Violation of SOLID principles (SRP, ISP), maintenance burden
+- **Evidence:** File reading, regex matching, Jackson initialization duplicated 19 times
+
+#### 5. Delayed Library Evaluation (Medium)
+
+- **Issue:** Regex-based GraphQL and Avro parsing when robust libraries exist
+- **Root Cause:** No upfront research phase, implemented first solution
+- **Impact:** Fragile parsing, missing edge cases, reinventing the wheel
+- **Evidence:** graphql-java 21.3 and Apache Avro 1.11.3 available but unused
+
+#### 6. Package Organization Debt (Medium)
+
+- **Issue:** 19 scanners in flat `impl/` directory, no technology grouping
+- **Root Cause:** Deferred organization "until later", never prioritized
+- **Impact:** Hard to navigate, unclear ownership, no clear structure
+- **Evidence:** All scanners in single directory regardless of ecosystem
+
+#### 7. Missing SPI Validation (Medium)
+
+- **Issue:** No integration test validating ServiceLoader discovers all scanners
+- **Root Cause:** Assumed SPI registration "just works", no verification
+- **Impact:** Silent failures if SPI file has typos, runtime discovery issues
+- **Evidence:** Zero tests calling `ServiceLoader.load(Scanner.class)`
+
+### Prevention Measures (Mandatory for All Future Work)
+
+#### Definition of Done Checklist
+
+Every PR MUST satisfy:
+
+- ✅ Functional tests written covering happy path + edge cases
+- ✅ Test coverage ≥80% for modified files (verified via `mvn jacoco:report`)
+- ✅ No `continue-on-error: true` in critical CI workflows
+- ✅ All tests passing locally AND in CI
+- ✅ Complete Javadoc for new public APIs
+- ✅ SPI registration validated if adding new implementations
+
+#### PR Template Updates (Enforced)
+
+Add to `.github/pull_request_template.md`:
+
+```markdown
+## Test Coverage
+- [ ] Added functional tests (not just metadata tests)
+- [ ] Coverage ≥80% for changed files (attach JaCoCo report screenshot)
+- [ ] Integration tests added if touching SPI
+
+## Quality Gates
+- [ ] All tests passing (no continue-on-error bypasses)
+- [ ] No new code duplication >20 LOC (check with SonarQube/manual review)
+- [ ] Evaluated 3rd party libraries before implementing parsers
+```
+
+#### Quarterly Architecture Reviews (Scheduled)
+
+Every 3 months OR after 5 scanners added:
+
+- Review SOLID compliance (SRP, OCP, LSP, ISP, DIP)
+- Identify code duplication >100 LOC and refactor
+- Evaluate new 3rd party libraries (avoid reinventing wheels)
+- Package reorganization if >10 classes in single directory
+- Coverage audit (must be ≥60% overall, ≥80% for new code)
+
+#### Upfront Library Evaluation (Required)
+
+Before implementing ANY parser:
+
+1. Research existing libraries (5-10 min search)
+2. Evaluate: maturity, maintenance, license, API simplicity
+3. Document decision in ADR if implementing custom solution
+4. Prefer libraries for complex formats (GraphQL, Avro, SQL, etc.)
+
+**Examples:**
+
+- GraphQL → Use graphql-java, NOT regex
+- Avro → Use Apache Avro, NOT Jackson JSON
+- SQL → Use JSqlParser, NOT regex
+- JSON/XML/TOML → Jackson is appropriate
+
+#### CI/CD Quality Enforcement (Non-Negotiable)
+
+- **NEVER** use `continue-on-error: true` in build.yml or pr.yml
+- Coverage gate: `mvn verify` fails if coverage <60%
+- Require `mvn test` to pass before merge (no bypasses)
+- Add SPI validation test running in CI
+
+#### Refactoring Trigger Points
+
+Stop feature work and refactor when:
+
+- Test coverage drops below 60%
+- Code duplication >500 LOC total
+- >10 classes in single directory
+- SOLID violations identified in code review
+- CI/CD bypasses added (continue-on-error, skip tests)
+
+### Current State (Post-Phase 6)
+
+**Status:** Architecture refactoring in progress (see refactoring-proposal.md)
+
+**Metrics:**
+
+- 19 scanners across 5 ecosystems (Java, Python, .NET, JavaScript, Go)
+- 145 tests (all metadata, zero functional tests)
+- Test coverage: 1% (136/7,891 instructions)
+- Code duplication: ~900 LOC
+- CI/CD: `continue-on-error: true` blocking quality enforcement
+
+**Refactoring Plan:**
+
+- Week 1: Fix CI/CD, add SPI validation, adopt graphql-java and Apache Avro
+- Week 2: Build test infrastructure, add 6 critical scanner tests
+- Week 3: Extract base classes (AbstractRegexScanner, AbstractJavaParserScanner, AbstractJacksonScanner)
+- Week 4: Package reorganization by technology (java/, python/, dotnet/, javascript/, go/, schema/)
+
+**Target Metrics (End of Refactoring):**
+
+- Test coverage: 80%+
+- Code duplication: <200 LOC
+- CI/CD: All quality gates enforced
+- Package structure: Technology-based hierarchy
+- 100+ functional tests covering parsing logic
+
+**Next:** Architecture refactoring (branch: refactor/architecture-improvements) - see `.github/ISSUE_TEMPLATE/refactoring-proposal.md` for complete plan
