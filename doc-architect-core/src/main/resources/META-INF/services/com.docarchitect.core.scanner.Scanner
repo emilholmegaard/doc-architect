@@ -1,28 +1,32 @@
 # Scanner implementations
 
 # Java/JVM Scanners
-com.docarchitect.core.scanner.impl.MavenDependencyScanner
-com.docarchitect.core.scanner.impl.GradleDependencyScanner
-com.docarchitect.core.scanner.impl.SpringRestApiScanner
-com.docarchitect.core.scanner.impl.JpaEntityScanner
-com.docarchitect.core.scanner.impl.KafkaScanner
+com.docarchitect.core.scanner.impl.java.MavenDependencyScanner
+com.docarchitect.core.scanner.impl.java.GradleDependencyScanner
+com.docarchitect.core.scanner.impl.java.SpringRestApiScanner
+com.docarchitect.core.scanner.impl.java.JpaEntityScanner
+com.docarchitect.core.scanner.impl.java.KafkaScanner
 
 # Python Scanners
-com.docarchitect.core.scanner.impl.PipPoetryDependencyScanner
-com.docarchitect.core.scanner.impl.FastAPIScanner
-com.docarchitect.core.scanner.impl.FlaskScanner
-com.docarchitect.core.scanner.impl.SQLAlchemyScanner
-com.docarchitect.core.scanner.impl.DjangoOrmScanner
+com.docarchitect.core.scanner.impl.python.PipPoetryDependencyScanner
+com.docarchitect.core.scanner.impl.python.FastAPIScanner
+com.docarchitect.core.scanner.impl.python.FlaskScanner
+com.docarchitect.core.scanner.impl.python.SQLAlchemyScanner
+com.docarchitect.core.scanner.impl.python.DjangoOrmScanner
 
 # .NET Scanners
-com.docarchitect.core.scanner.impl.NuGetDependencyScanner
-com.docarchitect.core.scanner.impl.AspNetCoreApiScanner
-com.docarchitect.core.scanner.impl.EntityFrameworkScanner
+com.docarchitect.core.scanner.impl.dotnet.NuGetDependencyScanner
+com.docarchitect.core.scanner.impl.dotnet.AspNetCoreApiScanner
+com.docarchitect.core.scanner.impl.dotnet.EntityFrameworkScanner
 
-# Additional Scanners (Phase 6)
-com.docarchitect.core.scanner.impl.GraphQLScanner
-com.docarchitect.core.scanner.impl.AvroSchemaScanner
-com.docarchitect.core.scanner.impl.SqlMigrationScanner
-com.docarchitect.core.scanner.impl.NpmDependencyScanner
-com.docarchitect.core.scanner.impl.GoModScanner
-com.docarchitect.core.scanner.impl.ExpressScanner
+# JavaScript/Node.js Scanners
+com.docarchitect.core.scanner.impl.javascript.NpmDependencyScanner
+com.docarchitect.core.scanner.impl.javascript.ExpressScanner
+
+# Go Scanners
+com.docarchitect.core.scanner.impl.go.GoModScanner
+
+# Schema & API Definition Scanners
+com.docarchitect.core.scanner.impl.schema.GraphQLScanner
+com.docarchitect.core.scanner.impl.schema.AvroSchemaScanner
+com.docarchitect.core.scanner.impl.schema.SqlMigrationScanner

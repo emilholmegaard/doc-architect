@@ -1,0 +1,110 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: doc-architect
+  title: Documentation Architecture
+  description: Architecture Decision Records and documentation for the organization
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    github.com/project-slug: emilholmegaard/doc-architect
+  tags:
+    - documentation
+    - adr
+    - architecture
+  links:
+    - url: https://github.com/emilholmegaard/doc-architect
+      title: Repository
+      icon: github
+spec:
+  type: documentation
+  lifecycle: production
+  owner: architecture-team
+  system: platform
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Documentation
+metadata:
+  name: adr-001-adopt-adr
+  title: ADR-001 - Adopt ADR for Architectural Decisions
+  description: Decision to adopt Architecture Decision Records for documenting architectural decisions
+  annotations:
+    backstage.io/techdocs-ref: file:adr/ADR-001-adopt-adr-for-decisions.md
+  tags:
+    - adr
+    - documentation
+    - process
+spec:
+  type: adr
+  lifecycle: production
+  owner: architecture-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Documentation
+metadata:
+  name: adr-002-use-c4-model
+  title: ADR-002 - Use C4 Model for Architecture Documentation
+  description: Decision to adopt the C4 model for visualizing and documenting software architecture
+  annotations:
+    backstage.io/techdocs-ref: file:adr/ADR-002-use-c4-model.md
+  tags:
+    - adr
+    - documentation
+    - c4-model
+spec:
+  type: adr
+  lifecycle: production
+  owner: architecture-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Documentation
+metadata:
+  name: adr-003-event-driven-integration
+  title: ADR-003 - Event-Driven Architecture for System Integration
+  description: Decision to adopt event-driven architecture for integrating microservices
+  annotations:
+    backstage.io/techdocs-ref: file:adr/ADR-003-event-driven-integration.md
+  tags:
+    - adr
+    - architecture
+    - event-driven
+spec:
+  type: adr
+  lifecycle: production
+  owner: architecture-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Documentation
+metadata:
+  name: architecture-overview
+  title: Architecture Overview
+  description: Overview of the system architecture and design principles
+  annotations:
+    backstage.io/techdocs-ref: file:architecture-overview.md
+  tags:
+    - architecture
+    - overview
+spec:
+  type: documentation
+  lifecycle: production
+  owner: architecture-team
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: Documentation
+metadata:
+  name: onboarding-guide
+  title: Onboarding Guide
+  description: Guide for new team members to understand the architecture
+  annotations:
+    backstage.io/techdocs-ref: file:onboarding-guide.md
+  tags:
+    - onboarding
+    - guide
+spec:
+  type: documentation
+  lifecycle: production
+  owner: architecture-team

@@ -1,6 +1,12 @@
 package com.docarchitect.core.scanner.impl;
 
 import com.docarchitect.core.scanner.Scanner;
+import com.docarchitect.core.scanner.impl.java.*;
+import com.docarchitect.core.scanner.impl.python.*;
+import com.docarchitect.core.scanner.impl.dotnet.*;
+import com.docarchitect.core.scanner.impl.javascript.*;
+import com.docarchitect.core.scanner.impl.go.*;
+import com.docarchitect.core.scanner.impl.schema.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
