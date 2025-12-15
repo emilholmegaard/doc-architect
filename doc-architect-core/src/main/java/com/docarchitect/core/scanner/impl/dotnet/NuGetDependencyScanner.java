@@ -19,9 +19,9 @@ import java.util.*;
  * <p>Uses Jackson XML to parse .csproj and packages.config files.
  * Supports both SDK-style and legacy .NET project formats.
  *
- * <h3>Supported Formats</h3>
+ * <p><b>Supported Formats</b></p>
  *
- * <h4>SDK-Style .csproj (Modern .NET Core/.NET 5+)</h4>
+ * <p><b>SDK-Style .csproj (Modern .NET Core/.NET 5+):</b></p>
  * <pre>{@code
  * <Project Sdk="Microsoft.NET.Sdk">
  *   <ItemGroup>
@@ -31,7 +31,7 @@ import java.util.*;
  * </Project>
  * }</pre>
  *
- * <h4>Legacy .csproj (.NET Framework)</h4>
+ * <p><b>Legacy .csproj (.NET Framework):</b></p>
  * <pre>{@code
  * <Project ToolsVersion="15.0">
  *   <ItemGroup>
@@ -42,7 +42,7 @@ import java.util.*;
  * </Project>
  * }</pre>
  *
- * <h4>packages.config (Legacy NuGet)</h4>
+ * <p><b>packages.config (Legacy NuGet):</b></p>
  * <pre>{@code
  * <?xml version="1.0" encoding="utf-8"?>
  * <packages>
@@ -51,7 +51,7 @@ import java.util.*;
  * </packages>
  * }</pre>
  *
- * <h4>Directory.Build.props (Centralized Package Management)</h4>
+ * <p><b>Directory.Build.props (Centralized Package Management):</b></p>
  * <pre>{@code
  * <Project>
  *   <ItemGroup>

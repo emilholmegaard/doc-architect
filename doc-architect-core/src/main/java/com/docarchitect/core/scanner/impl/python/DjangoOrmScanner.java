@@ -19,9 +19,9 @@ import java.util.regex.Pattern;
  * <p>Since we're running in Java, we parse Python files as TEXT using regex patterns
  * to extract Django model classes, fields, and relationships.
  *
- * <h3>Supported Patterns</h3>
+ * <p><b>Supported Patterns</b></p>
  *
- * <h4>Django Model Classes</h4>
+ * <p><b>Django Model Classes:</b></p>
  * <pre>{@code
  * class User(models.Model):
  *     id = models.AutoField(primary_key=True)
@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  *     created_at = models.DateTimeField(auto_now_add=True)
  * }</pre>
  *
- * <h3>Field Types</h3>
+ * <p><b>Field Types</b></p>
  * <ul>
  *   <li>{@code models.CharField} - String field</li>
  *   <li>{@code models.IntegerField} - Integer field</li>
@@ -42,14 +42,14 @@ import java.util.regex.Pattern;
  *   <li>{@code models.OneToOneField} - One-to-one relationship</li>
  * </ul>
  *
- * <h3>Relationship Patterns</h3>
+ * <p><b>Relationship Patterns</b></p>
  * <ul>
  *   <li>{@code models.ForeignKey("User", on_delete=models.CASCADE)}</li>
  *   <li>{@code models.ManyToManyField("Tag", related_name="posts")}</li>
  *   <li>{@code models.OneToOneField("Profile", on_delete=models.CASCADE)}</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
  *   <li>{@code CLASS_PATTERN}: {@code class\s+(\w+)\s*\(.*models\.Model.*\):}</li>
  *   <li>{@code FIELD_PATTERN}: {@code (\w+)\s*=\s*models\.(\w+)\s*\((.+?)\)}</li>

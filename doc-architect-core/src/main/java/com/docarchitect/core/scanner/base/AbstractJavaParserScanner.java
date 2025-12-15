@@ -32,7 +32,7 @@ import java.util.Optional;
  *   <li>Kafka Scanner (KafkaListener, SendTo, KafkaTemplate)</li>
  * </ul>
  *
- * <h3>When to Use This Base Class</h3>
+ * <p><b>When to Use This Base Class</b></p>
  * <p>Use AbstractJavaParserScanner when:</p>
  * <ul>
  *   <li>Parsing Java source code (not bytecode)</li>

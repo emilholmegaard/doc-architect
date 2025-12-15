@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  *   <li>Pipfile - TOML format with [packages] and [dev-packages] sections</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
  *   <li>{@code REQUIREMENTS_PATTERN}: {@code ^([a-zA-Z0-9_-]+)\s*([=<>~!]+)\s*(.+)$} - Parses {@code package==1.0.0}</li>
  *   <li>{@code SETUP_INSTALL_REQUIRES}: {@code install_requires\s*=\s*\[(.*?)\]} - Extracts install_requires list</li>

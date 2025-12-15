@@ -18,16 +18,16 @@ import java.util.regex.Pattern;
  * <p>Since we're running in Java, we parse Python files as TEXT using regex patterns
  * to extract route decorators and function definitions.
  *
- * <h3>Supported Decorator Styles</h3>
+ * <p><b>Supported Decorator Styles</b></p>
  *
- * <h4>Legacy Style (Flask 1.x)</h4>
+ * <p><b>Legacy Style (Flask 1.x):</b></p>
  * <ul>
  *   <li>{@code @app.route("/path", methods=["GET"])}</li>
  *   <li>{@code @app.route("/path", methods=["POST", "PUT"])}</li>
  *   <li>{@code @blueprint.route("/path", methods=["DELETE"])}</li>
  * </ul>
  *
- * <h4>Modern Style (Flask 2.0+)</h4>
+ * <p><b>Modern Style (Flask 2.0+):</b></p>
  * <ul>
  *   <li>{@code @app.get("/path")}</li>
  *   <li>{@code @app.post("/path")}</li>
@@ -37,14 +37,14 @@ import java.util.regex.Pattern;
  *   <li>{@code @blueprint.get("/path")}</li>
  * </ul>
  *
- * <h3>Parameter Extraction</h3>
+ * <p><b>Parameter Extraction</b></p>
  * <ul>
  *   <li>Path parameters: {@code <user_id>} or {@code <int:user_id>}</li>
  *   <li>Query parameters: {@code request.args.get('param')}</li>
  *   <li>Body parameters: {@code request.json} or {@code request.get_json()}</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
  *   <li>{@code MODERN_DECORATOR}: {@code @(app|blueprint)\.(get|post|put|delete|patch)\s*\(\s*['"](.*?)['"]}</li>
  *   <li>{@code LEGACY_DECORATOR}: {@code @(app|blueprint)\.route\s*\(\s*['"](.*?)['"].*?methods\s*=\s*\[(.*?)\]}</li>

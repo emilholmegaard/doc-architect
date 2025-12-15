@@ -22,7 +22,7 @@ import java.util.List;
  *   <li>ScanResult creation helpers ({@link #emptyResult()}, {@link #failedResult(List)})</li>
  * </ul>
  *
- * <h3>Usage Example</h3>
+ * <p><b>Usage Example</b></p>
  * <p>Concrete scanners typically implement the pattern:</p>
  * <ol>
  *   <li>Override getId() to return a unique scanner identifier</li>

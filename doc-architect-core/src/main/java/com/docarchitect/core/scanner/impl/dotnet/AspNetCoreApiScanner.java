@@ -18,9 +18,9 @@ import java.util.regex.Pattern;
  * <p>Uses regex patterns to extract controller attributes and action methods.
  * Similar to Spring's annotation-based approach, but for C# attributes.
  *
- * <h3>Supported Patterns</h3>
+ * <p><b>Supported Patterns</b></p>
  *
- * <h4>Controller Attributes</h4>
+ * <p><b>Controller Attributes:</b></p>
  * <pre>{@code
  * [ApiController]
  * [Route("api/[controller]")]
@@ -37,7 +37,7 @@ import java.util.regex.Pattern;
  * }
  * }</pre>
  *
- * <h3>HTTP Method Attributes</h3>
+ * <p><b>HTTP Method Attributes</b></p>
  * <ul>
  *   <li>{@code [HttpGet]} - GET requests</li>
  *   <li>{@code [HttpPost]} - POST requests</li>
@@ -46,7 +46,7 @@ import java.util.regex.Pattern;
  *   <li>{@code [HttpPatch]} - PATCH requests</li>
  * </ul>
  *
- * <h3>Parameter Attributes</h3>
+ * <p><b>Parameter Attributes</b></p>
  * <ul>
  *   <li>{@code [FromRoute]} - Path parameter</li>
  *   <li>{@code [FromQuery]} - Query parameter</li>
@@ -54,7 +54,7 @@ import java.util.regex.Pattern;
  *   <li>{@code [FromHeader]} - Header parameter</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
  *   <li>{@code CLASS_PATTERN}: {@code public\s+class\s+(\w+)\s*:\s*ControllerBase}</li>
  *   <li>{@code ROUTE_PATTERN}: {@code \[Route\("(.+?)"\)\]}</li>

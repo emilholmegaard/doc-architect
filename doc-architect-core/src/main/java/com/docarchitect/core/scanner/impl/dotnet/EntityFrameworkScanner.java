@@ -19,9 +19,9 @@ import java.util.regex.Pattern;
  * <p>Uses regex patterns to extract DbContext classes, DbSet properties,
  * entity classes, and navigation properties.
  *
- * <h3>Supported Patterns</h3>
+ * <p><b>Supported Patterns</b></p>
  *
- * <h4>DbContext Declaration</h4>
+ * <p><b>DbContext Declaration:</b></p>
  * <pre>{@code
  * public class ApplicationDbContext : DbContext
  * {
@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * }
  * }</pre>
  *
- * <h4>Entity Classes</h4>
+ * <p><b>Entity Classes:</b></p>
  * <pre>{@code
  * public class User
  * {
@@ -44,20 +44,20 @@ import java.util.regex.Pattern;
  * }
  * }</pre>
  *
- * <h4>Navigation Properties</h4>
+ * <p><b>Navigation Properties:</b></p>
  * <ul>
  *   <li>{@code public ICollection<T>} - One-to-many relationship</li>
  *   <li>{@code public List<T>} - One-to-many relationship</li>
  *   <li>{@code public T} - Many-to-one or one-to-one relationship</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
- *   <li>{@code DBCONTEXT_PATTERN}: {@code public\s+class\s+(\w+)\s*:\s*DbContext}</li>
- *   <li>{@code DBSET_PATTERN}: {@code public\s+DbSet<(\w+)>\s+(\w+)}</li>
- *   <li>{@code CLASS_PATTERN}: {@code public\s+class\s+(\w+)}</li>
- *   <li>{@code PROPERTY_PATTERN}: {@code public\s+(\w+(?:<[^>]+>)?)\s+(\w+)\s*\{\s*get;\s*set;}</li>
- *   <li>{@code COLLECTION_NAV_PATTERN}: {@code public\s+(?:ICollection|List)<(\w+)>\s+(\w+)}</li>
+ *   <li>DBCONTEXT_PATTERN: Matches DbContext class declarations</li>
+ *   <li>DBSET_PATTERN: Matches DbSet property declarations</li>
+ *   <li>CLASS_PATTERN: Matches class declarations</li>
+ *   <li>PROPERTY_PATTERN: Matches property declarations with getters/setters</li>
+ *   <li>COLLECTION_NAV_PATTERN: Matches navigation property collections</li>
  * </ul>
  *
  * @see DataEntity

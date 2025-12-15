@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  * <p>Since we're running in Java, we parse Python files as TEXT using regex patterns
  * to extract route decorators and function definitions.
  *
- * <h3>Supported Patterns</h3>
+ * <p><b>Supported Patterns</b></p>
  * <ul>
  *   <li>{@code @app.get("/path")} - GET endpoint</li>
  *   <li>{@code @app.post("/path")} - POST endpoint</li>
@@ -28,14 +28,14 @@ import java.util.regex.Pattern;
  *   <li>{@code @router.get("/path")} - APIRouter endpoints</li>
  * </ul>
  *
- * <h3>Parameter Extraction</h3>
+ * <p><b>Parameter Extraction</b></p>
  * <ul>
  *   <li>Path parameters: {@code {user_id}} or {@code {item_id: int}}</li>
  *   <li>Query parameters: {@code param: Query(...)} or {@code param: Optional[str] = Query(None)}</li>
  *   <li>Body parameters: {@code body: Model} or {@code body: dict}</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
  *   <li>{@code DECORATOR_PATTERN}: {@code @(app|router)\.(get|post|put|delete|patch)\s*\(\s*['"](.*?)['"]}</li>
  *   <li>{@code FUNCTION_PATTERN}: {@code def\s+(\w+)\s*\((.*?)\):}</li>

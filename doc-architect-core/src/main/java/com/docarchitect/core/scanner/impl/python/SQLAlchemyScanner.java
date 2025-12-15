@@ -19,9 +19,9 @@ import java.util.regex.Pattern;
  * <p>Since we're running in Java, we parse Python files as TEXT using regex patterns
  * to extract model classes, fields, and relationships.
  *
- * <h3>Supported Patterns</h3>
+ * <p><b>Supported Patterns</b></p>
  *
- * <h4>Legacy Column() Style (SQLAlchemy 1.x)</h4>
+ * <p><b>Legacy Column() Style (SQLAlchemy 1.x):</b></p>
  * <pre>{@code
  * class User(Base):
  *     __tablename__ = 'users'
@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
  *     email = Column(String(255), unique=True)
  * }</pre>
  *
- * <h4>Modern mapped_column() Style (SQLAlchemy 2.0+)</h4>
+ * <p><b>Modern mapped_column() Style (SQLAlchemy 2.0+):</b></p>
  * <pre>{@code
  * class User(Base):
  *     __tablename__ = 'users'
@@ -39,13 +39,13 @@ import java.util.regex.Pattern;
  *     email: Mapped[Optional[str]] = mapped_column(String(255))
  * }</pre>
  *
- * <h3>Relationship Patterns</h3>
+ * <p><b>Relationship Patterns</b></p>
  * <ul>
  *   <li>{@code relationship("User", back_populates="posts")}</li>
  *   <li>{@code relationship("Post", backref="author")}</li>
  * </ul>
  *
- * <h3>Regex Patterns</h3>
+ * <p><b>Regex Patterns</b></p>
  * <ul>
  *   <li>{@code CLASS_PATTERN}: {@code class\s+(\w+)\s*\(.*Base.*\):}</li>
  *   <li>{@code TABLENAME_PATTERN}: {@code __tablename__\s*=\s*['"](.+?)['"]}</li>

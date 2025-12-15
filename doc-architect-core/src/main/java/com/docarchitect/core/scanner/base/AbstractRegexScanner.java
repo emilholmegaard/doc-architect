@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  * <p>This base class is used by scanners for Python (FastAPI, Flask, SQLAlchemy, Django),
  * .NET (ASP.NET Core, Entity Framework), JavaScript (Express.js), Go, GraphQL, and SQL.
  *
- * <h3>When to Use This Base Class</h3>
+ * <p><b>When to Use This Base Class</b></p>
  * <p>Use AbstractRegexScanner when:</p>
  * <ul>
  *   <li>Parsing languages without a Java AST parser (Python, JavaScript, C#, Go)</li>
