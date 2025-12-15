@@ -36,7 +36,7 @@ jobs:
       
       - name: Upload integration test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: integration-test-results
           path: '**/target/failsafe-reports/'
@@ -99,7 +99,7 @@ jobs:
       
       - name: Upload dependency report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: dependency-check-report
           path: target/dependency-check-report.html
@@ -161,7 +161,7 @@ jobs:
             -o json > sbom.json
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: sbom-weekly
           path: sbom.json
