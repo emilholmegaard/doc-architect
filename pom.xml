@@ -33,7 +33,7 @@
         <logback.version>1.5.22</logback.version>
         <snakeyaml.version>2.3</snakeyaml.version>
         <javaparser.version>3.25.8</javaparser.version>
-        <jackson.version>2.18.2</jackson.version>
+        <jackson.version>2.20.1</jackson.version>
 
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
