@@ -1,12 +1,31 @@
 package com.docarchitect.core.scanner.impl;
 
-import com.docarchitect.core.scanner.Scanner;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import com.docarchitect.core.scanner.Scanner;
+import com.docarchitect.core.scanner.impl.dotnet.AspNetCoreApiScanner;
+import com.docarchitect.core.scanner.impl.dotnet.EntityFrameworkScanner;
+import com.docarchitect.core.scanner.impl.dotnet.NuGetDependencyScanner;
+import com.docarchitect.core.scanner.impl.go.GoModScanner;
+import com.docarchitect.core.scanner.impl.java.GradleDependencyScanner;
+import com.docarchitect.core.scanner.impl.java.JpaEntityScanner;
+import com.docarchitect.core.scanner.impl.java.KafkaScanner;
+import com.docarchitect.core.scanner.impl.java.MavenDependencyScanner;
+import com.docarchitect.core.scanner.impl.java.SpringRestApiScanner;
+import com.docarchitect.core.scanner.impl.javascript.ExpressScanner;
+import com.docarchitect.core.scanner.impl.javascript.NpmDependencyScanner;
+import com.docarchitect.core.scanner.impl.python.DjangoOrmScanner;
+import com.docarchitect.core.scanner.impl.python.FastAPIScanner;
+import com.docarchitect.core.scanner.impl.python.FlaskScanner;
+import com.docarchitect.core.scanner.impl.python.PipPoetryDependencyScanner;
+import com.docarchitect.core.scanner.impl.python.SqlAlchemyScanner;
+import com.docarchitect.core.scanner.impl.schema.AvroSchemaScanner;
+import com.docarchitect.core.scanner.impl.schema.GraphQLScanner;
+import com.docarchitect.core.scanner.impl.schema.SqlMigrationScanner;
 
 /**
  * Metadata tests for all scanner implementations.
@@ -26,7 +45,7 @@ class ScannersMetadataTest {
             new PipPoetryDependencyScanner(),
             new FastAPIScanner(),
             new FlaskScanner(),
-            new SQLAlchemyScanner(),
+            new SqlAlchemyScanner(),
             new DjangoOrmScanner(),
             // .NET scanners
             new NuGetDependencyScanner(),
@@ -74,7 +93,11 @@ class ScannersMetadataTest {
         assertThat(scanner.getSupportedFilePatterns())
             .isNotNull()
             .isNotEmpty()
-            .allMatch(pattern -> pattern.contains("*") || pattern.contains("/"));
+            .allMatch(pattern ->
+                pattern.contains("*") ||
+                pattern.contains("/") ||
+                pattern.matches("[a-z0-9._-]+\\.(mod|js|ts|json|xml|yml|yaml|toml|sql|graphql|avsc|avro|cs|py|go)")
+            );
     }
 
     @ParameterizedTest

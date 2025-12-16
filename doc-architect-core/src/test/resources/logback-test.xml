@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!--
+        Logback Configuration for Tests
+
+        This file controls logging during test execution.
+        Logs are quieter by default (WARN level) to reduce noise.
+
+        Override for debugging tests: mvn test -Dlogback.level=DEBUG
+     -->
+
+    <!-- Console Appender with simple format for tests -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Root Logger (WARN for tests, reduces noise) -->
+    <root level="${LOGBACK_LEVEL:-WARN}">
+        <appender-ref ref="CONSOLE" />
+    </root>
+
+    <!-- Scanner tests: only show errors by default -->
+    <logger name="com.docarchitect.core.scanner" level="${TEST_LOG_LEVEL:-ERROR}" />
+
+    <!-- Silence 3rd party libraries during tests -->
+    <logger name="com.fasterxml.jackson" level="ERROR" />
+    <logger name="com.github.javaparser" level="ERROR" />
+</configuration>

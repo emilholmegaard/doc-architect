@@ -29,11 +29,14 @@
         <junit.version>6.0.1</junit.version>
         <mockito.version>5.21.0</mockito.version>
         <assertj.version>3.27.6</assertj.version>
+        <archunit.version>1.2.1</archunit.version>
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.22</logback.version>
-        <snakeyaml.version>2.5</snakeyaml.version>
-        <javaparser.version>3.27.1</javaparser.version>
-        <jackson.version>2.20.1</jackson.version>
+        <snakeyaml.version>2.3</snakeyaml.version>
+        <javaparser.version>3.25.8</javaparser.version>
+        <jackson.version>2.18.2</jackson.version>
+        <graphql-java.version>21.3</graphql-java.version>
+        <avro.version>1.11.3</avro.version>
 
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
@@ -68,6 +71,32 @@
                 <groupId>com.github.javaparser</groupId>
                 <artifactId>javaparser-core</artifactId>
                 <version>${javaparser.version}</version>
+            </dependency>
+
+            <!-- GraphQL Schema Parser -->
+            <dependency>
+                <groupId>com.graphql-java</groupId>
+                <artifactId>graphql-java</artifactId>
+                <version>${graphql-java.version}</version>
+            </dependency>
+
+            <!-- Apache Avro Schema Parser -->
+            <dependency>
+                <groupId>org.apache.avro</groupId>
+                <artifactId>avro</artifactId>
+                <version>${avro.version}</version>
+            </dependency>
+
+            <!-- Jackson Core (must be same version as dataformats) -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
             </dependency>
 
             <!-- Jackson XML/YAML -->
@@ -133,6 +162,12 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>
