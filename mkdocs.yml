@@ -8,14 +8,18 @@ nav:
   - Architecture Overview: 'docs/architecture-overview.md'
   - Onboarding Guide: 'docs/onboarding-guide.md'
   - ADRs:
-    - 'ADR Template': 'adr/TEMPLATE.md'
-    - 'ADR-001 - Multi-Module Maven Structure': 'adr/001-multi-module-maven-structure.md'
-    - 'ADR-002 - CLI framework': 'adr/002-cli-framework-picocli.md'
-    - 'ADR-003 - JVM Scanner Implementation Strategy': 'adr/003-jvm-scanner-implementation-strategy.md'
-    - 'ADR-004 - Python Scanner Implementation Strategy': 'adr/004-python-scanner-text-based-parsing.md'
-    - 'ADR-005 - Logback Logging Configuration': 'adr/005-logback-logging-configuration.md'
-    - 'ADR-006 - Technology Based Package Organization': 'adr/006-technology-based-package-organization.md'
-    - 'ADR-007 - TechDocs as Documentation Solution': 'adr/007-techdocs-as-documentation-solution.md'
+    - 'ADR Template': 'docs/adrs/TEMPLATE.md'
+    - 'ADR-001: Multi-Module Maven Structure': 'docs/adrs/001-multi-module-maven-structure.md'
+    - 'ADR-002: CLI Framework': 'docs/adrs/002-cli-framework-picocli.md'
+    - 'ADR-003: JVM Scanner Implementation Strategy': 'docs/adrs/003-jvm-scanner-implementation-strategy.md'
+    - 'ADR-004: Python Scanner Implementation Strategy': 'docs/adrs/004-python-scanner-text-based-parsing.md'
+    - 'ADR-005: Logback Logging Configuration': 'docs/adrs/005-logback-logging-configuration.md'
+    - 'ADR-006: Technology Based Package Organization': 'docs/adrs/006-technology-based-package-organization.md'
+    - 'ADR-007: TechDocs as Documentation Solution': 'docs/adrs/007-techdocs-as-documentation-solution.md'
+    - 'ADR-008: MkDocs Material Theme': 'docs/adrs/008-mkdocs-material-theme.md'
+    - 'ADR-009: Use C4 Model': /docs/adrs/009-use-c4-model.md
+    - 'ADR-010: Event Driven Integration': 'docs/adrs/010-event-driven-integration.md'
+
 plugins:
   - search
   - techdocs-core
