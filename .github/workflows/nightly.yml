@@ -36,7 +36,7 @@ jobs:
       
       - name: Upload integration test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: integration-test-results
           path: '**/target/failsafe-reports/'
@@ -99,7 +99,7 @@ jobs:
       
       - name: Upload dependency report
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: dependency-check-report
           path: target/dependency-check-report.html
@@ -135,7 +135,7 @@ jobs:
           scanners: 'vuln,secret,config'
       
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
       
@@ -148,7 +148,7 @@ jobs:
           severity-cutoff: high
       
       - name: Upload Grype results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: ${{ steps.grype.outputs.sarif }}
       
@@ -161,7 +161,7 @@ jobs:
             -o json > sbom.json
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: sbom-weekly
           path: sbom.json
@@ -218,7 +218,7 @@ jobs:
         uses: actions/checkout@v6
       
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: java
           queries: security-extended,security-and-quality
@@ -234,4 +234,4 @@ jobs:
         run: mvn clean package -DskipTests
       
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
