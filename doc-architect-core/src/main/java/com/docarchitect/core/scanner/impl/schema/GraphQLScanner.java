@@ -82,14 +82,35 @@ public class GraphQLScanner extends AbstractRegexScanner {
 
     private final Parser parser = new Parser();
 
+    private static final String SCANNER_ID = "graphql-schema";
+    private static final String DISPLAY_NAME = "GraphQL Schema Scanner";
+    private static final String GRAPHQL_FILE_PATTERN = "**/*.graphql";
+    private static final String GQL_FILE_PATTERN = "**/*.gql";
+    private static final String GRAPHQL_EXTENSION = ".graphql";
+    private static final String GQL_EXTENSION = ".gql";
+    private static final int PRIORITY = 60;
+    private static final String QUERY_TYPE = "Query";
+    private static final String MUTATION_TYPE = "Mutation";
+    private static final String SUBSCRIPTION_TYPE = "Subscription";
+    private static final String QUERY_OPERATION = "query";
+    private static final String MUTATION_OPERATION = "mutation";
+    private static final String SUBSCRIPTION_OPERATION = "subscription";
+    private static final String GRAPHQL_INPUT_TYPE = "graphql-input";
+    private static final String GRAPHQL_TYPE = "graphql-type";
+    private static final String ID_FIELD_NAME = "id";
+    private static final String ID_TYPE_NAME = "ID";
+    private static final String UNKNOWN_TYPE = "Unknown";
+    private static final String COMMA_SEPARATOR = ", ";
+    private static final String COLON_SEPARATOR = ": ";
+
     @Override
     public String getId() {
-        return "graphql-schema";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "GraphQL Schema Scanner";
+        return DISPLAY_NAME;
     }
 
     @Override
@@ -99,17 +120,17 @@ public class GraphQLScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.graphql", "**/*.gql");
+        return Set.of(GRAPHQL_FILE_PATTERN, GQL_FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 60;
+        return PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.graphql", "**/*.gql");
+        return hasAnyFiles(context, GRAPHQL_FILE_PATTERN, GQL_FILE_PATTERN);
     }
 
     @Override
@@ -121,8 +142,8 @@ public class GraphQLScanner extends AbstractRegexScanner {
 
         // Find all GraphQL schema files
         List<Path> schemaFiles = new ArrayList<>();
-        context.findFiles("**/*.graphql").forEach(schemaFiles::add);
-        context.findFiles("**/*.gql").forEach(schemaFiles::add);
+        context.findFiles(GRAPHQL_FILE_PATTERN).forEach(schemaFiles::add);
+        context.findFiles(GQL_FILE_PATTERN).forEach(schemaFiles::add);
 
         if (schemaFiles.isEmpty()) {
             log.warn("No GraphQL schema files found in project");
@@ -163,7 +184,9 @@ public class GraphQLScanner extends AbstractRegexScanner {
     private void parseSchemaFile(Path schemaFile, List<ApiEndpoint> apiEndpoints,
                                  List<DataEntity> dataEntities) throws IOException {
         String content = readFileContent(schemaFile);
-        String componentId = schemaFile.getFileName().toString().replace(".graphql", "").replace(".gql", "");
+        String componentId = schemaFile.getFileName().toString()
+            .replace(GRAPHQL_EXTENSION, "")
+            .replace(GQL_EXTENSION, "");
 
         // Parse GraphQL schema using graphql-java library
         Document document = parser.parseDocument(content);
@@ -191,12 +214,12 @@ public class GraphQLScanner extends AbstractRegexScanner {
                                    List<ApiEndpoint> apiEndpoints, List<DataEntity> dataEntities) {
         String typeName = objectType.getName();
 
-        if ("Query".equals(typeName)) {
-            extractOperations(objectType.getFieldDefinitions(), componentId, "query", apiEndpoints);
-        } else if ("Mutation".equals(typeName)) {
-            extractOperations(objectType.getFieldDefinitions(), componentId, "mutation", apiEndpoints);
-        } else if ("Subscription".equals(typeName)) {
-            extractOperations(objectType.getFieldDefinitions(), componentId, "subscription", apiEndpoints);
+        if (QUERY_TYPE.equals(typeName)) {
+            extractOperations(objectType.getFieldDefinitions(), componentId, QUERY_OPERATION, apiEndpoints);
+        } else if (MUTATION_TYPE.equals(typeName)) {
+            extractOperations(objectType.getFieldDefinitions(), componentId, MUTATION_OPERATION, apiEndpoints);
+        } else if (SUBSCRIPTION_TYPE.equals(typeName)) {
+            extractOperations(objectType.getFieldDefinitions(), componentId, SUBSCRIPTION_OPERATION, apiEndpoints);
         } else {
             extractTypeAsEntity(typeName, objectType.getFieldDefinitions(), componentId, dataEntities);
         }
@@ -233,7 +256,7 @@ public class GraphQLScanner extends AbstractRegexScanner {
         DataEntity entity = new DataEntity(
             componentId,
             typeName,
-            "graphql-input",
+            GRAPHQL_INPUT_TYPE,
             fields,
             null,
             "GraphQL input type: " + typeName
@@ -260,15 +283,15 @@ public class GraphQLScanner extends AbstractRegexScanner {
             // Build request schema from arguments
             String requestSchema = field.getInputValueDefinitions().isEmpty() ? null :
                 field.getInputValueDefinitions().stream()
-                    .map(arg -> arg.getName() + ": " + extractTypeName(arg.getType()))
-                    .reduce((a, b) -> a + ", " + b)
+                    .map(arg -> arg.getName() + COLON_SEPARATOR + extractTypeName(arg.getType()))
+                    .reduce((a, b) -> a + COMMA_SEPARATOR + b)
                     .orElse(null);
 
             // Determine ApiType based on operation type
             ApiType apiType = switch (operationType.toLowerCase()) {
-                case "query" -> ApiType.GRAPHQL_QUERY;
-                case "mutation" -> ApiType.GRAPHQL_MUTATION;
-                case "subscription" -> ApiType.GRAPHQL_SUBSCRIPTION;
+                case QUERY_OPERATION -> ApiType.GRAPHQL_QUERY;
+                case MUTATION_OPERATION -> ApiType.GRAPHQL_MUTATION;
+                case SUBSCRIPTION_OPERATION -> ApiType.GRAPHQL_SUBSCRIPTION;
                 default -> ApiType.GRAPHQL_QUERY;
             };
 
@@ -318,7 +341,7 @@ public class GraphQLScanner extends AbstractRegexScanner {
 
         // Try to find ID field for primary key
         String primaryKey = fields.stream()
-            .filter(f -> "id".equalsIgnoreCase(f.name()) || "ID".equals(f.dataType()))
+            .filter(f -> ID_FIELD_NAME.equalsIgnoreCase(f.name()) || ID_TYPE_NAME.equals(f.dataType()))
             .findFirst()
             .map(DataEntity.Field::name)
             .orElse(null);
@@ -326,7 +349,7 @@ public class GraphQLScanner extends AbstractRegexScanner {
         DataEntity entity = new DataEntity(
             componentId,
             typeName,
-            "graphql-type",
+            GRAPHQL_TYPE,
             fields,
             primaryKey,
             "GraphQL type: " + typeName
@@ -351,6 +374,6 @@ public class GraphQLScanner extends AbstractRegexScanner {
         } else if (type instanceof TypeName typeName) {
             return typeName.getName();
         }
-        return "Unknown";
+        return UNKNOWN_TYPE;
     }
 }

@@ -53,6 +53,40 @@ import com.docarchitect.core.util.Technologies;
  */
 public class FlaskScanner extends AbstractRegexScanner {
 
+    // Scanner identification
+    private static final String SCANNER_ID = "flask-rest";
+    private static final String SCANNER_DISPLAY_NAME = "Flask REST Scanner";
+    private static final int SCANNER_PRIORITY = 51;
+
+    // File patterns
+    private static final String PYTHON_FILE_PATTERN = "**/*.py";
+    private static final String PYTHON_FILE_EXTENSION = ".py";
+
+    // HTTP Methods
+    private static final String HTTP_METHOD_GET = "GET";
+    private static final String HTTP_METHOD_POST = "POST";
+    private static final String HTTP_METHOD_PUT = "PUT";
+    private static final String HTTP_METHOD_DELETE = "DELETE";
+    private static final String HTTP_METHOD_PATCH = "PATCH";
+
+    // Python syntax
+    private static final String PYTHON_DEF_KEYWORD = "def ";
+
+    // Parsing constants
+    private static final int FUNCTION_SEARCH_WINDOW = 5;
+    private static final String DEFAULT_RESPONSE_SCHEMA = "dict";
+
+    // Regex group indices for decorators
+    private static final int DECORATOR_APP_VAR_GROUP = 1;
+    private static final int DECORATOR_METHOD_GROUP = 2;
+    private static final int DECORATOR_PATH_GROUP = 3;
+    private static final int LEGACY_DECORATOR_PATH_GROUP = 2;
+    private static final int LEGACY_DECORATOR_METHODS_GROUP = 3;
+    private static final int FUNCTION_NAME_GROUP = 1;
+    private static final int FUNCTION_PARAMS_GROUP = 2;
+    private static final int PATH_PARAM_TYPE_GROUP = 1;
+    private static final int PATH_PARAM_NAME_GROUP = 2;
+
     /**
      * Regex for modern Flask 2.0+ decorators: @app.get("/users").
      * Captures: (1) app variable name, (2) HTTP method, (3) path.
@@ -97,12 +131,12 @@ public class FlaskScanner extends AbstractRegexScanner {
 
     @Override
     public String getId() {
-        return "flask-rest";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Flask REST Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -112,17 +146,17 @@ public class FlaskScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.py");
+        return Set.of(PYTHON_FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 51;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.py");
+        return hasAnyFiles(context, PYTHON_FILE_PATTERN);
     }
 
     @Override
@@ -130,7 +164,7 @@ public class FlaskScanner extends AbstractRegexScanner {
         log.info("Scanning Flask endpoints in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
-        List<Path> pythonFiles = context.findFiles("**/*.py").toList();
+        List<Path> pythonFiles = context.findFiles(PYTHON_FILE_PATTERN).toList();
 
         if (pythonFiles.isEmpty()) {
             return emptyResult();
@@ -147,13 +181,13 @@ public class FlaskScanner extends AbstractRegexScanner {
         log.info("Found {} Flask endpoints", apiEndpoints.size());
 
         return buildSuccessResult(
-            List.of(),           // No components
-            List.of(),           // No dependencies
-            apiEndpoints,        // API endpoints
-            List.of(),           // No message flows
-            List.of(),           // No data entities
-            List.of(),           // No relationships
-            List.of()            // No warnings
+            List.of(),
+            List.of(),
+            apiEndpoints,
+            List.of(),
+            List.of(),
+            List.of(),
+            List.of()
         );
     }
 
@@ -167,8 +201,8 @@ public class FlaskScanner extends AbstractRegexScanner {
             // Try modern decorator style first
             Matcher modernMatcher = MODERN_DECORATOR.matcher(line);
             if (modernMatcher.find()) {
-                String httpMethod = modernMatcher.group(2).toUpperCase();
-                String path = modernMatcher.group(3);
+                String httpMethod = modernMatcher.group(DECORATOR_METHOD_GROUP).toUpperCase();
+                String path = modernMatcher.group(DECORATOR_PATH_GROUP);
                 extractEndpoint(lines, i, componentId, httpMethod, path, apiEndpoints);
                 continue;
             }
@@ -176,8 +210,8 @@ public class FlaskScanner extends AbstractRegexScanner {
             // Try legacy decorator with methods
             Matcher legacyMatcher = LEGACY_DECORATOR.matcher(line);
             if (legacyMatcher.find()) {
-                String path = legacyMatcher.group(2);
-                String methodsStr = legacyMatcher.group(3);
+                String path = legacyMatcher.group(LEGACY_DECORATOR_PATH_GROUP);
+                String methodsStr = legacyMatcher.group(LEGACY_DECORATOR_METHODS_GROUP);
                 List<String> methods = extractMethods(methodsStr);
 
                 for (String method : methods) {
@@ -189,8 +223,8 @@ public class FlaskScanner extends AbstractRegexScanner {
             // Try simple route decorator (defaults to GET)
             Matcher simpleMatcher = SIMPLE_ROUTE.matcher(line);
             if (simpleMatcher.find()) {
-                String path = simpleMatcher.group(2);
-                extractEndpoint(lines, i, componentId, "GET", path, apiEndpoints);
+                String path = simpleMatcher.group(LEGACY_DECORATOR_PATH_GROUP);
+                extractEndpoint(lines, i, componentId, HTTP_METHOD_GET, path, apiEndpoints);
             }
         }
     }
@@ -221,14 +255,13 @@ public class FlaskScanner extends AbstractRegexScanner {
         if (functionLine != null) {
             Matcher funcMatcher = FUNCTION_PATTERN.matcher(functionLine);
             if (funcMatcher.find()) {
-                String functionName = funcMatcher.group(1);
-                String parameters = funcMatcher.group(2);
+                String functionName = funcMatcher.group(FUNCTION_NAME_GROUP);
+                String parameters = funcMatcher.group(FUNCTION_PARAMS_GROUP);
 
                 // Extract path parameters
                 List<String> pathParams = extractPathParameters(path);
 
                 String requestSchema = buildRequestSchema(pathParams, parameters);
-                String responseSchema = "dict"; // Default
 
                 ApiEndpoint endpoint = new ApiEndpoint(
                     componentId,
@@ -237,7 +270,7 @@ public class FlaskScanner extends AbstractRegexScanner {
                     httpMethod,
                     componentId + "." + functionName,
                     requestSchema,
-                    responseSchema,
+                    DEFAULT_RESPONSE_SCHEMA,
                     null
                 );
 
@@ -251,9 +284,9 @@ public class FlaskScanner extends AbstractRegexScanner {
      * Finds the next function definition starting from the given line index.
      */
     private String findNextFunctionDefinition(List<String> lines, int startIndex) {
-        for (int i = startIndex; i < Math.min(startIndex + 5, lines.size()); i++) {
+        for (int i = startIndex; i < Math.min(startIndex + FUNCTION_SEARCH_WINDOW, lines.size()); i++) {
             String line = lines.get(i).trim();
-            if (line.startsWith("def ")) {
+            if (line.startsWith(PYTHON_DEF_KEYWORD)) {
                 return line;
             }
         }
@@ -268,8 +301,8 @@ public class FlaskScanner extends AbstractRegexScanner {
         List<String> params = new ArrayList<>();
         Matcher matcher = PATH_PARAM_PATTERN.matcher(path);
         while (matcher.find()) {
-            String type = matcher.group(1);
-            String name = matcher.group(2);
+            String type = matcher.group(PATH_PARAM_TYPE_GROUP);
+            String name = matcher.group(PATH_PARAM_NAME_GROUP);
             if (type != null) {
                 params.add(name + ": " + type);
             } else {
@@ -302,6 +335,6 @@ public class FlaskScanner extends AbstractRegexScanner {
      */
     private String extractModuleName(Path file) {
         String fileName = file.getFileName().toString();
-        return fileName.replaceAll("\\.py$", "");
+        return fileName.replaceAll("\\" + PYTHON_FILE_EXTENSION + "$", "");
     }
 }

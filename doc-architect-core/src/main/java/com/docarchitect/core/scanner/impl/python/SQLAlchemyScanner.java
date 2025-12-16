@@ -56,35 +56,35 @@ import com.docarchitect.core.util.Technologies;
  */
 public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass> {
 
-    /**
-     * Regex to extract __tablename__ from class body.
-     * Example: __tablename__ = 'users' or __tablename__ = "products"
-     */
-    private static final Pattern TABLENAME_PATTERN = Pattern.compile(
-        "__tablename__\\s*=\\s*['\"](.+?)['\"]"
-    );
+    // --- Regex Patterns ---
+    private static final String REGEX_TABLENAME = "__tablename__\\s*=\\s*['\"](.+?)['\"]";
+    private static final String REGEX_PRIMARY_KEY = "primary_key\\s*=\\s*True";
+    private static final String REGEX_NULLABLE = "nullable\\s*=\\s*(True|False)";
+    private static final String REGEX_RELATIONSHIP_TARGET = "relationship\\s*\\(\\s*['\"](.+?)['\"]";
 
-    /**
-     * Regex to extract primary_key=True from column definition.
-     */
-    private static final Pattern PRIMARY_KEY_PATTERN = Pattern.compile(
-        "primary_key\\s*=\\s*True"
-    );
+    private static final Pattern TABLENAME_PATTERN = Pattern.compile(REGEX_TABLENAME);
+    private static final Pattern PRIMARY_KEY_PATTERN = Pattern.compile(REGEX_PRIMARY_KEY);
+    private static final Pattern NULLABLE_PATTERN = Pattern.compile(REGEX_NULLABLE);
+    private static final Pattern RELATIONSHIP_TARGET_PATTERN = Pattern.compile(REGEX_RELATIONSHIP_TARGET);
 
-    /**
-     * Regex to extract nullable=False from column definition.
-     */
-    private static final Pattern NULLABLE_PATTERN = Pattern.compile(
-        "nullable\\s*=\\s*(True|False)"
-    );
+    // --- Magic Numbers ---
+    private static final int CLASS_BODY_SEARCH_LIMIT = 500;
 
-    /**
-     * Regex to extract target model from relationship().
-     * Example: relationship("Post", back_populates="user")
-     */
-    private static final Pattern RELATIONSHIP_TARGET_PATTERN = Pattern.compile(
-        "relationship\\s*\\(\\s*['\"](.+?)['\"]"
-    );
+    // --- Magic Strings ---
+    private static final String SQLALCHEMY_ENTITY_SCANNER_ID = "sqlalchemy-entities";
+    private static final String SQLALCHEMY_ENTITY_SCANNER_DISPLAY_NAME = "SQLAlchemy Entity Scanner";
+    private static final int SCANNER_PRIORITY = 60;
+    private static final String BASE_CLASS_NAME = "Base";
+    private static final String SQLALCHEMY_RELATIONSHIP_DESCRIPTION = "SQLAlchemy relationship";
+    private static final String SQLALCHEMY_MODEL_PREFIX = "SQLAlchemy Model: ";
+    private static final String COLUMN_FUNCTION_NAME = "Column";
+    private static final String MAPPED_COLUMN_FUNCTION_NAME = "mapped_column";
+    private static final String RELATIONSHIP_FUNCTION_NAME = "relationship";
+    private static final String ANY_TYPE_HINT = "Any";
+    private static final String TABLENAME_FIELD_NAME = "__tablename__";
+    private static final String TABLE_TYPE = "table";
+    private static final String SQLALCHEMY_TECHNOLOGY = "SQLAlchemy";
+    private static final String PYTHON_FILE_PATTERN = "**/*.py";
 
     public SqlAlchemyScanner() {
         super(AstParserFactory.getPythonParser());
@@ -92,12 +92,12 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
     @Override
     public String getId() {
-        return "sqlalchemy-entities";
+        return SQLALCHEMY_ENTITY_SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "SQLAlchemy Entity Scanner";
+        return SQLALCHEMY_ENTITY_SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -107,17 +107,17 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.py");
+        return Set.of(PYTHON_FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 60;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.py");
+        return hasAnyFiles(context, PYTHON_FILE_PATTERN);
     }
 
     @Override
@@ -127,7 +127,7 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
 
-        List<Path> pythonFiles = context.findFiles("**/*.py").toList();
+        List<Path> pythonFiles = context.findFiles(PYTHON_FILE_PATTERN).toList();
 
         if (pythonFiles.isEmpty()) {
             return emptyResult();
@@ -168,12 +168,12 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
         for (PythonAst.PythonClass pythonClass : classes) {
             // Skip non-SQLAlchemy models (must inherit from Base)
-            if (!pythonClass.inheritsFrom("Base")) {
+            if (!pythonClass.inheritsFrom(BASE_CLASS_NAME)) {
                 continue;
             }
 
             // Skip the Base class itself (declarative base)
-            if (pythonClass.name().equals("Base")) {
+            if (pythonClass.name().equals(BASE_CLASS_NAME)) {
                 continue;
             }
 
@@ -185,12 +185,12 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             String primaryKey = null;
 
             for (PythonAst.Field field : pythonClass.fields()) {
-                if (field.name().equals("__tablename__") || field.name().startsWith("_")) {
+                if (field.name().equals(TABLENAME_FIELD_NAME) || field.name().startsWith("_")) {
                     continue;
                 }
 
                 // Check if this is a relationship field
-                if (field.value() != null && field.value().contains("relationship(")) {
+                if (field.value() != null && field.value().contains(RELATIONSHIP_FUNCTION_NAME + "(")) {
                     // Extract relationship
                     Relationship rel = extractRelationship(pythonClass.name(), field);
                     if (rel != null) {
@@ -198,7 +198,7 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
                         log.debug("Found SQLAlchemy relationship: {} -> {}", pythonClass.name(), rel.targetId());
                     }
                 } else if (field.value() != null &&
-                          (field.value().contains("Column(") || field.value().contains("mapped_column("))) {
+                          (field.value().contains(COLUMN_FUNCTION_NAME + "(") || field.value().contains(MAPPED_COLUMN_FUNCTION_NAME + "("))) {
                     // Regular column field
                     String sqlType = extractColumnType(field);
                     boolean nullable = isNullable(field.value());
@@ -224,12 +224,12 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             // Create DataEntity
             if (!fields.isEmpty()) {
                 DataEntity entity = new DataEntity(
-                    pythonClass.name(),    // componentId: class name (User, Product)
-                    tableName,              // name: table name (users, products)
-                    "table",
+                    pythonClass.name(),
+                    tableName,
+                    TABLE_TYPE,
                     fields,
                     primaryKey,
-                    "SQLAlchemy Model: " + pythonClass.name()
+                    SQLALCHEMY_MODEL_PREFIX + pythonClass.name()
                 );
 
                 dataEntities.add(entity);
@@ -252,7 +252,7 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             if (classMatcher.find()) {
                 int classStart = classMatcher.end();
                 // Extract class body (simplified - search next 500 chars for __tablename__)
-                int searchEnd = Math.min(classStart + 500, fileContent.length());
+                int searchEnd = Math.min(classStart + CLASS_BODY_SEARCH_LIMIT, fileContent.length());
                 String classBody = fileContent.substring(classStart, searchEnd);
 
                 Matcher tablenameMatcher = TABLENAME_PATTERN.matcher(classBody);
@@ -284,8 +284,8 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             sourceModel,
             targetModel,
             RelationshipType.DEPENDS_ON,
-            "SQLAlchemy relationship",
-            "SQLAlchemy"
+            SQLALCHEMY_RELATIONSHIP_DESCRIPTION,
+            SQLALCHEMY_TECHNOLOGY
         );
     }
 
@@ -301,14 +301,14 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
         // For mapped_column() style: id: Mapped[int] = mapped_column(...)
         // Use the type hint
-        if (field.type() != null && !field.type().equals("Any")) {
+        if (field.type() != null && !field.type().equals(ANY_TYPE_HINT)) {
             return mapPythonTypeToSql(field.type());
         }
 
         // For Column() style: id = Column(Integer, ...)
         // Extract the first argument from Column(...)
-        if (value.contains("Column(")) {
-            int startIdx = value.indexOf("Column(") + 7;
+        if (value.contains(COLUMN_FUNCTION_NAME + "(")) {
+            int startIdx = value.indexOf(COLUMN_FUNCTION_NAME + "(") + COLUMN_FUNCTION_NAME.length() + 1;
             int endIdx = value.indexOf(",", startIdx);
             if (endIdx == -1) {
                 endIdx = value.indexOf(")", startIdx);

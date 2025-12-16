@@ -32,14 +32,37 @@ import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
  */
 public class KafkaScanner extends AbstractJavaParserScanner {
 
+    private static final String SCANNER_ID = "kafka-messaging";
+    private static final String SCANNER_DISPLAY_NAME = "Kafka Message Flow Scanner";
+    private static final String FILE_PATTERN = "**/*.java";
+    private static final int SCANNER_PRIORITY = 70;
+    private static final String TECHNOLOGY = "kafka";
+    
+    private static final String KAFKA_LISTENER_ANNOTATION = "KafkaListener";
+    private static final String SEND_TO_ANNOTATION = "SendTo";
+    private static final String KAFKA_TEMPLATE_METHOD = "send";
+    private static final String KAFKA_TEMPLATE_IDENTIFIER = "kafkaTemplate";
+    private static final String KAFKA_TEMPLATE_CLASS_IDENTIFIER = "KafkaTemplate";
+    
+    private static final String TOPICS_PARAM_NAME = "topics";
+    private static final String DEFAULT_MESSAGE_TYPE = "Object";
+    private static final String DEFAULT_TOPIC = "unknown-topic";
+    private static final String QUOTE_REGEX = "\"";
+    
+    private static final char ARRAY_START = '{';
+    private static final char ARRAY_END = '}';
+    private static final String ARRAY_DELIMITER = ",";
+    private static final int FIRST_ARGUMENT_INDEX = 0;
+    private static final int MIN_ARGUMENTS_FOR_TOPIC = 1;
+
     @Override
     public String getId() {
-        return "kafka-messaging";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Kafka Message Flow Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -49,17 +72,17 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.java");
+        return Set.of(FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 70;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.java");
+        return hasAnyFiles(context, FILE_PATTERN);
     }
 
     @Override
@@ -67,7 +90,7 @@ public class KafkaScanner extends AbstractJavaParserScanner {
         log.info("Scanning Kafka message flows in: {}", context.rootPath());
 
         List<MessageFlow> messageFlows = new ArrayList<>();
-        List<Path> javaFiles = context.findFiles("**/*.java").toList();
+        List<Path> javaFiles = context.findFiles(FILE_PATTERN).toList();
 
         if (javaFiles.isEmpty()) {
             return emptyResult();
@@ -120,7 +143,7 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
     private void extractKafkaListenerFlows(MethodDeclaration method, String className, List<MessageFlow> messageFlows) {
         Optional<AnnotationExpr> kafkaListener = method.getAnnotations().stream()
-            .filter(ann -> "KafkaListener".equals(ann.getNameAsString()))
+            .filter(ann -> KAFKA_LISTENER_ANNOTATION.equals(ann.getNameAsString()))
             .findFirst();
 
         if (kafkaListener.isEmpty()) {
@@ -129,17 +152,17 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
         List<String> topics = extractTopicsFromAnnotation(kafkaListener.get());
         String messageType = method.getParameters().isEmpty()
-            ? "Object"
+            ? DEFAULT_MESSAGE_TYPE
             : method.getParameters().get(0).getType().asString();
 
         for (String topic : topics) {
             MessageFlow flow = new MessageFlow(
-                null, // No publisher (this is a consumer)
+                null,
                 className,
                 topic,
                 messageType,
                 null,
-                "kafka"
+                TECHNOLOGY
             );
 
             messageFlows.add(flow);
@@ -149,7 +172,7 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
     private void extractSendToFlows(MethodDeclaration method, String className, List<MessageFlow> messageFlows) {
         Optional<AnnotationExpr> sendTo = method.getAnnotations().stream()
-            .filter(ann -> "SendTo".equals(ann.getNameAsString()))
+            .filter(ann -> SEND_TO_ANNOTATION.equals(ann.getNameAsString()))
             .findFirst();
 
         if (sendTo.isEmpty()) {
@@ -161,11 +184,11 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
         MessageFlow flow = new MessageFlow(
             className,
-            null, // No subscriber (this is a producer)
+            null,
             topic,
             messageType,
             null,
-            "kafka"
+            TECHNOLOGY
         );
 
         messageFlows.add(flow);
@@ -174,23 +197,23 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
     private void extractKafkaTemplateFlows(MethodDeclaration method, String className, List<MessageFlow> messageFlows) {
         method.findAll(MethodCallExpr.class).forEach(call -> {
-            if (!"send".equals(call.getNameAsString())) {
+            if (!KAFKA_TEMPLATE_METHOD.equals(call.getNameAsString())) {
                 return;
             }
 
             call.getScope().ifPresent(scope -> {
                 String scopeStr = scope.toString();
-                if (scopeStr.contains("kafkaTemplate") || scopeStr.contains("KafkaTemplate")) {
-                    if (call.getArguments().size() >= 1) {
-                        String topic = call.getArguments().get(0).toString().replaceAll("\"", "");
+                if (scopeStr.contains(KAFKA_TEMPLATE_IDENTIFIER) || scopeStr.contains(KAFKA_TEMPLATE_CLASS_IDENTIFIER)) {
+                    if (call.getArguments().size() >= MIN_ARGUMENTS_FOR_TOPIC) {
+                        String topic = call.getArguments().get(FIRST_ARGUMENT_INDEX).toString().replaceAll(QUOTE_REGEX, "");
 
                         MessageFlow flow = new MessageFlow(
                             className,
                             null,
                             topic,
-                            "Object",
+                            DEFAULT_MESSAGE_TYPE,
                             null,
-                            "kafka"
+                            TECHNOLOGY
                         );
 
                         messageFlows.add(flow);
@@ -209,7 +232,7 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
         if (annotation instanceof NormalAnnotationExpr normal) {
             return normal.getPairs().stream()
-                .filter(pair -> "topics".equals(pair.getNameAsString()))
+                .filter(pair -> TOPICS_PARAM_NAME.equals(pair.getNameAsString()))
                 .findFirst()
                 .map(pair -> parseTopicsValue(pair.getValue().toString()))
                 .orElse(List.of());
@@ -220,23 +243,21 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
     private List<String> parseTopicsValue(String value) {
         value = value.trim();
-        if (value.startsWith("{") && value.endsWith("}")) {
-            // Array: {"topic1", "topic2"}
-            return Arrays.stream(value.substring(1, value.length() - 1).split(","))
+        if (value.startsWith(String.valueOf(ARRAY_START)) && value.endsWith(String.valueOf(ARRAY_END))) {
+            return Arrays.stream(value.substring(1, value.length() - 1).split(ARRAY_DELIMITER))
                 .map(String::trim)
-                .map(s -> s.replaceAll("\"", ""))
+                .map(s -> s.replaceAll(QUOTE_REGEX, ""))
                 .filter(s -> !s.isEmpty())
                 .toList();
         } else {
-            // Single topic: "topic1"
-            return List.of(value.replaceAll("\"", ""));
+            return List.of(value.replaceAll(QUOTE_REGEX, ""));
         }
     }
 
     private String extractTopicFromSendTo(AnnotationExpr annotation) {
         if (annotation instanceof SingleMemberAnnotationExpr single) {
-            return single.getMemberValue().toString().replaceAll("\"", "");
+            return single.getMemberValue().toString().replaceAll(QUOTE_REGEX, "");
         }
-        return "unknown-topic";
+        return DEFAULT_TOPIC;
     }
 }

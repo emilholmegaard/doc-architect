@@ -4,10 +4,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
@@ -76,18 +73,26 @@ import com.docarchitect.core.util.Technologies;
  */
 public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRoute> {
 
+    private static final String SCANNER_ID = "express-api";
+    private static final String SCANNER_DISPLAY_NAME = "Express.js API Scanner";
+    private static final int SCANNER_PRIORITY = 50;
+    private static final Set<String> SUPPORTED_FILE_PATTERNS = Set.of("*.js", "**/*.js", "*.ts", "**/*.ts");
+    private static final String JS_GLOB = "**/*.js";
+    private static final String TS_GLOB = "**/*.ts";
+    private static final String MODULE_NAME_EXTENSION_REGEX = "\\.(js|ts)$";
+
     public ExpressScanner() {
         super(AstParserFactory.getJavaScriptParser());
     }
 
     @Override
     public String getId() {
-        return "express-api";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Express.js API Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -97,18 +102,18 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("*.js", "**/*.js", "*.ts", "**/*.ts");
+        return SUPPORTED_FILE_PATTERNS;
     }
 
     @Override
     public int getPriority() {
-        return 50;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
         // Check if any JavaScript or TypeScript files exist (both root and subdirectories)
-        return hasAnyFiles(context, "*.js", "**/*.js", "*.ts", "**/*.ts");
+        return hasAnyFiles(context, SUPPORTED_FILE_PATTERNS.toArray(new String[0]));
     }
 
     @Override
@@ -118,8 +123,8 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
 
         // Find all JavaScript and TypeScript files
-        List<Path> jsFiles = context.findFiles("**/*.js").toList();
-        List<Path> tsFiles = context.findFiles("**/*.ts").toList();
+        List<Path> jsFiles = context.findFiles(JS_GLOB).toList();
+        List<Path> tsFiles = context.findFiles(TS_GLOB).toList();
         List<Path> allFiles = new ArrayList<>();
         allFiles.addAll(jsFiles);
         allFiles.addAll(tsFiles);
@@ -200,6 +205,6 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
     private String extractModuleName(Path file) {
         String fileName = file.getFileName().toString();
         // Remove .js or .ts extension
-        return fileName.replaceAll("\\.(js|ts)$", "");
+        return fileName.replaceAll(MODULE_NAME_EXTENSION_REGEX, "");
     }
 }

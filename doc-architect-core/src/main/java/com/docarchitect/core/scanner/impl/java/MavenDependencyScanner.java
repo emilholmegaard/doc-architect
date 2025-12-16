@@ -62,15 +62,40 @@ import com.docarchitect.core.util.Technologies;
 public class MavenDependencyScanner extends AbstractJacksonScanner {
 
     private static final Pattern PROPERTY_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
+    private static final String SCANNER_ID = "maven-dependencies";
+    private static final String SCANNER_DISPLAY_NAME = "Maven Dependency Scanner";
+    private static final String POM_FILE_PATTERN = "**/pom.xml";
+    private static final int SCANNER_PRIORITY = 10;
+
+    private static final String KEY_GROUP_ID = "groupId";
+    private static final String KEY_ARTIFACT_ID = "artifactId";
+    private static final String KEY_VERSION = "version";
+    private static final String KEY_PACKAGING = "packaging";
+    private static final String KEY_PARENT = "parent";
+    private static final String KEY_PROPERTIES = "properties";
+    private static final String KEY_DEPENDENCIES = "dependencies";
+    private static final String KEY_DEPENDENCY_MANAGEMENT = "dependencyManagement";
+    private static final String KEY_DEPENDENCY = "dependency";
+    private static final String KEY_SCOPE = "scope";
+
+    private static final String DEFAULT_PACKAGING = "jar";
+    private static final String DEFAULT_SCOPE = "compile";
+    private static final String DEFAULT_SOURCE_COMPONENT = "unknown";
+    private static final String COMPONENT_DESCRIPTION_PREFIX = "Maven project: ";
+    private static final String COMPONENT_TECH = "maven";
+
+    private static final String PROPERTY_PROJECT_GROUP_ID = "project.groupId";
+    private static final String PROPERTY_PROJECT_ARTIFACT_ID = "project.artifactId";
+    private static final String PROPERTY_PROJECT_VERSION = "project.version";
 
     @Override
     public String getId() {
-        return "maven-dependencies";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Maven Dependency Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -80,17 +105,17 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/pom.xml");
+        return Set.of(POM_FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 10;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/pom.xml");
+        return hasAnyFiles(context, POM_FILE_PATTERN);
     }
 
     @Override
@@ -101,7 +126,7 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         List<Component> components = new ArrayList<>();
 
         // Find all pom.xml files
-        List<Path> pomFiles = context.findFiles("**/pom.xml").toList();
+        List<Path> pomFiles = context.findFiles(POM_FILE_PATTERN).toList();
 
         if (pomFiles.isEmpty()) {
             log.warn("No pom.xml files found in project");
@@ -146,15 +171,15 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         Map<String, Object> pom = xmlMapper.readValue(content, Map.class);
 
         // Extract project coordinates
-        String groupId = extractText(pom, "groupId");
-        String artifactId = extractText(pom, "artifactId");
-        String version = extractText(pom, "version");
-        String packaging = extractText(pom, "packaging", "jar");
+        String groupId = extractText(pom, KEY_GROUP_ID);
+        String artifactId = extractText(pom, KEY_ARTIFACT_ID);
+        String version = extractText(pom, KEY_VERSION);
+        String packaging = extractText(pom, KEY_PACKAGING, DEFAULT_PACKAGING);
 
         // Handle parent POM inheritance
         if (groupId == null || version == null) {
             @SuppressWarnings("unchecked")
-            Map<String, Object> parent = (Map<String, Object>) pom.get("parent");
+            Map<String, Object> parent = (Map<String, Object>) pom.get(KEY_PARENT);
             if (parent != null) {
                 if (groupId == null) {
                     groupId = extractText(parent, "groupId");
@@ -167,13 +192,13 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
 
         // Build properties map for placeholder resolution
         Map<String, String> properties = new HashMap<>();
-        if (groupId != null) properties.put("project.groupId", groupId);
-        if (artifactId != null) properties.put("project.artifactId", artifactId);
-        if (version != null) properties.put("project.version", version);
+        if (groupId != null) properties.put(PROPERTY_PROJECT_GROUP_ID, groupId);
+        if (artifactId != null) properties.put(PROPERTY_PROJECT_ARTIFACT_ID, artifactId);
+        if (version != null) properties.put(PROPERTY_PROJECT_VERSION, version);
 
         // Extract custom properties
         @SuppressWarnings("unchecked")
-        Map<String, Object> propertiesSection = (Map<String, Object>) pom.get("properties");
+        Map<String, Object> propertiesSection = (Map<String, Object>) pom.get(KEY_PROPERTIES);
         if (propertiesSection != null) {
             propertiesSection.forEach((key, value) ->
                 properties.put(key, String.valueOf(value))
@@ -186,8 +211,8 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
                 IdGenerator.generate("maven", groupId, artifactId),
                 artifactId,
                 "jar".equals(packaging) ? ComponentType.LIBRARY : ComponentType.SERVICE,
-                "Maven project: " + (groupId != null ? groupId + ":" : "") + artifactId,
-                "maven",
+                COMPONENT_DESCRIPTION_PREFIX + (groupId != null ? groupId + ":" : "") + artifactId,
+                COMPONENT_TECH,
                 pomFile.getParent().toString(),
                 Map.of(
                     "groupId", Objects.toString(groupId, ""),
@@ -199,8 +224,8 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         }
 
         // Extract dependencies
-        extractDependencies(pom, "dependencies", properties, dependencies);
-        extractDependencies(pom, "dependencyManagement", properties, dependencies);
+        extractDependencies(pom, KEY_DEPENDENCIES, properties, dependencies);
+        extractDependencies(pom, KEY_DEPENDENCY_MANAGEMENT, properties, dependencies);
     }
 
     /**
@@ -220,9 +245,9 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         }
 
         // Handle dependencyManagement wrapper
-        if ("dependencyManagement".equals(section) && sectionObj instanceof Map) {
+        if (KEY_DEPENDENCY_MANAGEMENT.equals(section) && sectionObj instanceof Map) {
             Map<String, Object> depMgmt = (Map<String, Object>) sectionObj;
-            sectionObj = depMgmt.get("dependencies");
+            sectionObj = depMgmt.get(KEY_DEPENDENCIES);
             if (sectionObj == null) {
                 return;
             }
@@ -231,7 +256,7 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         List<Map<String, Object>> depsList;
         if (sectionObj instanceof Map) {
             Map<String, Object> depsMap = (Map<String, Object>) sectionObj;
-            Object dependency = depsMap.get("dependency");
+            Object dependency = depsMap.get(KEY_DEPENDENCY);
             if (dependency instanceof List) {
                 depsList = (List<Map<String, Object>>) dependency;
             } else if (dependency instanceof Map) {
@@ -246,15 +271,15 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         }
 
         for (Map<String, Object> dep : depsList) {
-            String groupId = resolveProperties(extractText(dep, "groupId"), properties);
-            String artifactId = extractText(dep, "artifactId");
-            String versionRaw = extractText(dep, "version");
+            String groupId = resolveProperties(extractText(dep, KEY_GROUP_ID), properties);
+            String artifactId = extractText(dep, KEY_ARTIFACT_ID);
+            String versionRaw = extractText(dep, KEY_VERSION);
             String version = versionRaw != null ? resolveProperties(versionRaw, properties) : null;
-            String scope = extractText(dep, "scope", "compile");
+            String scope = extractText(dep, KEY_SCOPE, DEFAULT_SCOPE);
 
             if (groupId != null && artifactId != null) {
                 // Use current component as source (extracted from properties map)
-                String sourceComponentId = properties.getOrDefault("project.artifactId", "unknown");
+                String sourceComponentId = properties.getOrDefault(PROPERTY_PROJECT_ARTIFACT_ID, DEFAULT_SOURCE_COMPONENT);
 
                 Dependency dependency = new Dependency(
                     sourceComponentId,

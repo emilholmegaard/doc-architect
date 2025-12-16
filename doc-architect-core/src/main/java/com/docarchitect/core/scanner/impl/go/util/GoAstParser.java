@@ -43,6 +43,14 @@ import java.util.regex.Pattern;
 public class GoAstParser {
 
     private static final boolean ANTLR_AVAILABLE = checkAntlrAvailability();
+    private static final String BASE_ERROR_LISTENER_CLASS = "org.antlr.v4.runtime.BaseErrorListener";
+    private static final String GO_LEXER_CLASS = "com.docarchitect.parser.GoLexer";
+    private static final String GO_PARSER_CLASS = "com.docarchitect.parser.GoParser";
+    private static final String SOURCE_FILE_METHOD = "sourceFile";
+    private static final String STRUCT_KEYWORD = "struct";
+    private static final String GO_LEXER_MISSING_MESSAGE = "GoLexer not found - ensure ANTLR grammar is generated";
+    private static final String GO_PARSER_MISSING_MESSAGE = "GoParser not found - ensure ANTLR grammar is generated";
+    private static final String SOURCE_FILE_INVOKE_ERROR = "Cannot invoke sourceFile on parser";
 
     /**
      * Regex to match struct definitions: type UserService struct { ... }
@@ -80,8 +88,8 @@ public class GoAstParser {
      */
     private static boolean checkAntlrAvailability() {
         try {
-            Class.forName("org.antlr.v4.runtime.BaseErrorListener");
-            Class.forName("com.docarchitect.parser.GoLexer");
+            Class.forName(BASE_ERROR_LISTENER_CLASS);
+            Class.forName(GO_LEXER_CLASS);
             return true;
         } catch (ClassNotFoundException e) {
             return false;
@@ -109,10 +117,10 @@ public class GoAstParser {
      */
     private static Lexer createGoLexer(CharStream input) {
         try {
-            Class<?> lexerClass = Class.forName("com.docarchitect.parser.GoLexer");
+            Class<?> lexerClass = Class.forName(GO_LEXER_CLASS);
             return (Lexer) lexerClass.getDeclaredConstructor(CharStream.class).newInstance(input);
         } catch (Exception e) {
-            throw new RuntimeException("GoLexer not found - ensure ANTLR grammar is generated", e);
+            throw new RuntimeException(GO_LEXER_MISSING_MESSAGE, e);
         }
     }
 
@@ -121,10 +129,10 @@ public class GoAstParser {
      */
     private static Parser createGoParser(CommonTokenStream tokens) {
         try {
-            Class<?> parserClass = Class.forName("com.docarchitect.parser.GoParser");
+            Class<?> parserClass = Class.forName(GO_PARSER_CLASS);
             return (Parser) parserClass.getDeclaredConstructor(CommonTokenStream.class).newInstance(tokens);
         } catch (Exception e) {
-            throw new RuntimeException("GoParser not found - ensure ANTLR grammar is generated", e);
+            throw new RuntimeException(GO_PARSER_MISSING_MESSAGE, e);
         }
     }
 
@@ -133,9 +141,9 @@ public class GoAstParser {
      */
     private static ParseTree getSourceFileTree(Parser parser) {
         try {
-            return (ParseTree) parser.getClass().getMethod("sourceFile").invoke(parser);
+            return (ParseTree) parser.getClass().getMethod(SOURCE_FILE_METHOD).invoke(parser);
         } catch (Exception e) {
-            throw new RuntimeException("Cannot invoke sourceFile on parser", e);
+            throw new RuntimeException(SOURCE_FILE_INVOKE_ERROR, e);
         }
     }
 
@@ -153,9 +161,8 @@ public class GoAstParser {
         private void walkTree(ParseTree node) {
             if (node == null) return;
 
-            // Extract struct from node text
             String text = node.getText();
-            if (text != null && text.contains("struct")) {
+            if (text != null && text.contains(STRUCT_KEYWORD)) {
                 GoAst.GoStruct struct = extractStructFromText(text);
                 if (struct != null) {
                     structs.add(struct);
@@ -172,7 +179,7 @@ public class GoAstParser {
             Matcher matcher = STRUCT_PATTERN.matcher(text);
             if (matcher.find()) {
                 String name = matcher.group(1);
-                return new GoAst.GoStruct(name, List.of(), List.of());
+                return new GoAst.GoStruct(name, List.of(), "");
             }
             return null;
         }
@@ -188,7 +195,7 @@ public class GoAstParser {
         Matcher matcher = STRUCT_PATTERN.matcher(content);
         while (matcher.find()) {
             String name = matcher.group(1);
-            structs.add(new GoAst.GoStruct(name, List.of(), List.of()));
+            structs.add(new GoAst.GoStruct(name, List.of(), ""));
         }
 
         return structs;

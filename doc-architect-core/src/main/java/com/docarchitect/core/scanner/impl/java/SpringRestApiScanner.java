@@ -67,19 +67,42 @@ import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
  */
 public class SpringRestApiScanner extends AbstractJavaParserScanner {
 
-    private static final Set<String> CONTROLLER_ANNOTATIONS = Set.of("RestController", "Controller");
+    private static final String SCANNER_ID = "spring-rest-api";
+    private static final String DISPLAY_NAME = "Spring REST API Scanner";
+    private static final String JAVA_FILE_PATTERN = "**/*.java";
+    private static final int DEFAULT_PRIORITY = 50;
+
+    private static final String REST_CONTROLLER_ANNOTATION = "RestController";
+    private static final String CONTROLLER_ANNOTATION = "Controller";
+    private static final String REQUEST_MAPPING = "RequestMapping";
+    private static final String GET_MAPPING = "GetMapping";
+    private static final String POST_MAPPING = "PostMapping";
+    private static final String PUT_MAPPING = "PutMapping";
+    private static final String PATCH_MAPPING = "PatchMapping";
+    private static final String DELETE_MAPPING = "DeleteMapping";
+
+    private static final String VALUE_ATTRIBUTE = "value";
+    private static final String PATH_ATTRIBUTE = "path";
+    private static final String METHOD_ATTRIBUTE = "method";
+    private static final String REQUEST_METHOD_PREFIX = "RequestMethod\\.";
+    private static final String DEFAULT_HTTP_METHOD = "GET";
+
+    private static final String PATH_REGEX = "[\"'{}\\[\\]]";
+    private static final String PATH_SEPARATOR = "/";
+
+    private static final Set<String> CONTROLLER_ANNOTATIONS = Set.of(REST_CONTROLLER_ANNOTATION, CONTROLLER_ANNOTATION);
     private static final Set<String> MAPPING_ANNOTATIONS = Set.of(
-        "RequestMapping", "GetMapping", "PostMapping", "PutMapping", "PatchMapping", "DeleteMapping"
-    );
+        REQUEST_MAPPING, GET_MAPPING, POST_MAPPING, PUT_MAPPING, PATCH_MAPPING, DELETE_MAPPING);
+    private static final Set<String> PARAMETER_ANNOTATIONS = Set.of("PathVariable", "RequestParam", "RequestBody", "RequestHeader");
 
     @Override
     public String getId() {
-        return "spring-rest-api";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Spring REST API Scanner";
+        return DISPLAY_NAME;
     }
 
     @Override
@@ -89,17 +112,17 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.java");
+        return Set.of(JAVA_FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 50;
+        return DEFAULT_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.java");
+        return hasAnyFiles(context, JAVA_FILE_PATTERN);
     }
 
     @Override
@@ -110,7 +133,7 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
         List<Component> components = new ArrayList<>();
 
         // Find all Java files
-        List<Path> javaFiles = context.findFiles("**/*.java").toList();
+        List<Path> javaFiles = context.findFiles(JAVA_FILE_PATTERN).toList();
 
         if (javaFiles.isEmpty()) {
             log.warn("No Java files found in project");
@@ -180,7 +203,7 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
             // Extract base path from class-level @RequestMapping
             String basePath = extractPathFromAnnotation(
                 classDecl.getAnnotations().stream()
-                    .filter(ann -> "RequestMapping".equals(ann.getNameAsString()))
+                    .filter(ann -> REQUEST_MAPPING.equals(ann.getNameAsString()))
                     .findFirst()
                     .orElse(null)
             );
@@ -275,7 +298,7 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
         // Handle @RequestMapping(value = "/path", method = RequestMethod.GET)
         if (annotation instanceof NormalAnnotationExpr normalAnnotation) {
             return normalAnnotation.getPairs().stream()
-                .filter(pair -> "value".equals(pair.getNameAsString()) || "path".equals(pair.getNameAsString()))
+                .filter(pair -> VALUE_ATTRIBUTE.equals(pair.getNameAsString()) || PATH_ATTRIBUTE.equals(pair.getNameAsString()))
                 .findFirst()
                 .map(MemberValuePair::getValue)
                 .map(expr -> cleanPath(expr.toString()))
@@ -294,25 +317,25 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
      */
     private String determineHttpMethod(String annotationName, AnnotationExpr annotation) {
         return switch (annotationName) {
-            case "GetMapping" -> "GET";
-            case "PostMapping" -> "POST";
-            case "PutMapping" -> "PUT";
-            case "PatchMapping" -> "PATCH";
-            case "DeleteMapping" -> "DELETE";
-            case "RequestMapping" -> {
+            case GET_MAPPING -> "GET";
+            case POST_MAPPING -> "POST";
+            case PUT_MAPPING -> "PUT";
+            case PATCH_MAPPING -> "PATCH";
+            case DELETE_MAPPING -> "DELETE";
+            case REQUEST_MAPPING -> {
                 // Extract method from annotation if present
                 if (annotation instanceof NormalAnnotationExpr normalAnnotation) {
                     String method = normalAnnotation.getPairs().stream()
-                        .filter(pair -> "method".equals(pair.getNameAsString()))
+                        .filter(pair -> METHOD_ATTRIBUTE.equals(pair.getNameAsString()))
                         .findFirst()
                         .map(pair -> pair.getValue().toString())
-                        .map(value -> value.replaceAll("RequestMethod\\.", ""))
-                        .orElse("GET");
+                        .map(value -> value.replaceAll(REQUEST_METHOD_PREFIX, ""))
+                        .orElse(DEFAULT_HTTP_METHOD);
                     yield method;
                 }
-                yield "GET"; // Default to GET
+                yield DEFAULT_HTTP_METHOD;
             }
-            default -> "GET";
+            default -> DEFAULT_HTTP_METHOD;
         };
     }
 
@@ -328,7 +351,7 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
 
         // Check for parameter annotations
         Optional<String> annotationType = param.getAnnotations().stream()
-            .filter(ann -> Set.of("PathVariable", "RequestParam", "RequestBody", "RequestHeader").contains(ann.getNameAsString()))
+            .filter(ann -> PARAMETER_ANNOTATIONS.contains(ann.getNameAsString()))
             .map(AnnotationExpr::getNameAsString)
             .findFirst();
 
@@ -346,7 +369,7 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
      * @return cleaned path
      */
     private String cleanPath(String path) {
-        return path.replaceAll("[\"'{}\\[\\]]", "").trim();
+        return path.replaceAll(PATH_REGEX, "").trim();
     }
 
     /**
@@ -358,14 +381,14 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
      */
     private String combinePaths(String basePath, String methodPath) {
         if (basePath == null || basePath.isEmpty()) {
-            return methodPath.startsWith("/") ? methodPath : "/" + methodPath;
+            return methodPath.startsWith(PATH_SEPARATOR) ? methodPath : PATH_SEPARATOR + methodPath;
         }
         if (methodPath == null || methodPath.isEmpty()) {
             return basePath;
         }
 
-        String cleanBase = basePath.endsWith("/") ? basePath.substring(0, basePath.length() - 1) : basePath;
-        String cleanMethod = methodPath.startsWith("/") ? methodPath : "/" + methodPath;
+        String cleanBase = basePath.endsWith(PATH_SEPARATOR) ? basePath.substring(0, basePath.length() - 1) : basePath;
+        String cleanMethod = methodPath.startsWith(PATH_SEPARATOR) ? methodPath : PATH_SEPARATOR + methodPath;
 
         return cleanBase + cleanMethod;
     }

@@ -53,6 +53,49 @@ public class PythonAstParser {
 
     private static final boolean ANTLR_AVAILABLE = checkAntlrAvailability();
 
+    // --- Constants to remove magic numbers/strings ---
+    private static final String ANTLR_BASE_ERROR_LISTENER_CLASS = "org.antlr.v4.runtime.BaseErrorListener";
+
+    private static final String PY3_LEXER_CLASS = "com.docarchitect.parser.Python3Lexer";
+    private static final String PY3_PARSER_CLASS = "com.docarchitect.parser.Python3Parser";
+    private static final String PY2_LEXER_CLASS = "com.docarchitect.parser.Python2Lexer";
+    private static final String PY2_PARSER_CLASS = "com.docarchitect.parser.Python2Parser";
+
+    private static final String PARSER_FILE_INPUT_METHOD = "file_input";
+
+    private static final String CLASSDEF_CONTEXT_SIMPLE_NAME = "ClassdefContext";
+    private static final String CLASSDEF_ALT_SIMPLE_NAME = "ClassDef";
+
+    private static final String TOKEN_NAME = "NAME";
+
+    private static final String WORD_REGEX = "\\w+";
+    private static final String BASE_CLASS_REGEX = "class\\s+\\w+\\s*\\(([^)]*)\\)";
+    private static final String FIELD_DECLARATION_REGEX = "^\\s*(\\w+)\\s*(?::\\s*([\\w.\\[\\]]+))?\\s*=\\s*(.+?)$";
+    private static final String DECORATOR_REGEX = "@(\\w+)";
+    private static final String CLASS_DEF_REGEX = "^\\s*class\\s+(\\w+)\\s*(?:\\(([^)]*)\\))?\\s*:";
+
+    private static final String EXCLUDED_FIELD_NAME_META = "Meta";
+    private static final String PRIVATE_FIELD_PREFIX = "_";
+
+    private static final String NEWLINE = "\n";
+    private static final String DECORATOR_PREFIX = "@";
+    private static final String DECORATOR_ARG_OPEN_REGEX = "\\(";
+
+    private static final String CLASS_KEYWORD = "class ";
+    private static final String DEF_KEYWORD = "def ";
+
+    private static final String TYPE_FROM_VALUE_REGEX = "(\\w+)\\s*\\(";
+    private static final String TYPE_SPLIT_REGEX = "[\\(\\s]";
+    private static final String DOT = ".";
+    private static final String COMMA = ",";
+
+    private static final String DEFAULT_TYPE_NAME = "Any";
+
+    private static final int DECORATOR_LOOKBACK_LINES = 10;
+    private static final int UNSET_INDENT = -1;
+    private static final int DEFAULT_LINE_NUMBER = 0;
+    private static final int LINES_INDEX_OFFSET = -1;
+
     /**
      * Represents a parsed Python class.
      */
@@ -159,7 +202,7 @@ public class PythonAstParser {
      */
     private static boolean checkAntlrAvailability() {
         try {
-            Class.forName("org.antlr.v4.runtime.BaseErrorListener");
+            Class.forName(ANTLR_BASE_ERROR_LISTENER_CLASS);
             return true;
         } catch (ClassNotFoundException e) {
             return false;
@@ -227,7 +270,7 @@ public class PythonAstParser {
      */
     private static Lexer createPython3Lexer(CharStream input) {
         try {
-            Class<?> lexerClass = Class.forName("com.docarchitect.parser.Python3Lexer");
+            Class<?> lexerClass = Class.forName(PY3_LEXER_CLASS);
             return (Lexer) lexerClass.getDeclaredConstructor(CharStream.class).newInstance(input);
         } catch (Exception e) {
             throw new RuntimeException("Python3Lexer not found - ensure ANTLR grammar is generated", e);
@@ -239,7 +282,7 @@ public class PythonAstParser {
      */
     private static Parser createPython3Parser(CommonTokenStream tokens) {
         try {
-            Class<?> parserClass = Class.forName("com.docarchitect.parser.Python3Parser");
+            Class<?> parserClass = Class.forName(PY3_PARSER_CLASS);
             return (Parser) parserClass.getDeclaredConstructor(CommonTokenStream.class).newInstance(tokens);
         } catch (Exception e) {
             throw new RuntimeException("Python3Parser not found - ensure ANTLR grammar is generated", e);
@@ -251,7 +294,7 @@ public class PythonAstParser {
      */
     private static Lexer createPython2Lexer(CharStream input) {
         try {
-            Class<?> lexerClass = Class.forName("com.docarchitect.parser.Python2Lexer");
+            Class<?> lexerClass = Class.forName(PY2_LEXER_CLASS);
             return (Lexer) lexerClass.getDeclaredConstructor(CharStream.class).newInstance(input);
         } catch (Exception e) {
             throw new RuntimeException("Python2Lexer not found - ensure ANTLR grammar is generated", e);
@@ -263,7 +306,7 @@ public class PythonAstParser {
      */
     private static Parser createPython2Parser(CommonTokenStream tokens) {
         try {
-            Class<?> parserClass = Class.forName("com.docarchitect.parser.Python2Parser");
+            Class<?> parserClass = Class.forName(PY2_PARSER_CLASS);
             return (Parser) parserClass.getDeclaredConstructor(CommonTokenStream.class).newInstance(tokens);
         } catch (Exception e) {
             throw new RuntimeException("Python2Parser not found - ensure ANTLR grammar is generated", e);
@@ -275,12 +318,10 @@ public class PythonAstParser {
      */
     private static ParseTree getFileInputTree(Parser parser) {
         try {
-            // Try Python 3 first
-            return (ParseTree) parser.getClass().getMethod("file_input").invoke(parser);
+            return (ParseTree) parser.getClass().getMethod(PARSER_FILE_INPUT_METHOD).invoke(parser);
         } catch (Exception e) {
             try {
-                // Try Python 2
-                return (ParseTree) parser.getClass().getMethod("file_input").invoke(parser);
+                return (ParseTree) parser.getClass().getMethod(PARSER_FILE_INPUT_METHOD).invoke(parser);
             } catch (Exception e2) {
                 throw new RuntimeException("Cannot invoke file_input on parser", e2);
             }
@@ -304,7 +345,7 @@ public class PythonAstParser {
             String nodeType = node.getClass().getSimpleName();
 
             // Look for classdef nodes
-            if (nodeType.contains("ClassdefContext") || nodeType.contains("ClassDef")) {
+            if (nodeType.contains(CLASSDEF_CONTEXT_SIMPLE_NAME) || nodeType.contains(CLASSDEF_ALT_SIMPLE_NAME)) {
                 PythonClass pythonClass = extractClassInfo(node);
                 if (pythonClass != null) {
                     classes.add(pythonClass);
@@ -319,7 +360,7 @@ public class PythonAstParser {
 
         private PythonClass extractClassInfo(ParseTree classNode) {
             try {
-                String className = extractNodeValue(classNode, "NAME");
+                String className = extractNodeValue(classNode, TOKEN_NAME);
                 List<String> baseClasses = extractBaseClasses(classNode);
                 List<PythonField> fields = extractFields(classNode);
                 List<String> decorators = extractDecorators(classNode);
@@ -337,7 +378,7 @@ public class PythonAstParser {
         private String extractNodeValue(ParseTree node, String nodeName) {
             for (int i = 0; i < node.getChildCount(); i++) {
                 ParseTree child = node.getChild(i);
-                if (child.getText().matches("\\w+") && child.getClass().getSimpleName().contains(nodeName)) {
+                if (child.getText().matches(WORD_REGEX) && child.getClass().getSimpleName().contains(nodeName)) {
                     return child.getText();
                 }
             }
@@ -348,11 +389,11 @@ public class PythonAstParser {
             List<String> bases = new ArrayList<>();
             try {
                 String classText = classNode.getText();
-                Pattern basePattern = Pattern.compile("class\\s+\\w+\\s*\\(([^)]*)\\)");
+                Pattern basePattern = Pattern.compile(BASE_CLASS_REGEX);
                 java.util.regex.Matcher matcher = basePattern.matcher(classText);
                 if (matcher.find()) {
                     String baseStr = matcher.group(1);
-                    for (String base : baseStr.split(",")) {
+                    for (String base : baseStr.split(COMMA)) {
                         String trimmed = base.trim();
                         if (!trimmed.isEmpty()) {
                             bases.add(trimmed);
@@ -369,10 +410,7 @@ public class PythonAstParser {
             List<PythonField> fields = new ArrayList<>();
             try {
                 String classBody = classNode.getText();
-                Pattern fieldPattern = Pattern.compile(
-                    "^\\s*(\\w+)\\s*(?::\\s*([\\w.\\[\\]]+))?\\s*=\\s*(.+?)$",
-                    Pattern.MULTILINE
-                );
+                Pattern fieldPattern = Pattern.compile(FIELD_DECLARATION_REGEX, Pattern.MULTILINE);
 
                 java.util.regex.Matcher matcher = fieldPattern.matcher(classBody);
                 while (matcher.find()) {
@@ -380,7 +418,7 @@ public class PythonAstParser {
                     String fieldType = matcher.group(2);
                     String fieldValue = matcher.group(3);
 
-                    if (!fieldName.equals("Meta") && !fieldName.startsWith("_")) {
+                    if (!fieldName.equals(EXCLUDED_FIELD_NAME_META) && !fieldName.startsWith(PRIVATE_FIELD_PREFIX)) {
                         if (fieldType == null) {
                             fieldType = extractTypeFromValue(fieldValue);
                         }
@@ -397,7 +435,7 @@ public class PythonAstParser {
             List<String> decorators = new ArrayList<>();
             try {
                 String classText = classNode.getText();
-                Pattern decorPattern = Pattern.compile("@(\\w+)");
+                Pattern decorPattern = Pattern.compile(DECORATOR_REGEX);
                 java.util.regex.Matcher matcher = decorPattern.matcher(classText);
                 while (matcher.find()) {
                     decorators.add(matcher.group(1));
@@ -416,7 +454,7 @@ public class PythonAstParser {
             } catch (Exception e) {
                 // Ignore
             }
-            return 0;
+            return DEFAULT_LINE_NUMBER;
         }
     }
 
@@ -428,10 +466,7 @@ public class PythonAstParser {
         String content = new String(java.nio.file.Files.readAllBytes(filePath));
         List<String> lines = java.nio.file.Files.readAllLines(filePath);
 
-        Pattern classPattern = Pattern.compile(
-            "^\\s*class\\s+(\\w+)\\s*(?:\\(([^)]*)\\))?\\s*:",
-            Pattern.MULTILINE
-        );
+        Pattern classPattern = Pattern.compile(CLASS_DEF_REGEX, Pattern.MULTILINE);
 
         java.util.regex.Matcher classMatcher = classPattern.matcher(content);
         while (classMatcher.find()) {
@@ -446,7 +481,7 @@ public class PythonAstParser {
                 content,
                 classBodyStart,
                 lines,
-                content.substring(0, classMatcher.start()).split("\n").length - 1
+                content.substring(0, classMatcher.start()).split(NEWLINE).length + LINES_INDEX_OFFSET
             );
             List<PythonField> fields = extractFields(classBody);
 
@@ -455,7 +490,7 @@ public class PythonAstParser {
                 baseClasses,
                 fields,
                 decorators,
-                content.substring(0, classMatcher.start()).split("\n").length
+                content.substring(0, classMatcher.start()).split(NEWLINE).length
             );
 
             classes.add(pythonClass);
@@ -470,12 +505,12 @@ public class PythonAstParser {
     private static List<String> extractDecorators(String content, int classStartPos) {
         List<String> decorators = new ArrayList<>();
         String beforeClass = content.substring(0, classStartPos);
-        String[] lines = beforeClass.split("\n");
+        String[] lines = beforeClass.split(NEWLINE);
 
-        for (int i = lines.length - 1; i >= 0 && i >= lines.length - 10; i--) {
+        for (int i = lines.length - 1; i >= 0 && i >= lines.length - DECORATOR_LOOKBACK_LINES; i--) {
             String line = lines[i].trim();
-            if (line.startsWith("@")) {
-                String decorator = line.substring(1).split("\\(")[0].trim();
+            if (line.startsWith(DECORATOR_PREFIX)) {
+                String decorator = line.substring(1).split(DECORATOR_ARG_OPEN_REGEX)[0].trim();
                 decorators.add(0, decorator);
             } else if (!line.isEmpty()) {
                 break;
@@ -491,23 +526,23 @@ public class PythonAstParser {
     private static String extractClassBodyFromString(String content, int bodyStart,
                                                      List<String> lines, int lineNumber) {
         StringBuilder classBody = new StringBuilder();
-        int baseIndent = -1;
+        int baseIndent = UNSET_INDENT;
 
         for (int i = lineNumber + 1; i < lines.size(); i++) {
             String line = lines.get(i);
             int indent = line.length() - line.trim().length();
 
-            if (baseIndent == -1 && !line.trim().isEmpty()) {
+            if (baseIndent == UNSET_INDENT && !line.trim().isEmpty()) {
                 baseIndent = indent;
             }
 
-            if (baseIndent != -1 && !line.trim().isEmpty() && indent < baseIndent) {
-                if (line.trim().startsWith("class ") || line.trim().startsWith("def ")) {
+            if (baseIndent != UNSET_INDENT && !line.trim().isEmpty() && indent < baseIndent) {
+                if (line.trim().startsWith(CLASS_KEYWORD) || line.trim().startsWith(DEF_KEYWORD)) {
                     break;
                 }
             }
 
-            classBody.append(line).append("\n");
+            classBody.append(line).append(NEWLINE);
         }
 
         return classBody.toString();
@@ -518,10 +553,7 @@ public class PythonAstParser {
      */
     private static List<PythonField> extractFields(String classBody) {
         List<PythonField> fields = new ArrayList<>();
-        Pattern fieldPattern = Pattern.compile(
-            "^\\s*(\\w+)\\s*(?::\\s*([\\w.\\[\\]]+))?\\s*=\\s*(.+?)$",
-            Pattern.MULTILINE
-        );
+        Pattern fieldPattern = Pattern.compile(FIELD_DECLARATION_REGEX, Pattern.MULTILINE);
 
         java.util.regex.Matcher fieldMatcher = fieldPattern.matcher(classBody);
         Set<String> seenFields = new HashSet<>();
@@ -531,7 +563,7 @@ public class PythonAstParser {
             String fieldType = fieldMatcher.group(2);
             String fieldValue = fieldMatcher.group(3);
 
-            if (fieldName.equals("Meta") || fieldName.startsWith("_") || seenFields.contains(fieldName)) {
+            if (fieldName.equals(EXCLUDED_FIELD_NAME_META) || fieldName.startsWith(PRIVATE_FIELD_PREFIX) || seenFields.contains(fieldName)) {
                 continue;
             }
 
@@ -542,7 +574,7 @@ public class PythonAstParser {
             }
 
             if (fieldType == null) {
-                fieldType = "Any";
+                fieldType = DEFAULT_TYPE_NAME;
             }
 
             fields.add(new PythonField(
@@ -560,18 +592,18 @@ public class PythonAstParser {
      * Extract type from field value expression.
      */
     private static String extractTypeFromValue(String value) {
-        Pattern typePattern = Pattern.compile("(\\w+)\\s*\\(");
+        Pattern typePattern = Pattern.compile(TYPE_FROM_VALUE_REGEX);
         java.util.regex.Matcher typeMatcher = typePattern.matcher(value);
 
         if (typeMatcher.find()) {
             return typeMatcher.group(1);
         }
 
-        if (value.contains(".")) {
-            return value.substring(value.lastIndexOf(".") + 1).split("[\\(\\s]")[0];
+        if (value.contains(DOT)) {
+            return value.substring(value.lastIndexOf(DOT) + 1).split(TYPE_SPLIT_REGEX)[0];
         }
 
-        return value.split("[\\(\\s]")[0];
+        return value.split(TYPE_SPLIT_REGEX)[0];
     }
 
     /**
@@ -584,7 +616,7 @@ public class PythonAstParser {
             return bases;
         }
 
-        for (String base : baseClassesStr.split(",")) {
+        for (String base : baseClassesStr.split(COMMA)) {
             String trimmed = base.trim();
             if (!trimmed.isEmpty()) {
                 bases.add(trimmed);

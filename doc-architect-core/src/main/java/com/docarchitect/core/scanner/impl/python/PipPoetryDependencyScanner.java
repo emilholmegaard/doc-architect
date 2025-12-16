@@ -73,16 +73,65 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         "['\"]([a-zA-Z0-9_-]+)\\s*([=<>~!]+)\\s*(.+?)['\"]"
     );
 
+    // GroupId for Python packages
+    private static final String PYPI_GROUP_ID = "pypi";
+    
+    // Dependency scopes
+    private static final String SCOPE_COMPILE = "compile";
+    private static final String SCOPE_TEST = "test";
+    private static final String SCOPE_OPTIONAL = "optional";
+    
+    // Component and project identifiers
+    private static final String PYTHON_PROJECT_DESCRIPTION = "Python Project";
+    private static final String PYTHON_LANGUAGE = "Python";
+    
+    // Poetry and Pipfile configuration keys
+    private static final String POETRY_PYTHON_KEY = "python";
+    private static final String POETRY_VERSION_WILDCARD = "*";
+    
+    // TOML/JSON configuration keys for pyproject.toml
+    private static final String CONFIG_KEY_PROJECT = "project";
+    private static final String CONFIG_KEY_DEPENDENCIES = "dependencies";
+    private static final String CONFIG_KEY_OPTIONAL_DEPENDENCIES = "optional-dependencies";
+    private static final String CONFIG_KEY_TOOL = "tool";
+    private static final String CONFIG_KEY_POETRY = "poetry";
+    private static final String CONFIG_KEY_DEV_DEPENDENCIES = "dev-dependencies";
+    private static final String CONFIG_KEY_VERSION = "version";
+    
+    // TOML/JSON configuration keys for Pipfile
+    private static final String CONFIG_KEY_PACKAGES = "packages";
+    private static final String CONFIG_KEY_DEV_PACKAGES = "dev-packages";
+
+    // File pattern prefixes
+    private static final String PREFIX_EDITABLE = "-e ";
+    private static final String PREFIX_EDITABLE_LONG = "--editable";
+    private static final String PREFIX_REQUIREMENT = "-r ";
+    private static final String PREFIX_REQUIREMENT_LONG = "--requirement";
+    private static final String COMMENT_PREFIX = "#";
+
+    // File patterns
+    private static final String PATTERN_REQUIREMENTS = "**/requirements*.txt";
+    private static final String PATTERN_PYPROJECT = "**/pyproject.toml";
+    private static final String PATTERN_SETUP_PY = "**/setup.py";
+    private static final String PATTERN_PIPFILE = "**/Pipfile";
+    
+    // Scanner priority
+    private static final int SCANNER_PRIORITY = 10;
+    
+    // Scanner ID and display name
+    private static final String SCANNER_ID = "pip-poetry-dependencies";
+    private static final String SCANNER_DISPLAY_NAME = "Pip/Poetry Dependency Scanner";
+
     private final TomlMapper tomlMapper = new TomlMapper();
 
     @Override
     public String getId() {
-        return "pip-poetry-dependencies";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Pip/Poetry Dependency Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -92,21 +141,21 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/requirements*.txt", "**/pyproject.toml", "**/setup.py", "**/Pipfile");
+        return Set.of(PATTERN_REQUIREMENTS, PATTERN_PYPROJECT, PATTERN_SETUP_PY, PATTERN_PIPFILE);
     }
 
     @Override
     public int getPriority() {
-        return 10;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
         return hasAnyFiles(context,
-            "**/requirements*.txt",
-            "**/pyproject.toml",
-            "**/setup.py",
-            "**/Pipfile"
+            PATTERN_REQUIREMENTS,
+            PATTERN_PYPROJECT,
+            PATTERN_SETUP_PY,
+            PATTERN_PIPFILE
         );
     }
 
@@ -123,15 +172,15 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
             sourceComponentId,
             context.rootPath().getFileName().toString(),
             ComponentType.LIBRARY,
-            "Python Project",
-            "Python",
+            PYTHON_PROJECT_DESCRIPTION,
+            PYTHON_LANGUAGE,
             null,
             Map.of()
         );
         components.add(pythonProject);
 
         // Parse requirements.txt files
-        context.findFiles("**/requirements*.txt").forEach(file -> {
+        context.findFiles(PATTERN_REQUIREMENTS).forEach(file -> {
             try {
                 parseRequirementsTxt(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -140,7 +189,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         });
 
         // Parse pyproject.toml files
-        context.findFiles("**/pyproject.toml").forEach(file -> {
+        context.findFiles(PATTERN_PYPROJECT).forEach(file -> {
             try {
                 parsePyprojectToml(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -149,7 +198,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         });
 
         // Parse setup.py files
-        context.findFiles("**/setup.py").forEach(file -> {
+        context.findFiles(PATTERN_SETUP_PY).forEach(file -> {
             try {
                 parseSetupPy(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -158,7 +207,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         });
 
         // Parse Pipfile
-        context.findFiles("**/Pipfile").forEach(file -> {
+        context.findFiles(PATTERN_PIPFILE).forEach(file -> {
             try {
                 parsePipfile(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -190,17 +239,17 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
             line = line.trim();
 
             // Skip comments and empty lines
-            if (line.isEmpty() || line.startsWith("#")) {
+            if (line.isEmpty() || line.startsWith(COMMENT_PREFIX)) {
                 continue;
             }
 
             // Handle -e git+https://... editable installs
-            if (line.startsWith("-e ") || line.startsWith("--editable")) {
+            if (line.startsWith(PREFIX_EDITABLE) || line.startsWith(PREFIX_EDITABLE_LONG)) {
                 continue;
             }
 
             // Handle -r requirements-dev.txt includes
-            if (line.startsWith("-r ") || line.startsWith("--requirement")) {
+            if (line.startsWith(PREFIX_REQUIREMENT) || line.startsWith(PREFIX_REQUIREMENT_LONG)) {
                 continue;
             }
 
@@ -212,11 +261,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                 if (packageName != null && !packageName.isEmpty()) {
                     Dependency dep = new Dependency(
                         sourceComponentId,
-                        "pypi", // Python packages use PyPI as groupId
-                        packageName, // artifactId
-                        versionSpec, // version
-                        "compile", // scope
-                        true // direct
+                        PYPI_GROUP_ID,
+                        packageName,
+                        versionSpec,
+                        SCOPE_COMPILE,
+                        true
                     );
 
                     dependencies.add(dep);
@@ -237,22 +286,22 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         JsonNode root = tomlMapper.readTree(content);
 
         // Parse [project.dependencies]
-        JsonNode project = root.get("project");
+        JsonNode project = root.get(CONFIG_KEY_PROJECT);
         if (project != null) {
-            JsonNode deps = project.get("dependencies");
+            JsonNode deps = project.get(CONFIG_KEY_DEPENDENCIES);
             if (deps != null && deps.isArray()) {
                 for (JsonNode dep : deps) {
-                    parseDependencySpec(dep.asText(), sourceComponentId, "compile", dependencies);
+                    parseDependencySpec(dep.asText(), sourceComponentId, SCOPE_COMPILE, dependencies);
                 }
             }
 
             // Parse [project.optional-dependencies]
-            JsonNode optionalDeps = project.get("optional-dependencies");
+            JsonNode optionalDeps = project.get(CONFIG_KEY_OPTIONAL_DEPENDENCIES);
             if (optionalDeps != null && optionalDeps.isObject()) {
                 optionalDeps.fields().forEachRemaining(entry -> {
                     if (entry.getValue().isArray()) {
                         for (JsonNode dep : entry.getValue()) {
-                            parseDependencySpec(dep.asText(), sourceComponentId, "optional", dependencies);
+                            parseDependencySpec(dep.asText(), sourceComponentId, SCOPE_OPTIONAL, dependencies);
                         }
                     }
                 });
@@ -260,23 +309,23 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         }
 
         // Parse [tool.poetry.dependencies] (Poetry format)
-        JsonNode tool = root.get("tool");
+        JsonNode tool = root.get(CONFIG_KEY_TOOL);
         if (tool != null) {
-            JsonNode poetry = tool.get("poetry");
+            JsonNode poetry = tool.get(CONFIG_KEY_POETRY);
             if (poetry != null) {
-                JsonNode poetryDeps = poetry.get("dependencies");
+                JsonNode poetryDeps = poetry.get(CONFIG_KEY_DEPENDENCIES);
                 if (poetryDeps != null && poetryDeps.isObject()) {
                     poetryDeps.fields().forEachRemaining(entry -> {
                         String packageName = entry.getKey();
-                        if (!"python".equals(packageName)) { // Skip python version requirement
+                        if (!POETRY_PYTHON_KEY.equals(packageName)) {
                             String version = extractVersionFromPoetryDep(entry.getValue());
                             Dependency dep = new Dependency(
                                 sourceComponentId,
-                                "pypi", // Python packages use PyPI as groupId
-                                packageName, // artifactId
-                                version, // version
-                                "compile", // scope
-                                true // direct
+                                PYPI_GROUP_ID,
+                                packageName,
+                                version,
+                                SCOPE_COMPILE,
+                                true
                             );
                             dependencies.add(dep);
                         }
@@ -284,18 +333,18 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                 }
 
                 // Parse [tool.poetry.dev-dependencies]
-                JsonNode devDeps = poetry.get("dev-dependencies");
+                JsonNode devDeps = poetry.get(CONFIG_KEY_DEV_DEPENDENCIES);
                 if (devDeps != null && devDeps.isObject()) {
                     devDeps.fields().forEachRemaining(entry -> {
                         String packageName = entry.getKey();
                         String version = extractVersionFromPoetryDep(entry.getValue());
                         Dependency dep = new Dependency(
                             sourceComponentId,
-                            "pypi", // Python packages use PyPI as groupId
-                            packageName, // artifactId
-                            version, // version
-                            "test", // scope
-                            true // direct
+                            PYPI_GROUP_ID,
+                            packageName,
+                            version,
+                            SCOPE_TEST,
+                            true
                         );
                         dependencies.add(dep);
                     });
@@ -314,10 +363,10 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         if (depNode.isTextual()) {
             return depNode.asText();
         } else if (depNode.isObject()) {
-            JsonNode version = depNode.get("version");
-            return version != null ? version.asText() : "*";
+            JsonNode version = depNode.get(CONFIG_KEY_VERSION);
+            return version != null ? version.asText() : POETRY_VERSION_WILDCARD;
         }
-        return "*";
+        return POETRY_VERSION_WILDCARD;
     }
 
     /**
@@ -338,11 +387,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
                 Dependency dep = new Dependency(
                     sourceComponentId,
-                    "pypi", // Python packages use PyPI as groupId
-                    packageName, // artifactId
-                    versionSpec, // version
-                    "compile", // scope
-                    true // direct
+                    PYPI_GROUP_ID,
+                    packageName,
+                    versionSpec,
+                    SCOPE_COMPILE,
+                    true
                 );
 
                 dependencies.add(dep);
@@ -360,7 +409,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         JsonNode root = tomlMapper.readTree(content);
 
         // Parse [packages]
-        JsonNode packages = root.get("packages");
+        JsonNode packages = root.get(CONFIG_KEY_PACKAGES);
         if (packages != null && packages.isObject()) {
             packages.fields().forEachRemaining(entry -> {
                 String packageName = entry.getKey();
@@ -368,11 +417,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
                 Dependency dep = new Dependency(
                     sourceComponentId,
-                    "pypi", // Python packages use PyPI as groupId
-                    packageName, // artifactId
-                    version, // version
-                    "compile", // scope
-                    true // direct
+                    PYPI_GROUP_ID,
+                    packageName,
+                    version,
+                    SCOPE_COMPILE,
+                    true
                 );
 
                 dependencies.add(dep);
@@ -381,7 +430,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         }
 
         // Parse [dev-packages]
-        JsonNode devPackages = root.get("dev-packages");
+        JsonNode devPackages = root.get(CONFIG_KEY_DEV_PACKAGES);
         if (devPackages != null && devPackages.isObject()) {
             devPackages.fields().forEachRemaining(entry -> {
                 String packageName = entry.getKey();
@@ -389,11 +438,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
                 Dependency dep = new Dependency(
                     sourceComponentId,
-                    "pypi", // Python packages use PyPI as groupId
-                    packageName, // artifactId
-                    version, // version
-                    "test", // scope
-                    true // direct
+                    PYPI_GROUP_ID,
+                    packageName,
+                    version,
+                    SCOPE_TEST,
+                    true
                 );
 
                 dependencies.add(dep);
@@ -411,10 +460,10 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
         if (depNode.isTextual()) {
             return depNode.asText();
         } else if (depNode.isObject()) {
-            JsonNode version = depNode.get("version");
-            return version != null ? version.asText() : "*";
+            JsonNode version = depNode.get(CONFIG_KEY_VERSION);
+            return version != null ? version.asText() : POETRY_VERSION_WILDCARD;
         }
-        return "*";
+        return POETRY_VERSION_WILDCARD;
     }
 
     /**
@@ -428,11 +477,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
             Dependency dep = new Dependency(
                 sourceComponentId,
-                "pypi", // Python packages use PyPI as groupId
-                packageName, // artifactId
-                versionSpec, // version
-                scope, // scope
-                true // direct
+                PYPI_GROUP_ID,
+                packageName,
+                versionSpec,
+                scope,
+                true
             );
 
             dependencies.add(dep);

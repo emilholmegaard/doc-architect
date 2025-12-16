@@ -62,29 +62,58 @@ import com.docarchitect.core.util.Technologies;
  */
 public class GradleDependencyScanner extends AbstractRegexScanner {
 
-    // Regex for string notation: implementation 'group:artifact:version'
-    private static final Pattern STRING_NOTATION = Pattern.compile(
-        "(implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly|annotationProcessor)\\s*[\"']([^:]+):([^:]+):([^\"']+)[\"']"
+    private static final String SCANNER_ID = "gradle-dependencies";
+    private static final String DISPLAY_NAME = "Gradle Dependency Scanner";
+    private static final int PRIORITY = 10;
+
+    private static final String BUILD_GRADLE_GROOVY_PATTERN = "**/build.gradle";
+    private static final String BUILD_GRADLE_KTS_PATTERN = "**/build.gradle.kts";
+    private static final String DSL_KOTLIN = "kotlin";
+    private static final String DSL_GROOVY = "groovy";
+    private static final String COMPONENT_TECHNOLOGY = "gradle";
+    private static final String COMPONENT_DESCRIPTION_PREFIX = "Gradle project: ";
+    private static final String BUILD_FILE_METADATA_KEY = "buildFile";
+    private static final String DSL_METADATA_KEY = "dsl";
+
+    private static final String CONFIG_IMPLEMENTATION = "implementation";
+    private static final String CONFIG_API = "api";
+    private static final String CONFIG_COMPILE_ONLY = "compileOnly";
+    private static final String CONFIG_RUNTIME_ONLY = "runtimeOnly";
+    private static final String CONFIG_TEST_IMPLEMENTATION = "testImplementation";
+    private static final String CONFIG_TEST_RUNTIME_ONLY = "testRuntimeOnly";
+    private static final String CONFIG_ANNOTATION_PROCESSOR = "annotationProcessor";
+
+    private static final String CONFIGURATIONS_REGEX = String.join("|",
+        CONFIG_IMPLEMENTATION,
+        CONFIG_API,
+        CONFIG_COMPILE_ONLY,
+        CONFIG_RUNTIME_ONLY,
+        CONFIG_TEST_IMPLEMENTATION,
+        CONFIG_TEST_RUNTIME_ONLY,
+        CONFIG_ANNOTATION_PROCESSOR
     );
 
-    // Regex for Kotlin function notation: implementation("group:artifact:version")
-    private static final Pattern KOTLIN_NOTATION = Pattern.compile(
-        "(implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly|annotationProcessor)\\s*\\(\\s*[\"']([^:]+):([^:]+):([^\"']+)[\"']\\s*\\)"
-    );
+    private static final String STRING_NOTATION_PATTERN = "(%s)\\s*[\"']([^:]+):([^:]+):([^\"']+)[\"']";
+    private static final String KOTLIN_NOTATION_PATTERN = "(%s)\\s*\\(\\s*[\"']([^:]+):([^:]+):([^\"']+)[\"']\\s*\\)";
+    private static final String MAP_NOTATION_PATTERN = "(%s)\\s+group:\\s*[\"']([^\"']+)[\"']\\s*,\\s*name:\\s*[\"']([^\"']+)[\"']\\s*,\\s*version:\\s*[\"']([^\"']+)[\"']";
 
-    // Regex for map notation: implementation group: 'group', name: 'artifact', version: 'version'
-    private static final Pattern MAP_NOTATION = Pattern.compile(
-        "(implementation|api|compileOnly|runtimeOnly|testImplementation|testRuntimeOnly|annotationProcessor)\\s+group:\\s*[\"']([^\"']+)[\"']\\s*,\\s*name:\\s*[\"']([^\"']+)[\"']\\s*,\\s*version:\\s*[\"']([^\"']+)[\"']"
-    );
+    private static final Pattern STRING_NOTATION = Pattern.compile(String.format(STRING_NOTATION_PATTERN, CONFIGURATIONS_REGEX));
+    private static final Pattern KOTLIN_NOTATION = Pattern.compile(String.format(KOTLIN_NOTATION_PATTERN, CONFIGURATIONS_REGEX));
+    private static final Pattern MAP_NOTATION = Pattern.compile(String.format(MAP_NOTATION_PATTERN, CONFIGURATIONS_REGEX));
+
+    private static final String SCOPE_COMPILE = "compile";
+    private static final String SCOPE_PROVIDED = "provided";
+    private static final String SCOPE_RUNTIME = "runtime";
+    private static final String SCOPE_TEST = "test";
 
     @Override
     public String getId() {
-        return "gradle-dependencies";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Gradle Dependency Scanner";
+        return DISPLAY_NAME;
     }
 
     @Override
@@ -94,17 +123,17 @@ public class GradleDependencyScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/build.gradle", "**/build.gradle.kts");
+        return Set.of(BUILD_GRADLE_GROOVY_PATTERN, BUILD_GRADLE_KTS_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 10;
+        return PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/build.gradle", "**/build.gradle.kts");
+        return hasAnyFiles(context, BUILD_GRADLE_GROOVY_PATTERN, BUILD_GRADLE_KTS_PATTERN);
     }
 
     @Override
@@ -116,8 +145,8 @@ public class GradleDependencyScanner extends AbstractRegexScanner {
 
         // Find all build.gradle and build.gradle.kts files
         List<Path> gradleFiles = new ArrayList<>();
-        gradleFiles.addAll(context.findFiles("**/build.gradle").toList());
-        gradleFiles.addAll(context.findFiles("**/build.gradle.kts").toList());
+        gradleFiles.addAll(context.findFiles(BUILD_GRADLE_GROOVY_PATTERN).toList());
+        gradleFiles.addAll(context.findFiles(BUILD_GRADLE_KTS_PATTERN).toList());
 
         if (gradleFiles.isEmpty()) {
             log.warn("No build.gradle or build.gradle.kts files found in project");
@@ -164,15 +193,15 @@ public class GradleDependencyScanner extends AbstractRegexScanner {
 
         // Create component for this Gradle project
         Component component = new Component(
-            IdGenerator.generate("gradle", projectName),
+            IdGenerator.generate(COMPONENT_TECHNOLOGY, projectName),
             projectName,
             ComponentType.SERVICE,
-            "Gradle project: " + projectName,
-            "gradle",
+            COMPONENT_DESCRIPTION_PREFIX + projectName,
+            COMPONENT_TECHNOLOGY,
             buildFile.getParent().toString(),
             Map.of(
-                "buildFile", fileName,
-                "dsl", isKotlinDsl ? "kotlin" : "groovy"
+                BUILD_FILE_METADATA_KEY, fileName,
+                DSL_METADATA_KEY, isKotlinDsl ? DSL_KOTLIN : DSL_GROOVY
             )
         );
         components.add(component);
@@ -225,12 +254,11 @@ public class GradleDependencyScanner extends AbstractRegexScanner {
      */
     private String mapConfigurationToScope(String configuration) {
         return switch (configuration) {
-            case "implementation", "api" -> "compile";
-            case "compileOnly" -> "provided";
-            case "runtimeOnly" -> "runtime";
-            case "testImplementation", "testRuntimeOnly" -> "test";
-            case "annotationProcessor" -> "provided";
-            default -> "compile";
+            case CONFIG_IMPLEMENTATION, CONFIG_API -> SCOPE_COMPILE;
+            case CONFIG_COMPILE_ONLY, CONFIG_ANNOTATION_PROCESSOR -> SCOPE_PROVIDED;
+            case CONFIG_RUNTIME_ONLY -> SCOPE_RUNTIME;
+            case CONFIG_TEST_IMPLEMENTATION, CONFIG_TEST_RUNTIME_ONLY -> SCOPE_TEST;
+            default -> SCOPE_COMPILE;
         };
     }
 }

@@ -3,6 +3,8 @@ package com.docarchitect.core.scanner.impl.javascript.util;
 import com.docarchitect.core.scanner.ast.AstParser;
 import com.docarchitect.core.scanner.ast.JavaScriptAst;
 
+import com.docarchitect.core.util.Technologies;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -29,6 +31,6 @@ public class JavaScriptAstParserAdapter implements AstParser<JavaScriptAst.Expre
 
     @Override
     public String getLanguage() {
-        return "javascript";
+        return Technologies.JAVASCRIPT;
     }
 }

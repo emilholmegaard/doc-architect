@@ -75,14 +75,55 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 public class AvroSchemaScanner extends AbstractJacksonScanner {
 
+    // Scanner Metadata
+    private static final String SCANNER_ID = "avro-schema";
+    private static final String SCANNER_DISPLAY_NAME = "Avro Schema Scanner";
+
+    // File Extensions
+    private static final String AVSC_EXTENSION = ".avsc";
+    private static final String AVRO_EXTENSION = ".avro";
+    private static final String PATTERN_AVSC_FILES = "**/*.avsc";
+    private static final String PATTERN_AVRO_FILES = "**/*.avro";
+
+    // Avro Schema Field Names
+    private static final String FIELD_TYPE = "type";
+    private static final String FIELD_NAME = "name";
+    private static final String FIELD_NAMESPACE = "namespace";
+    private static final String FIELD_DOC = "doc";
+    private static final String FIELD_FIELDS = "fields";
+    private static final String FIELD_ITEMS = "items";
+    private static final String FIELD_VALUES = "values";
+
+    // Avro Type Names
+    private static final String TYPE_RECORD = "record";
+    private static final String TYPE_ARRAY = "array";
+    private static final String TYPE_MAP = "map";
+    private static final String TYPE_ENUM = "enum";
+    private static final String TYPE_FIXED = "fixed";
+    private static final String TYPE_NULL = "null";
+    private static final String TYPE_UNKNOWN = "unknown";
+    private static final String TYPE_COMPLEX = "complex";
+
+    // Default Values
+    private static final String DEFAULT_RECORD_NAME = "UnknownRecord";
+    private static final String DEFAULT_DESCRIPTION_PREFIX = "Avro record: ";
+    private static final String COMPONENT_TYPE_AVRO_RECORD = "avro-record";
+    private static final String MESSAGE_PROTOCOL_KAFKA = "kafka";
+
+    // Event/Message Detection Keywords
+    private static final String KEYWORD_EVENT = "event";
+    private static final String KEYWORD_MESSAGE = "message";
+    private static final String KEYWORD_COMMAND = "command";
+    private static final String KEYWORD_KAFKA = "kafka";
+
     @Override
     public String getId() {
-        return "avro-schema";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Avro Schema Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -92,7 +133,7 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.avsc", "**/*.avro");
+        return Set.of(PATTERN_AVSC_FILES, PATTERN_AVRO_FILES);
     }
 
     @Override
@@ -102,7 +143,7 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.avsc", "**/*.avro");
+        return hasAnyFiles(context, PATTERN_AVSC_FILES, PATTERN_AVRO_FILES);
     }
 
     @Override
@@ -114,8 +155,8 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
 
         // Find all Avro schema files
         List<Path> schemaFiles = new ArrayList<>();
-        context.findFiles("**/*.avsc").forEach(schemaFiles::add);
-        context.findFiles("**/*.avro").forEach(schemaFiles::add);
+        context.findFiles(PATTERN_AVSC_FILES).forEach(schemaFiles::add);
+        context.findFiles(PATTERN_AVRO_FILES).forEach(schemaFiles::add);
 
         if (schemaFiles.isEmpty()) {
             log.warn("No Avro schema files found in project");
@@ -159,8 +200,8 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
         JsonNode schema = objectMapper.readTree(content);
 
         String componentId = schemaFile.getFileName().toString()
-            .replace(".avsc", "")
-            .replace(".avro", "");
+            .replace(AVSC_EXTENSION, "")
+            .replace(AVRO_EXTENSION, "");
 
         // Parse the schema (can be a single record or array of records)
         if (schema.isArray()) {
@@ -182,25 +223,25 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
      */
     private void parseAvroRecord(JsonNode recordNode, String componentId,
                                  List<DataEntity> dataEntities, List<MessageFlow> messageFlows) {
-        if (!recordNode.has("type")) {
+        if (!recordNode.has(FIELD_TYPE)) {
             return;
         }
 
-        String type = recordNode.get("type").asText();
-        if (!"record".equals(type)) {
+        String type = recordNode.get(FIELD_TYPE).asText();
+        if (!TYPE_RECORD.equals(type)) {
             return; // Only process record types
         }
 
-        String name = recordNode.has("name") ? recordNode.get("name").asText() : "UnknownRecord";
-        String namespace = recordNode.has("namespace") ? recordNode.get("namespace").asText() : null;
+        String name = recordNode.has(FIELD_NAME) ? recordNode.get(FIELD_NAME).asText() : DEFAULT_RECORD_NAME;
+        String namespace = recordNode.has(FIELD_NAMESPACE) ? recordNode.get(FIELD_NAMESPACE).asText() : null;
         String fullName = namespace != null ? namespace + "." + name : name;
-        String description = recordNode.has("doc") ? recordNode.get("doc").asText() : "Avro record: " + name;
+        String description = recordNode.has(FIELD_DOC) ? recordNode.get(FIELD_DOC).asText() : DEFAULT_DESCRIPTION_PREFIX + name;
 
         List<DataEntity.Field> fields = new ArrayList<>();
 
         // Extract fields
-        if (recordNode.has("fields")) {
-            JsonNode fieldsNode = recordNode.get("fields");
+        if (recordNode.has(FIELD_FIELDS)) {
+            JsonNode fieldsNode = recordNode.get(FIELD_FIELDS);
             for (JsonNode fieldNode : fieldsNode) {
                 DataEntity.Field field = parseField(fieldNode);
                 if (field != null) {
@@ -213,7 +254,7 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
         DataEntity entity = new DataEntity(
             componentId,
             fullName,
-            "avro-record",
+            COMPONENT_TYPE_AVRO_RECORD,
             fields,
             null, // Avro doesn't have explicit primary keys
             description
@@ -230,7 +271,7 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
                 name, // topic derived from schema name
                 fullName, // message type
                 fullName, // schema
-                "kafka" // Avro commonly used with Kafka
+                MESSAGE_PROTOCOL_KAFKA // Avro commonly used with Kafka
             );
             messageFlows.add(messageFlow);
             log.debug("Created message flow for Avro schema: {}", fullName);
@@ -244,15 +285,15 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
      * @return parsed field or null if invalid
      */
     private DataEntity.Field parseField(JsonNode fieldNode) {
-        if (!fieldNode.has("name") || !fieldNode.has("type")) {
+        if (!fieldNode.has(FIELD_NAME) || !fieldNode.has(FIELD_TYPE)) {
             return null;
         }
 
-        String fieldName = fieldNode.get("name").asText();
-        JsonNode typeNode = fieldNode.get("type");
+        String fieldName = fieldNode.get(FIELD_NAME).asText();
+        JsonNode typeNode = fieldNode.get(FIELD_TYPE);
         String fieldType = parseFieldType(typeNode);
         boolean nullable = isNullableType(typeNode);
-        String description = fieldNode.has("doc") ? fieldNode.get("doc").asText() : null;
+        String description = fieldNode.has(FIELD_DOC) ? fieldNode.get(FIELD_DOC).asText() : null;
 
         return new DataEntity.Field(
             fieldName,
@@ -276,36 +317,36 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
         if (typeNode.isArray()) {
             // Union type - extract non-null type
             for (JsonNode unionType : typeNode) {
-                String typeName = unionType.isTextual() ? unionType.asText() : "complex";
-                if (!"null".equals(typeName)) {
+                String typeName = unionType.isTextual() ? unionType.asText() : TYPE_COMPLEX;
+                if (!TYPE_NULL.equals(typeName)) {
                     return typeName;
                 }
             }
-            return "null";
+            return TYPE_NULL;
         }
 
         if (typeNode.isObject()) {
-            if (typeNode.has("type")) {
-                String type = typeNode.get("type").asText();
+            if (typeNode.has(FIELD_TYPE)) {
+                String type = typeNode.get(FIELD_TYPE).asText();
 
                 // Handle complex types
                 return switch (type) {
-                    case "array" -> typeNode.has("items") ?
-                        "array<" + parseFieldType(typeNode.get("items")) + ">" : "array";
-                    case "map" -> typeNode.has("values") ?
-                        "map<" + parseFieldType(typeNode.get("values")) + ">" : "map";
-                    case "record" -> typeNode.has("name") ?
-                        typeNode.get("name").asText() : "record";
-                    case "enum" -> typeNode.has("name") ?
-                        typeNode.get("name").asText() : "enum";
-                    case "fixed" -> typeNode.has("name") ?
-                        typeNode.get("name").asText() : "fixed";
+                    case TYPE_ARRAY -> typeNode.has(FIELD_ITEMS) ?
+                        TYPE_ARRAY + "<" + parseFieldType(typeNode.get(FIELD_ITEMS)) + ">" : TYPE_ARRAY;
+                    case TYPE_MAP -> typeNode.has(FIELD_VALUES) ?
+                        TYPE_MAP + "<" + parseFieldType(typeNode.get(FIELD_VALUES)) + ">" : TYPE_MAP;
+                    case TYPE_RECORD -> typeNode.has(FIELD_NAME) ?
+                        typeNode.get(FIELD_NAME).asText() : TYPE_RECORD;
+                    case TYPE_ENUM -> typeNode.has(FIELD_NAME) ?
+                        typeNode.get(FIELD_NAME).asText() : TYPE_ENUM;
+                    case TYPE_FIXED -> typeNode.has(FIELD_NAME) ?
+                        typeNode.get(FIELD_NAME).asText() : TYPE_FIXED;
                     default -> type;
                 };
             }
         }
 
-        return "unknown";
+        return TYPE_UNKNOWN;
     }
 
     /**
@@ -318,7 +359,7 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
         if (typeNode.isArray()) {
             // Union type - check if it contains "null"
             for (JsonNode unionType : typeNode) {
-                if (unionType.isTextual() && "null".equals(unionType.asText())) {
+                if (unionType.isTextual() && TYPE_NULL.equals(unionType.asText())) {
                     return true;
                 }
             }
@@ -337,11 +378,11 @@ public class AvroSchemaScanner extends AbstractJacksonScanner {
         String lowerName = name.toLowerCase();
         String lowerNamespace = namespace != null ? namespace.toLowerCase() : "";
 
-        return lowerName.contains("event") ||
-               lowerName.contains("message") ||
-               lowerName.contains("command") ||
-               lowerNamespace.contains("event") ||
-               lowerNamespace.contains("message") ||
-               lowerNamespace.contains("kafka");
+        return lowerName.contains(KEYWORD_EVENT) ||
+               lowerName.contains(KEYWORD_MESSAGE) ||
+               lowerName.contains(KEYWORD_COMMAND) ||
+               lowerNamespace.contains(KEYWORD_EVENT) ||
+               lowerNamespace.contains(KEYWORD_MESSAGE) ||
+               lowerNamespace.contains(KEYWORD_KAFKA);
     }
 }

@@ -19,6 +19,7 @@ nav:
     - 'ADR-008: MkDocs Material Theme': 'docs/adrs/008-mkdocs-material-theme.md'
     - 'ADR-009: Use C4 Model': /docs/adrs/009-use-c4-model.md
     - 'ADR-010: Event Driven Integration': 'docs/adrs/010-event-driven-integration.md'
+    - 'ADR-011: AST-First Parsing Strategy for Code Scanners': 'docs/adrs/011-ast-first-parsing-strategy-for-code-scanners.md'
 
 plugins:
   - search

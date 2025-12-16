@@ -1,10 +1,12 @@
 package com.docarchitect.core.scanner.ast;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Factory for creating language-specific AST parsers.
@@ -65,7 +67,7 @@ public final class AstParserFactory {
      */
     @SuppressWarnings("unchecked")
     public static AstParser<PythonAst.PythonClass> getPythonParser() {
-        return (AstParser<PythonAst.PythonClass>) parserCache.computeIfAbsent("python", lang ->
+        return (AstParser<PythonAst.PythonClass>) parserCache.computeIfAbsent(Technologies.PYTHON, lang ->
             createParser("com.docarchitect.core.scanner.impl.python.util.PythonAstParserAdapter", "Python")
         );
     }
@@ -80,7 +82,7 @@ public final class AstParserFactory {
      */
     @SuppressWarnings("unchecked")
     public static AstParser<DotNetAst.CSharpClass> getDotNetParser() {
-        return (AstParser<DotNetAst.CSharpClass>) parserCache.computeIfAbsent("dotnet", lang ->
+        return (AstParser<DotNetAst.CSharpClass>) parserCache.computeIfAbsent(Technologies.DOTNET, lang ->
             createParser("com.docarchitect.core.scanner.impl.dotnet.util.CSharpAstParserAdapter", ".NET")
         );
     }
@@ -95,7 +97,7 @@ public final class AstParserFactory {
      */
     @SuppressWarnings("unchecked")
     public static AstParser<JavaScriptAst.ExpressRoute> getJavaScriptParser() {
-        return (AstParser<JavaScriptAst.ExpressRoute>) parserCache.computeIfAbsent("javascript", lang ->
+        return (AstParser<JavaScriptAst.ExpressRoute>) parserCache.computeIfAbsent(Technologies.JAVASCRIPT, lang ->
             createParser("com.docarchitect.core.scanner.impl.javascript.util.JavaScriptAstParserAdapter", "JavaScript")
         );
     }
@@ -111,7 +113,7 @@ public final class AstParserFactory {
      */
     @SuppressWarnings("unchecked")
     public static AstParser<GoAst.GoStruct> getGoParser() {
-        return (AstParser<GoAst.GoStruct>) parserCache.computeIfAbsent("go", lang ->
+        return (AstParser<GoAst.GoStruct>) parserCache.computeIfAbsent(Technologies.GO, lang ->
             createParser("com.docarchitect.core.scanner.impl.go.util.GoAstParserAdapter", "Go")
         );
     }
@@ -159,16 +161,16 @@ public final class AstParserFactory {
     public static boolean isAvailable(String language) {
         try {
             switch (language.toLowerCase()) {
-                case "python":
+                case Technologies.PYTHON:
                     return getPythonParser().isAvailable();
-                case "dotnet":
+                case Technologies.DOTNET:
                 case "csharp":
                     return getDotNetParser().isAvailable();
-                case "javascript":
-                case "typescript":
+                case Technologies.JAVASCRIPT:
+                case Technologies.TYPESCRIPT:
                     return getJavaScriptParser().isAvailable();
-                case "go":
-                case "golang":
+                case Technologies.GO:
+                case Technologies.GOLANG:
                     return getGoParser().isAvailable();
                 default:
                     return false;

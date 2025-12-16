@@ -5,7 +5,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Scanner;
 import java.util.Set;
 
 import com.docarchitect.core.model.DataEntity;
@@ -32,18 +31,40 @@ import com.github.javaparser.ast.expr.NormalAnnotationExpr;
  */
 public class JpaEntityScanner extends AbstractJavaParserScanner {
 
+    private static final String SCANNER_ID = "jpa-entities";
+    private static final String SCANNER_DISPLAY_NAME = "JPA Entity Scanner";
+    private static final String JAVA_FILE_GLOB = "**/*.java";
+    private static final int SCANNER_PRIORITY = 60;
+
+    private static final String ENTITY_ANNOTATION = "Entity";
+    private static final String TABLE_ANNOTATION = "Table";
+    private static final String TABLE_NAME_ATTRIBUTE = "name";
+    private static final String COLUMN_ANNOTATION = "Column";
+    private static final String NULLABLE_ATTRIBUTE = "nullable";
+    private static final String FALSE_LITERAL = "false";
+    private static final String ID_ANNOTATION = "Id";
+
+    private static final String DATA_ENTITY_TYPE_TABLE = "table";
+    private static final String ENTITY_DESCRIPTION_PREFIX = "JPA Entity: ";
+    private static final String RELATIONSHIP_DESCRIPTION_SUFFIX = " relationship";
+    private static final String RELATIONSHIP_TECHNOLOGY = "JPA";
+
+    private static final String LIST_TYPE_PATTERN = "List<(.+)>";
+    private static final String SET_TYPE_PATTERN = "Set<(.+)>";
+    private static final String COLLECTION_TYPE_PATTERN = "Collection<(.+)>";
+
     private static final Set<String> RELATIONSHIP_ANNOTATIONS = Set.of(
         "OneToMany", "ManyToMany", "ManyToOne", "OneToOne"
     );
 
     @Override
     public String getId() {
-        return "jpa-entities";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "JPA Entity Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -53,17 +74,17 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.java");
+        return Set.of(JAVA_FILE_GLOB);
     }
 
     @Override
     public int getPriority() {
-        return 60;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.java");
+        return hasAnyFiles(context, JAVA_FILE_GLOB);
     }
 
     @Override
@@ -73,7 +94,7 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
 
-        List<Path> javaFiles = context.findFiles("**/*.java").toList();
+        List<Path> javaFiles = context.findFiles(JAVA_FILE_GLOB).toList();
 
         if (javaFiles.isEmpty()) {
             return emptyResult();
@@ -82,7 +103,7 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
         for (Path javaFile : javaFiles) {
             try {
                 parseJpaEntities(javaFile, dataEntities, relationships);
-            } catch (Exception e) {
+            } catch (IOException e) {
                 log.warn("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
             }
         }
@@ -109,7 +130,7 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
         CompilationUnit cu = cuOpt.get();
         cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
             boolean isEntity = classDecl.getAnnotations().stream()
-                .anyMatch(ann -> "Entity".equals(ann.getNameAsString()));
+                .anyMatch(ann -> ENTITY_ANNOTATION.equals(ann.getNameAsString()));
 
             if (!isEntity) {
                 return;
@@ -147,10 +168,10 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
             DataEntity entity = new DataEntity(
                 fullyQualifiedName,
                 tableName,
-                "table",
+                DATA_ENTITY_TYPE_TABLE,
                 fields,
                 primaryKey,
-                "JPA Entity: " + className
+                ENTITY_DESCRIPTION_PREFIX + className
             );
 
             dataEntities.add(entity);
@@ -160,11 +181,11 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
     private String extractTableName(ClassOrInterfaceDeclaration classDecl, String className) {
         return classDecl.getAnnotations().stream()
-            .filter(ann -> "Table".equals(ann.getNameAsString()))
+            .filter(ann -> TABLE_ANNOTATION.equals(ann.getNameAsString()))
             .filter(ann -> ann instanceof NormalAnnotationExpr)
             .findFirst()
             .flatMap(ann -> ((NormalAnnotationExpr) ann).getPairs().stream()
-                .filter(pair -> "name".equals(pair.getNameAsString()))
+                .filter(pair -> TABLE_NAME_ATTRIBUTE.equals(pair.getNameAsString()))
                 .findFirst()
                 .map(pair -> pair.getValue().toString().replaceAll("\"", "")))
             .orElse(toSnakeCase(className));
@@ -175,11 +196,11 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
         String fieldType = fieldDecl.getElementType().asString();
 
         boolean isNullable = fieldDecl.getAnnotations().stream()
-            .noneMatch(ann -> "Column".equals(ann.getNameAsString()) &&
+            .noneMatch(ann -> COLUMN_ANNOTATION.equals(ann.getNameAsString()) &&
                 ann instanceof NormalAnnotationExpr &&
                 ((NormalAnnotationExpr) ann).getPairs().stream()
-                    .anyMatch(pair -> "nullable".equals(pair.getNameAsString()) &&
-                        "false".equals(pair.getValue().toString())));
+                    .anyMatch(pair -> NULLABLE_ATTRIBUTE.equals(pair.getNameAsString()) &&
+                        FALSE_LITERAL.equals(pair.getValue().toString())));
 
         return new DataEntity.Field(
             fieldName,
@@ -191,31 +212,26 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
     private boolean isIdField(FieldDeclaration fieldDecl) {
         return fieldDecl.getAnnotations().stream()
-            .anyMatch(ann -> "Id".equals(ann.getNameAsString()));
+            .anyMatch(ann -> ID_ANNOTATION.equals(ann.getNameAsString()));
     }
 
     private void extractRelationship(FieldDeclaration fieldDecl, String sourceEntity,
                                      AnnotationExpr annotation, List<Relationship> relationships) {
         String fieldType = fieldDecl.getElementType().asString();
         String targetEntity = fieldType
-            .replaceAll("List<(.+)>", "$1")
-            .replaceAll("Set<(.+)>", "$1")
-            .replaceAll("Collection<(.+)>", "$1");
+            .replaceAll(LIST_TYPE_PATTERN, "$1")
+            .replaceAll(SET_TYPE_PATTERN, "$1")
+            .replaceAll(COLLECTION_TYPE_PATTERN, "$1");
 
         String annotationName = annotation.getNameAsString();
-        RelationshipType type = switch (annotationName) {
-            case "OneToMany", "ManyToMany", "ManyToOne", "OneToOne" -> RelationshipType.DEPENDS_ON;
-            default -> RelationshipType.DEPENDS_ON;
-        };
-
-        String description = annotationName + " relationship";
+        String description = annotationName + RELATIONSHIP_DESCRIPTION_SUFFIX;
 
         Relationship relationship = new Relationship(
             sourceEntity,
             targetEntity,
-            type,
+            RelationshipType.DEPENDS_ON,  
             description,
-            "JPA"
+            RELATIONSHIP_TECHNOLOGY
         );
 
         relationships.add(relationship);

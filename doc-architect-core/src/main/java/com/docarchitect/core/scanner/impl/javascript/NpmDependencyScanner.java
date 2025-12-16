@@ -69,14 +69,50 @@ import com.docarchitect.core.util.Technologies;
  */
 public class NpmDependencyScanner extends AbstractJacksonScanner {
 
+    // Scanner identification
+    private static final String SCANNER_ID = "npm-dependencies";
+    private static final String SCANNER_DISPLAY_NAME = "npm Dependency Scanner";
+
+    // File discovery
+    private static final String PACKAGE_JSON_GLOB = "**/package.json";
+    private static final int PRIORITY = 10;
+
+    // package.json fields
+    private static final String FIELD_NAME = "name";
+    private static final String FIELD_VERSION = "version";
+    private static final String FIELD_DESCRIPTION = "description";
+
+    // Dependency sections in package.json
+    private static final String SECTION_DEPENDENCIES = "dependencies";
+    private static final String SECTION_DEV_DEPENDENCIES = "devDependencies";
+    private static final String SECTION_PEER_DEPENDENCIES = "peerDependencies";
+
+    // Dependency scopes
+    private static final String SCOPE_COMPILE = "compile";
+    private static final String SCOPE_TEST = "test";
+    private static final String SCOPE_PROVIDED = "provided";
+
+    // NPM specifics
+    private static final String PACKAGE_MANAGER_NPM = "npm";
+    private static final String METADATA_PACKAGE_MANAGER = "packageManager";
+    private static final String DEFAULT_PACKAGE_NAME = "unknown";
+    private static final String DESCRIPTION_PREFIX = "npm package: ";
+
+    // Scoped package markers
+    private static final String SCOPED_PACKAGE_PREFIX = "@";
+    private static final String PACKAGE_SCOPE_SEPARATOR = "/";
+
+    // Error messages
+    private static final String ERROR_PARSE_PREFIX = "Failed to parse package.json file: ";
+
     @Override
     public String getId() {
-        return "npm-dependencies";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "npm Dependency Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -86,17 +122,17 @@ public class NpmDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/package.json");
+        return Set.of(PACKAGE_JSON_GLOB);
     }
 
     @Override
     public int getPriority() {
-        return 10;
+        return PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/package.json");
+        return hasAnyFiles(context, PACKAGE_JSON_GLOB);
     }
 
     @Override
@@ -107,7 +143,7 @@ public class NpmDependencyScanner extends AbstractJacksonScanner {
         List<Component> components = new ArrayList<>();
 
         // Find all package.json files
-        List<Path> packageJsonFiles = context.findFiles("**/package.json").toList();
+        List<Path> packageJsonFiles = context.findFiles(PACKAGE_JSON_GLOB).toList();
 
         if (packageJsonFiles.isEmpty()) {
             log.warn("No package.json files found in project");
@@ -119,7 +155,7 @@ public class NpmDependencyScanner extends AbstractJacksonScanner {
                 parsePackageJson(packageJsonFile, dependencies, components);
             } catch (Exception e) {
                 log.error("Failed to parse package.json: {}", packageJsonFile, e);
-                return ScanResult.failed(getId(), List.of("Failed to parse package.json file: " + packageJsonFile + " - " + e.getMessage()));
+                return ScanResult.failed(getId(), List.of(ERROR_PARSE_PREFIX + packageJsonFile + " - " + e.getMessage()));
             }
         }
 
@@ -151,34 +187,34 @@ public class NpmDependencyScanner extends AbstractJacksonScanner {
         Map<String, Object> packageJson = objectMapper.readValue(content, Map.class);
 
         // Extract package metadata
-        String packageName = extractText(packageJson, "name");
-        String version = extractText(packageJson, "version");
-        String description = extractText(packageJson, "description");
+        String packageName = extractText(packageJson, FIELD_NAME);
+        String version = extractText(packageJson, FIELD_VERSION);
+        String description = extractText(packageJson, FIELD_DESCRIPTION);
 
         if (packageName == null) {
-            log.warn("package.json missing 'name' field: {}", packageJsonFile);
-            packageName = "unknown";
+            log.warn("package.json missing '{}' field: {}", FIELD_NAME, packageJsonFile);
+            packageName = DEFAULT_PACKAGE_NAME;
         }
 
         // Create component for this npm package
         Component component = new Component(
-            IdGenerator.generate("npm", packageName),
+            IdGenerator.generate(PACKAGE_MANAGER_NPM, packageName),
             packageName,
             ComponentType.LIBRARY,
-            description != null ? description : "npm package: " + packageName,
-            "npm",
+            description != null ? description : DESCRIPTION_PREFIX + packageName,
+            PACKAGE_MANAGER_NPM,
             packageJsonFile.getParent().toString(),
             Map.of(
-                "version", Objects.toString(version, ""),
-                "packageManager", "npm"
+                FIELD_VERSION, Objects.toString(version, ""),
+                METADATA_PACKAGE_MANAGER, PACKAGE_MANAGER_NPM
             )
         );
         components.add(component);
 
         // Extract dependencies with different scopes
-        extractDependencies(packageJson, "dependencies", "compile", packageName, dependencies);
-        extractDependencies(packageJson, "devDependencies", "test", packageName, dependencies);
-        extractDependencies(packageJson, "peerDependencies", "provided", packageName, dependencies);
+        extractDependencies(packageJson, SECTION_DEPENDENCIES, SCOPE_COMPILE, packageName, dependencies);
+        extractDependencies(packageJson, SECTION_DEV_DEPENDENCIES, SCOPE_TEST, packageName, dependencies);
+        extractDependencies(packageJson, SECTION_PEER_DEPENDENCIES, SCOPE_PROVIDED, packageName, dependencies);
     }
 
     /**
@@ -209,14 +245,14 @@ public class NpmDependencyScanner extends AbstractJacksonScanner {
             String groupId;
             String artifactId;
 
-            if (packageName.startsWith("@") && packageName.contains("/")) {
+            if (packageName.startsWith(SCOPED_PACKAGE_PREFIX) && packageName.contains(PACKAGE_SCOPE_SEPARATOR)) {
                 // Scoped package: @angular/core -> groupId=@angular, artifactId=core
-                int slashIndex = packageName.indexOf('/');
+                int slashIndex = packageName.indexOf(PACKAGE_SCOPE_SEPARATOR);
                 groupId = packageName.substring(0, slashIndex);
                 artifactId = packageName.substring(slashIndex + 1);
             } else {
                 // Regular package: express -> groupId=npm, artifactId=express
-                groupId = "npm";
+                groupId = PACKAGE_MANAGER_NPM;
                 artifactId = packageName;
             }
 

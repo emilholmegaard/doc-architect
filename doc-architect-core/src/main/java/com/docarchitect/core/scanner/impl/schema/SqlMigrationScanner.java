@@ -86,6 +86,44 @@ import com.docarchitect.core.util.Technologies;
  */
 public class SqlMigrationScanner extends AbstractRegexScanner {
 
+    // Scanner Metadata
+    private static final String SCANNER_ID = "sql-migration";
+    private static final String SCANNER_DISPLAY_NAME = "SQL Migration Scanner";
+
+    // File Patterns
+    private static final String PATTERN_FLYWAY_VERSIONED = "**/V*.sql";
+    private static final String PATTERN_FLYWAY_REPEATABLE = "**/R__*.sql";
+    private static final String PATTERN_GOLANG_MIGRATE_UP = "**/*.up.sql";
+    private static final String PATTERN_LIQUIBASE_CHANGELOG = "**/changelog*.sql";
+    private static final String PATTERN_MIGRATIONS_DIR = "**/migrations/*.sql";
+    private static final String PATTERN_DB_DIR = "**/db/*.sql";
+    private static final String PATTERN_ALL_SQL = "**/*.sql";
+
+    // File Extensions
+    private static final String SQL_EXTENSION = ".sql";
+
+    // SQL Keywords
+    private static final String KEYWORD_PRIMARY_KEY = "PRIMARY KEY";
+    private static final String KEYWORD_FOREIGN_KEY = "FOREIGN KEY";
+    private static final String KEYWORD_CONSTRAINT = "CONSTRAINT";
+    private static final String KEYWORD_UNIQUE = "UNIQUE";
+    private static final String KEYWORD_CHECK = "CHECK";
+    private static final String KEYWORD_INDEX = "INDEX";
+    private static final String KEYWORD_NOT_NULL = "NOT NULL";
+
+    // Comment Patterns
+    private static final String COMMENT_SINGLE_LINE = "--";
+    private static final String COMMENT_MULTI_START = "/*";
+    private static final String COMMENT_MULTI_END = "*/";
+
+    // Component Types
+    private static final String COMPONENT_TYPE_TABLE = "table";
+    private static final String DESCRIPTION_PREFIX = "Database table: ";
+
+    // Default Values
+    private static final String DEFAULT_PK_COLUMN = "id";
+    private static final String TECHNOLOGY_SQL = "SQL";
+
     // Regex pattern for CREATE TABLE statements
     private static final Pattern CREATE_TABLE_PATTERN = Pattern.compile(
         "CREATE\\s+TABLE(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:`?\"?(\\w+)`?\"?)\\s*\\(([^;]+)\\)",
@@ -112,12 +150,12 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
 
     @Override
     public String getId() {
-        return "sql-migration";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "SQL Migration Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
@@ -128,12 +166,12 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
     @Override
     public Set<String> getSupportedFilePatterns() {
         return Set.of(
-            "**/V*.sql",           // Flyway versioned migrations
-            "**/R__*.sql",         // Flyway repeatable migrations
-            "**/*.up.sql",         // golang-migrate up migrations
-            "**/changelog*.sql",   // Liquibase
-            "**/migrations/*.sql", // Generic migrations directory
-            "**/db/*.sql"          // Generic db directory
+            PATTERN_FLYWAY_VERSIONED,     // Flyway versioned migrations
+            PATTERN_FLYWAY_REPEATABLE,    // Flyway repeatable migrations
+            PATTERN_GOLANG_MIGRATE_UP,    // golang-migrate up migrations
+            PATTERN_LIQUIBASE_CHANGELOG,  // Liquibase
+            PATTERN_MIGRATIONS_DIR,       // Generic migrations directory
+            PATTERN_DB_DIR                // Generic db directory
         );
     }
 
@@ -144,7 +182,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.sql");
+        return hasAnyFiles(context, PATTERN_ALL_SQL);
     }
 
     @Override
@@ -155,7 +193,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
         List<Relationship> relationships = new ArrayList<>();
 
         // Find all SQL migration files
-        List<Path> sqlFiles = context.findFiles("**/*.sql").toList();
+        List<Path> sqlFiles = context.findFiles(PATTERN_ALL_SQL).toList();
 
         if (sqlFiles.isEmpty()) {
             log.warn("No SQL migration files found in project");
@@ -196,7 +234,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
     private void parseSqlFile(Path sqlFile, List<DataEntity> dataEntities,
                               List<Relationship> relationships) throws IOException {
         String content = readFileContent(sqlFile);
-        String componentId = sqlFile.getFileName().toString().replace(".sql", "");
+        String componentId = sqlFile.getFileName().toString().replace(SQL_EXTENSION, "");
 
         // Remove SQL comments
         content = removeComments(content);
@@ -218,10 +256,10 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
             DataEntity entity = new DataEntity(
                 componentId,
                 tableName,
-                "table",
+                COMPONENT_TYPE_TABLE,
                 fields,
                 primaryKey,
-                "Database table: " + tableName
+                DESCRIPTION_PREFIX + tableName
             );
 
             dataEntities.add(entity);
@@ -262,12 +300,12 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
             line = line.trim();
 
             // Skip constraint definitions
-            if (line.toUpperCase().startsWith("PRIMARY KEY") ||
-                line.toUpperCase().startsWith("FOREIGN KEY") ||
-                line.toUpperCase().startsWith("CONSTRAINT") ||
-                line.toUpperCase().startsWith("UNIQUE") ||
-                line.toUpperCase().startsWith("CHECK") ||
-                line.toUpperCase().startsWith("INDEX") ||
+            if (line.toUpperCase().startsWith(KEYWORD_PRIMARY_KEY) ||
+                line.toUpperCase().startsWith(KEYWORD_FOREIGN_KEY) ||
+                line.toUpperCase().startsWith(KEYWORD_CONSTRAINT) ||
+                line.toUpperCase().startsWith(KEYWORD_UNIQUE) ||
+                line.toUpperCase().startsWith(KEYWORD_CHECK) ||
+                line.toUpperCase().startsWith(KEYWORD_INDEX) ||
                 line.isEmpty()) {
                 continue;
             }
@@ -279,7 +317,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
                 String columnType = parts[1].replaceAll(",$", "");
 
                 // Determine if nullable
-                boolean nullable = !line.toUpperCase().contains("NOT NULL");
+                boolean nullable = !line.toUpperCase().contains(KEYWORD_NOT_NULL);
 
                 DataEntity.Field field = new DataEntity.Field(
                     columnName,
@@ -310,7 +348,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
 
         // Check for inline PRIMARY KEY in column definition
         for (String line : tableBody.split("\n")) {
-            if (line.toUpperCase().contains("PRIMARY KEY")) {
+            if (line.toUpperCase().contains(KEYWORD_PRIMARY_KEY)) {
                 String[] parts = line.trim().split("\\s+");
                 if (parts.length > 0) {
                     return parts[0].replaceAll("[`'\",]", "");
@@ -320,7 +358,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
 
         // Default to 'id' if it exists
         return fields.stream()
-            .filter(f -> "id".equalsIgnoreCase(f.name()))
+            .filter(f -> DEFAULT_PK_COLUMN.equalsIgnoreCase(f.name()))
             .findFirst()
             .map(DataEntity.Field::name)
             .orElse(null);
@@ -346,7 +384,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
                 referencedTable,
                 RelationshipType.DEPENDS_ON,
                 "Foreign key: " + tableName + "." + columnName + " -> " + referencedTable + "." + referencedColumn,
-                "SQL"
+                TECHNOLOGY_SQL
             );
 
             relationships.add(relationship);

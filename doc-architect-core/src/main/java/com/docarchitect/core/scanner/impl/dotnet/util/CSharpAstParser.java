@@ -301,9 +301,9 @@ public class CSharpAstParser {
         List<DotNetAst.CSharpClass> classes = new ArrayList<>();
         String content = Files.readString(filePath);
 
-        // Pattern to match: public class ClassName : BaseClass
+        // Pattern to match: public class ClassName : BaseClass (including partial classes)
         Pattern classPattern = Pattern.compile(
-            "public\\s+class\\s+(\\w+)(?:\\s*:\\s*(\\w+))?",
+            "public\\s+(?:partial\\s+)?class\\s+(\\w+)(?:\\s*:\\s*(\\w+))?",
             Pattern.MULTILINE
         );
 

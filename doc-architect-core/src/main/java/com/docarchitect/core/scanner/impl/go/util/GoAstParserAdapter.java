@@ -1,11 +1,12 @@
 package com.docarchitect.core.scanner.impl.go.util;
 
-import com.docarchitect.core.scanner.ast.AstParser;
-import com.docarchitect.core.scanner.ast.GoAst;
-
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
+
+import com.docarchitect.core.scanner.ast.AstParser;
+import com.docarchitect.core.scanner.ast.GoAst;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Adapter that implements AstParser interface for Go using GoAstParser.
@@ -29,6 +30,6 @@ public class GoAstParserAdapter implements AstParser<GoAst.GoStruct> {
 
     @Override
     public String getLanguage() {
-        return "go";
+        return Technologies.GO;
     }
 }

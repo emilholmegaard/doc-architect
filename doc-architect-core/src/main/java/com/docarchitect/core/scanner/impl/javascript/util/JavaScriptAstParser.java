@@ -43,15 +43,19 @@ import java.util.regex.Pattern;
  */
 public class JavaScriptAstParser {
 
+    private static final String JAVASCRIPT_LEXER_CLASS = "com.docarchitect.parser.JavaScriptLexer";
+    private static final String JAVASCRIPT_PARSER_CLASS = "com.docarchitect.parser.JavaScriptParser";
+    private static final String PARSER_PROGRAM_METHOD = "program";
+    private static final String ROUTE_REGEX =
+        "(app|router)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"`]([^'\"`]+)['\"`]";
+    private static final int ROUTER_NAME_GROUP = 1;
+    private static final int HTTP_METHOD_GROUP = 2;
+    private static final int PATH_GROUP = 3;
+    private static final String APP_ROUTER_PREFIX = "app.";
+    private static final String ROUTER_ROUTER_PREFIX = "router.";
     private static final boolean ANTLR_AVAILABLE = checkAntlrAvailability();
 
-    /**
-     * Regex to match Express route definitions: app.get('/path') or router.post('/path').
-     * Captures: (1) app|router, (2) HTTP method, (3) path.
-     */
-    private static final Pattern ROUTE_PATTERN = Pattern.compile(
-        "(app|router)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"`]([^'\"`]+)['\"`]"
-    );
+    private static final Pattern ROUTE_PATTERN = Pattern.compile(ROUTE_REGEX);
 
     /**
      * Parse a JavaScript/TypeScript file and extract Express routes.
@@ -82,7 +86,7 @@ public class JavaScriptAstParser {
     private static boolean checkAntlrAvailability() {
         try {
             Class.forName("org.antlr.v4.runtime.BaseErrorListener");
-            Class.forName("com.docarchitect.parser.JavaScriptLexer");
+            Class.forName(JAVASCRIPT_LEXER_CLASS);
             return true;
         } catch (ClassNotFoundException e) {
             return false;
@@ -110,7 +114,7 @@ public class JavaScriptAstParser {
      */
     private static Lexer createJavaScriptLexer(CharStream input) {
         try {
-            Class<?> lexerClass = Class.forName("com.docarchitect.parser.JavaScriptLexer");
+            Class<?> lexerClass = Class.forName(JAVASCRIPT_LEXER_CLASS);
             return (Lexer) lexerClass.getDeclaredConstructor(CharStream.class).newInstance(input);
         } catch (Exception e) {
             throw new RuntimeException("JavaScriptLexer not found - ensure ANTLR grammar is generated", e);
@@ -122,7 +126,7 @@ public class JavaScriptAstParser {
      */
     private static Parser createJavaScriptParser(CommonTokenStream tokens) {
         try {
-            Class<?> parserClass = Class.forName("com.docarchitect.parser.JavaScriptParser");
+            Class<?> parserClass = Class.forName(JAVASCRIPT_PARSER_CLASS);
             return (Parser) parserClass.getDeclaredConstructor(CommonTokenStream.class).newInstance(tokens);
         } catch (Exception e) {
             throw new RuntimeException("JavaScriptParser not found - ensure ANTLR grammar is generated", e);
@@ -134,7 +138,7 @@ public class JavaScriptAstParser {
      */
     private static ParseTree getProgramTree(Parser parser) {
         try {
-            return (ParseTree) parser.getClass().getMethod("program").invoke(parser);
+            return (ParseTree) parser.getClass().getMethod(PARSER_PROGRAM_METHOD).invoke(parser);
         } catch (Exception e) {
             throw new RuntimeException("Cannot invoke program on parser", e);
         }
@@ -154,9 +158,8 @@ public class JavaScriptAstParser {
         private void walkTree(ParseTree node) {
             if (node == null) return;
 
-            // Extract route from node text
             String text = node.getText();
-            if (text != null && (text.contains("app.") || text.contains("router."))) {
+            if (text != null && (text.contains(APP_ROUTER_PREFIX) || text.contains(ROUTER_ROUTER_PREFIX))) {
                 JavaScriptAst.ExpressRoute route = extractRouteFromText(text);
                 if (route != null) {
                     routes.add(route);
@@ -170,12 +173,11 @@ public class JavaScriptAstParser {
         }
 
         private JavaScriptAst.ExpressRoute extractRouteFromText(String text) {
-            // Use regex to extract route details
             Matcher matcher = ROUTE_PATTERN.matcher(text);
             if (matcher.find()) {
-                String routerName = matcher.group(1);
-                String httpMethod = matcher.group(2);
-                String path = matcher.group(3);
+                String routerName = matcher.group(ROUTER_NAME_GROUP);
+                String httpMethod = matcher.group(HTTP_METHOD_GROUP);
+                String path = matcher.group(PATH_GROUP);
                 return new JavaScriptAst.ExpressRoute(routerName, httpMethod, path, null);
             }
             return null;
@@ -191,9 +193,9 @@ public class JavaScriptAstParser {
 
         Matcher matcher = ROUTE_PATTERN.matcher(content);
         while (matcher.find()) {
-            String routerName = matcher.group(1);
-            String httpMethod = matcher.group(2);
-            String path = matcher.group(3);
+            String routerName = matcher.group(ROUTER_NAME_GROUP);
+            String httpMethod = matcher.group(HTTP_METHOD_GROUP);
+            String path = matcher.group(PATH_GROUP);
 
             routes.add(new JavaScriptAst.ExpressRoute(routerName, httpMethod, path, null));
         }
