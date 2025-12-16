@@ -11,7 +11,7 @@ com.docarchitect.core.scanner.impl.java.KafkaScanner
 com.docarchitect.core.scanner.impl.python.PipPoetryDependencyScanner
 com.docarchitect.core.scanner.impl.python.FastAPIScanner
 com.docarchitect.core.scanner.impl.python.FlaskScanner
-com.docarchitect.core.scanner.impl.python.SQLAlchemyScanner
+com.docarchitect.core.scanner.impl.python.SqlAlchemyScanner
 com.docarchitect.core.scanner.impl.python.DjangoOrmScanner
 
 # .NET Scanners

@@ -1,22 +1,26 @@
 package com.docarchitect.core.scanner.impl.python;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for Flask REST endpoints in Python source files.
  *
- * <p>Since we're running in Java, we parse Python files as TEXT using regex patterns
- * to extract route decorators and function definitions.
+ * <p>Uses regex patterns to extract Flask route decorators and function definitions.
+ * Flask routes are typically module-level functions, which are not captured by AST parsers
+ * that focus on class definitions.
  *
  * <p><b>Supported Decorator Styles</b></p>
  *
@@ -44,14 +48,6 @@ import java.util.regex.Pattern;
  *   <li>Body parameters: {@code request.json} or {@code request.get_json()}</li>
  * </ul>
  *
- * <p><b>Regex Patterns</b></p>
- * <ul>
- *   <li>{@code MODERN_DECORATOR}: {@code @(app|blueprint)\.(get|post|put|delete|patch)\s*\(\s*['"](.*?)['"]}</li>
- *   <li>{@code LEGACY_DECORATOR}: {@code @(app|blueprint)\.route\s*\(\s*['"](.*?)['"].*?methods\s*=\s*\[(.*?)\]}</li>
- *   <li>{@code SIMPLE_ROUTE}: {@code @(app|blueprint)\.route\s*\(\s*['"](.*?)['"]}</li>
- *   <li>{@code PATH_PARAM_PATTERN}: {@code <(?:(\w+):)?(\w+)>}</li>
- * </ul>
- *
  * @see ApiEndpoint
  * @since 1.0.0
  */
@@ -59,28 +55,28 @@ public class FlaskScanner extends AbstractRegexScanner {
 
     /**
      * Regex for modern Flask 2.0+ decorators: @app.get("/users").
-     * Captures: (1) app|blueprint, (2) HTTP method, (3) path.
+     * Captures: (1) app variable name, (2) HTTP method, (3) path.
      */
     private static final Pattern MODERN_DECORATOR = Pattern.compile(
-        "@(app|blueprint|\\w+_bp)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"](.+?)['\"]"
+        "@(\\w+)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"](.+?)['\"]"
     );
 
     /**
      * Regex for legacy Flask decorators with methods: @app.route("/users", methods=["GET", "POST"]).
-     * Captures: (1) app|blueprint, (2) path, (3) methods list.
+     * Captures: (1) app variable name, (2) path, (3) methods list.
      */
     private static final Pattern LEGACY_DECORATOR = Pattern.compile(
-        "@(app|blueprint|\\w+_bp)\\.route\\s*\\(\\s*['\"](.+?)['\"].*?methods\\s*=\\s*\\[(.+?)\\]",
+        "@(\\w+)\\.route\\s*\\(\\s*['\"](.+?)['\"].*?methods\\s*=\\s*\\[(.+?)\\]",
         Pattern.DOTALL
     );
 
     /**
      * Regex for simple route decorator without methods: @app.route("/users").
-     * Captures: (1) app|blueprint, (2) path.
+     * Captures: (1) app variable name, (2) path.
      * Defaults to GET method.
      */
     private static final Pattern SIMPLE_ROUTE = Pattern.compile(
-        "@(app|blueprint|\\w+_bp)\\.route\\s*\\(\\s*['\"](.+?)['\"]"
+        "@(\\w+)\\.route\\s*\\(\\s*['\"](.+?)['\"]"
     );
 
     /**
@@ -111,7 +107,7 @@ public class FlaskScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("python");
+        return Set.of(Technologies.PYTHON);
     }
 
     @Override

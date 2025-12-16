@@ -6,6 +6,8 @@ import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
+import com.docarchitect.core.util.Technologies;
+
 import graphql.language.*;
 import graphql.parser.Parser;
 
@@ -92,7 +94,7 @@ public class GraphQLScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("graphql", "javascript", "typescript", "java", "kotlin");
+        return Set.of(Technologies.GRAPHQL, Technologies.JAVASCRIPT,Technologies.TYPESCRIPT, Technologies.JAVA, Technologies.KOTLIN, Technologies.CSHARP);
     }
 
     @Override

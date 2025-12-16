@@ -1,23 +1,25 @@
 package com.docarchitect.core.scanner.impl.python;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
 import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
-import com.docarchitect.core.scanner.base.AbstractRegexScanner;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.docarchitect.core.scanner.ast.AstParserFactory;
+import com.docarchitect.core.scanner.ast.PythonAst;
+import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for Django ORM model definitions in Python source files.
  *
- * <p>Since we're running in Java, we parse Python files as TEXT using regex patterns
- * to extract Django model classes, fields, and relationships.
+ * <p>Uses AST parsing via {@link PythonAst} to extract Django model classes,
+ * fields, and relationships from Python source code.
  *
  * <p><b>Supported Patterns</b></p>
  *
@@ -42,95 +44,95 @@ import java.util.regex.Pattern;
  *   <li>{@code models.OneToOneField} - One-to-one relationship</li>
  * </ul>
  *
- * <p><b>Relationship Patterns</b></p>
- * <ul>
- *   <li>{@code models.ForeignKey("User", on_delete=models.CASCADE)}</li>
- *   <li>{@code models.ManyToManyField("Tag", related_name="posts")}</li>
- *   <li>{@code models.OneToOneField("Profile", on_delete=models.CASCADE)}</li>
- * </ul>
- *
- * <p><b>Regex Patterns</b></p>
- * <ul>
- *   <li>{@code CLASS_PATTERN}: {@code class\s+(\w+)\s*\(.*models\.Model.*\):}</li>
- *   <li>{@code FIELD_PATTERN}: {@code (\w+)\s*=\s*models\.(\w+)\s*\((.+?)\)}</li>
- *   <li>{@code FOREIGNKEY_PATTERN}: {@code (\w+)\s*=\s*models\.(ForeignKey|OneToOneField|ManyToManyField)\s*\(\s*['"](.+?)['"]}</li>
- *   <li>{@code NULL_PATTERN}: {@code null\s*=\s*(True|False)}</li>
- *   <li>{@code PRIMARY_KEY_PATTERN}: {@code primary_key\s*=\s*True}</li>
- * </ul>
- *
+ * @see PythonAst
  * @see DataEntity
  * @since 1.0.0
  */
-public class DjangoOrmScanner extends AbstractRegexScanner {
+public class DjangoOrmScanner extends AbstractAstScanner<PythonAst.PythonClass> {
 
-    /**
-     * Regex to match Django model class: class User(models.Model):.
-     * Captures: (1) class name.
-     */
-    private static final Pattern CLASS_PATTERN = Pattern.compile(
-        "class\\s+(\\w+)\\s*\\(.*models\\.Model.*\\):"
-    );
-
-    /**
-     * Regex to match Django field: username = models.CharField(max_length=100).
-     * Captures: (1) field name, (2) field type, (3) field arguments.
-     */
-    private static final Pattern FIELD_PATTERN = Pattern.compile(
-        "(\\w+)\\s*=\\s*models\\.(\\w+)\\s*\\((.+?)\\)",
-        Pattern.DOTALL
-    );
-
-    /**
-     * Regex to match relationship fields: user = models.ForeignKey("User", ...).
-     * Captures: (1) field name, (2) relationship type, (3) target model.
-     */
-    private static final Pattern FOREIGNKEY_PATTERN = Pattern.compile(
-        "(\\w+)\\s*=\\s*models\\.(ForeignKey|OneToOneField|ManyToManyField)\\s*\\(\\s*['\"](.+?)['\"]"
-    );
-
-    /**
-     * Regex to extract null=True/False from field definition.
-     */
-    private static final Pattern NULL_PATTERN = Pattern.compile(
-        "null\\s*=\\s*(True|False)"
-    );
-
-    /**
-     * Regex to extract primary_key=True from field definition.
-     */
-    private static final Pattern PRIMARY_KEY_PATTERN = Pattern.compile(
-        "primary_key\\s*=\\s*True"
-    );
-
-    /**
-     * Regex to extract blank=True/False from field definition.
-     */
-    private static final Pattern BLANK_PATTERN = Pattern.compile(
-        "blank\\s*=\\s*(True|False)"
-    );
+    private static final String SCANNER_ID = "django-orm";
+    private static final String SCANNER_DISPLAY_NAME = "Django ORM Scanner";
+    private static final String PATTERN_MODELS_PY = "**/models.py";
+    private static final String PATTERN_MODELS_SUFFIX = "**/*_models.py";
+    private static final String DJANGO_SOURCE = "Django";
+    
+    private static final String BASE_CLASS_MODELS_MODEL = "models.Model";
+    private static final String BASE_CLASS_MODEL = "Model";
+    private static final String META_CLASS_NAME = "Meta";
+    private static final String DEFAULT_PRIMARY_KEY = "id";
+    private static final String ENTITY_TYPE_TABLE = "table";
+    
+    private static final String FIELD_FOREIGN_KEY = "ForeignKey";
+    private static final String FIELD_ONE_TO_ONE = "OneToOneField";
+    private static final String FIELD_MANY_TO_MANY = "ManyToManyField";
+    
+    private static final String FIELD_CHAR = "CharField";
+    private static final String FIELD_TEXT = "TextField";
+    private static final String FIELD_EMAIL = "EmailField";
+    private static final String FIELD_URL = "URLField";
+    private static final String FIELD_INTEGER = "IntegerField";
+    private static final String FIELD_SMALL_INTEGER = "SmallIntegerField";
+    private static final String FIELD_POSITIVE_INTEGER = "PositiveIntegerField";
+    private static final String FIELD_BIG_INTEGER = "BigIntegerField";
+    private static final String FIELD_BOOLEAN = "BooleanField";
+    private static final String FIELD_DATETIME = "DateTimeField";
+    private static final String FIELD_DATE = "DateField";
+    private static final String FIELD_TIME = "TimeField";
+    private static final String FIELD_DECIMAL = "DecimalField";
+    private static final String FIELD_FLOAT = "FloatField";
+    private static final String FIELD_BINARY = "BinaryField";
+    private static final String FIELD_JSON = "JSONField";
+    private static final String FIELD_UUID = "UUIDField";
+    private static final String FIELD_AUTO = "AutoField";
+    private static final String FIELD_BIG_AUTO = "BigAutoField";
+    
+    private static final String SQL_VARCHAR = "VARCHAR";
+    private static final String SQL_INTEGER = "INTEGER";
+    private static final String SQL_BIGINT = "BIGINT";
+    private static final String SQL_BOOLEAN = "BOOLEAN";
+    private static final String SQL_DATETIME = "DATETIME";
+    private static final String SQL_DATE = "DATE";
+    private static final String SQL_TIME = "TIME";
+    private static final String SQL_DECIMAL = "DECIMAL";
+    private static final String SQL_FLOAT = "FLOAT";
+    private static final String SQL_BLOB = "BLOB";
+    private static final String SQL_JSON = "JSON";
+    private static final String SQL_UUID = "UUID";
+    private static final String SQL_SERIAL = "SERIAL";
+    
+    private static final String PARAM_NULL_TRUE = "null=True";
+    private static final String PARAM_BLANK_TRUE = "blank=True";
+    private static final String PARAM_PRIMARY_KEY_TRUE = "primary_key=True";
+    
+    private static final String REGEX_CAMEL_TO_SNAKE = "([a-z])([A-Z])";
+    private static final String REGEX_WORD_DOT = "[\\w.]+";
 
     private static final Set<String> RELATIONSHIP_FIELDS = Set.of(
-        "ForeignKey", "OneToOneField", "ManyToManyField"
+        FIELD_FOREIGN_KEY, FIELD_ONE_TO_ONE, FIELD_MANY_TO_MANY
     );
+
+    public DjangoOrmScanner() {
+        super(AstParserFactory.getPythonParser());
+    }
 
     @Override
     public String getId() {
-        return "django-orm";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Django ORM Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("python");
+        return Set.of(Technologies.PYTHON);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/models.py", "**/*_models.py");
+        return Set.of(PATTERN_MODELS_PY, PATTERN_MODELS_SUFFIX);
     }
 
     @Override
@@ -140,7 +142,7 @@ public class DjangoOrmScanner extends AbstractRegexScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/models.py", "**/*_models.py");
+        return hasAnyFiles(context, PATTERN_MODELS_PY, PATTERN_MODELS_SUFFIX);
     }
 
     @Override
@@ -151,8 +153,8 @@ public class DjangoOrmScanner extends AbstractRegexScanner {
         List<Relationship> relationships = new ArrayList<>();
 
         List<Path> modelFiles = new ArrayList<>();
-        context.findFiles("**/models.py").forEach(modelFiles::add);
-        context.findFiles("**/*_models.py").forEach(modelFiles::add);
+        context.findFiles(PATTERN_MODELS_PY).forEach(modelFiles::add);
+        context.findFiles(PATTERN_MODELS_SUFFIX).forEach(modelFiles::add);
 
         if (modelFiles.isEmpty()) {
             return emptyResult();
@@ -179,94 +181,67 @@ public class DjangoOrmScanner extends AbstractRegexScanner {
         );
     }
 
-    private void parsePythonFile(Path file, List<DataEntity> dataEntities, List<Relationship> relationships) throws IOException {
-        String content = readFileContent(file);
-        List<String> lines = readFileLines(file);
+    private void parsePythonFile(Path file, List<DataEntity> dataEntities,
+                                 List<Relationship> relationships) {
+        List<PythonAst.PythonClass> classes = parseAstFile(file);
 
-        // Find all Django model classes
-        Matcher classMatcher = CLASS_PATTERN.matcher(content);
-        while (classMatcher.find()) {
-            String className = classMatcher.group(1);
-            int classStartPos = classMatcher.start();
+        for (PythonAst.PythonClass pythonClass : classes) {
+            // Skip non-Django models
+            if (!pythonClass.inheritsFrom(BASE_CLASS_MODELS_MODEL) &&
+                !pythonClass.inheritsFrom(BASE_CLASS_MODEL)) {
+                continue;
+            }
 
-            // Extract class body
-            String classBody = extractClassBody(lines, classStartPos, content);
+            // Extract table name
+            String tableName = extractTableName(pythonClass);
 
-            // Extract table name (default to snake_case of class name)
-            String tableName = extractTableName(classBody, className);
-
-            // Extract fields
+            // Extract fields and relationships
             List<DataEntity.Field> fields = new ArrayList<>();
             String primaryKey = null;
 
-            Matcher fieldMatcher = FIELD_PATTERN.matcher(classBody);
-            while (fieldMatcher.find()) {
-                String fieldName = fieldMatcher.group(1);
-                String fieldType = fieldMatcher.group(2);
-                String fieldArgs = fieldMatcher.group(3);
-
-                // Skip Meta class and other special fields
-                if (fieldName.equals("Meta") || fieldName.startsWith("_")) {
+            for (PythonAst.Field field : pythonClass.fields()) {
+                if (field.name().equals(META_CLASS_NAME) || field.name().startsWith("_")) {
                     continue;
                 }
 
                 // Check if this is a relationship field
-                if (RELATIONSHIP_FIELDS.contains(fieldType)) {
+                if (RELATIONSHIP_FIELDS.stream().anyMatch(rel -> field.type().contains(rel))) {
                     // Extract relationship
-                    Matcher fkMatcher = FOREIGNKEY_PATTERN.matcher(classBody);
-                    while (fkMatcher.find()) {
-                        if (fkMatcher.group(1).equals(fieldName)) {
-                            String targetModel = fkMatcher.group(3);
-
-                            RelationshipType relType = switch (fieldType) {
-                                case "ForeignKey" -> RelationshipType.DEPENDS_ON;
-                                case "OneToOneField" -> RelationshipType.DEPENDS_ON;
-                                case "ManyToManyField" -> RelationshipType.DEPENDS_ON;
-                                default -> RelationshipType.DEPENDS_ON;
-                            };
-
-                            Relationship rel = new Relationship(
-                                className,
-                                targetModel,
-                                relType,
-                                fieldType + " relationship",
-                                "Django"
-                            );
-
-                            relationships.add(rel);
-                            log.debug("Found Django relationship: {} --[{}]--> {}", className, fieldType, targetModel);
-                            break;
-                        }
+                    Relationship rel = extractRelationship(pythonClass.name(), field);
+                    if (rel != null) {
+                        relationships.add(rel);
+                        log.debug("Found Django relationship: {} --[{}]--> {}",
+                            pythonClass.name(), field.type(), rel.targetId());
                     }
                 } else {
                     // Regular field
-                    String sqlType = mapDjangoFieldToSql(fieldType);
-                    boolean nullable = isNullable(fieldArgs);
-                    boolean isPrimaryKey = isPrimaryKey(fieldArgs);
+                    String sqlType = mapDjangoFieldToSql(field.type());
+                    boolean nullable = isNullableField(field.value());
+                    boolean isPrimaryKey = isPrimaryKeyField(field.value());
 
-                    DataEntity.Field field = new DataEntity.Field(
-                        fieldName,
+                    DataEntity.Field dataField = new DataEntity.Field(
+                        field.name(),
                         sqlType,
                         nullable,
                         null
                     );
 
-                    fields.add(field);
+                    fields.add(dataField);
 
                     if (isPrimaryKey && primaryKey == null) {
-                        primaryKey = fieldName;
+                        primaryKey = field.name();
                     }
 
-                    log.debug("Found Django field: {}.{} ({})", className, fieldName, sqlType);
+                    log.debug("Found Django field: {}.{} ({})", pythonClass.name(), field.name(), sqlType);
                 }
             }
 
             // Django models always have an implicit 'id' primary key if not specified
             if (primaryKey == null) {
-                primaryKey = "id";
+                primaryKey = DEFAULT_PRIMARY_KEY;
                 DataEntity.Field idField = new DataEntity.Field(
-                    "id",
-                    "AutoField",
+                    DEFAULT_PRIMARY_KEY,
+                    FIELD_AUTO,
                     false,
                     null
                 );
@@ -274,128 +249,149 @@ public class DjangoOrmScanner extends AbstractRegexScanner {
             }
 
             // Create DataEntity
-            if (!fields.isEmpty() || !relationships.isEmpty()) {
+            if (!fields.isEmpty()) {
                 DataEntity entity = new DataEntity(
-                    className,
+                    pythonClass.name(),
                     tableName,
-                    "table",
+                    ENTITY_TYPE_TABLE,
                     fields,
                     primaryKey,
-                    "Django Model: " + className
+                    "Django Model: " + pythonClass.name()
                 );
 
                 dataEntities.add(entity);
-                log.debug("Found Django model: {} -> table: {}", className, tableName);
+                log.debug("Found Django model: {} -> table: {}", pythonClass.name(), tableName);
             }
         }
     }
 
     /**
-     * Extracts the class body from the source code.
+     * Extract table name from Django model class name.
      */
-    private String extractClassBody(List<String> lines, int classStartPos, String content) {
-        // Find the line number where the class starts
-        int lineNumber = content.substring(0, classStartPos).split("\n").length - 1;
-
-        StringBuilder classBody = new StringBuilder();
-        int baseIndent = -1;
-
-        for (int i = lineNumber; i < lines.size(); i++) {
-            String line = lines.get(i);
-
-            // Skip the class definition line
-            if (i == lineNumber) {
-                continue;
-            }
-
-            // Calculate indentation
-            int indent = line.length() - line.trim().length();
-
-            // Initialize base indentation from first non-empty line
-            if (baseIndent == -1 && !line.trim().isEmpty()) {
-                baseIndent = indent;
-            }
-
-            // Stop if we hit another class at the same/lower indentation
-            if (baseIndent != -1 && indent < baseIndent && !line.trim().isEmpty()) {
-                break;
-            }
-
-            classBody.append(line).append("\n");
-        }
-
-        return classBody.toString();
+    private String extractTableName(PythonAst.PythonClass pythonClass) {
+        // TODO: Could parse Meta class for db_table specification
+        // For now, use Django convention: app_modelname
+        return toSnakeCase(pythonClass.name());
     }
 
     /**
-     * Extracts table name from Meta class or generates from class name.
+     * Extract relationship information from a field.
      */
-    private String extractTableName(String classBody, String className) {
-        Pattern metaTablePattern = Pattern.compile(
-            "class\\s+Meta:.*?db_table\\s*=\\s*['\"](.+?)['\"]",
-            Pattern.DOTALL
+    private Relationship extractRelationship(String sourceModel, PythonAst.Field field) {
+        // Extract target model from field value
+        // Example: models.ForeignKey('User', on_delete=models.CASCADE)
+        if (field.value() == null) {
+            return null;
+        }
+
+        String targetModel = extractTargetModel(field.value());
+        if (targetModel == null) {
+            return null;
+        }
+
+        RelationshipType relType = switch (field.type()) {
+            case String s when s.contains(FIELD_FOREIGN_KEY) -> RelationshipType.DEPENDS_ON;
+            case String s when s.contains(FIELD_ONE_TO_ONE) -> RelationshipType.DEPENDS_ON;
+            case String s when s.contains(FIELD_MANY_TO_MANY) -> RelationshipType.DEPENDS_ON;
+            default -> RelationshipType.DEPENDS_ON;
+        };
+
+        return new Relationship(
+            sourceModel,
+            targetModel,
+            relType,
+            field.type() + " relationship",
+            DJANGO_SOURCE
         );
+    }
 
-        Matcher matcher = metaTablePattern.matcher(classBody);
-        if (matcher.find()) {
-            return matcher.group(1);
+    /**
+     * Extract target model name from relationship field value.
+     * Examples: 'User', "Profile", 'app.User'
+     */
+    private String extractTargetModel(String fieldValue) {
+        // Find quoted string after ForeignKey/OneToOneField/ManyToManyField
+        String[] parts = fieldValue.split("['\"]");
+        for (int i = 1; i < parts.length; i += 2) {
+            String part = parts[i].trim();
+            if (!part.isEmpty() && part.matches(REGEX_WORD_DOT)) {
+                // Extract just the class name if it's app.Model format
+                if (part.contains(".")) {
+                    return part.substring(part.lastIndexOf(".") + 1);
+                }
+                return part;
+            }
         }
-
-        // Default Django convention: app_modelname
-        return toSnakeCase(className);
+        return null;
     }
 
     /**
      * Maps Django field types to SQL types.
      */
     private String mapDjangoFieldToSql(String djangoField) {
-        return switch (djangoField) {
-            case "CharField", "TextField", "EmailField", "URLField", "SlugField" -> "VARCHAR";
-            case "IntegerField", "SmallIntegerField", "PositiveIntegerField" -> "INTEGER";
-            case "BigIntegerField" -> "BIGINT";
-            case "BooleanField" -> "BOOLEAN";
-            case "DateTimeField" -> "DATETIME";
-            case "DateField" -> "DATE";
-            case "TimeField" -> "TIME";
-            case "DecimalField" -> "DECIMAL";
-            case "FloatField" -> "FLOAT";
-            case "BinaryField" -> "BLOB";
-            case "JSONField" -> "JSON";
-            case "UUIDField" -> "UUID";
-            case "AutoField", "BigAutoField" -> "SERIAL";
-            default -> djangoField;
-        };
+        if (djangoField.contains(FIELD_CHAR) || djangoField.contains(FIELD_TEXT) ||
+            djangoField.contains(FIELD_EMAIL) || djangoField.contains(FIELD_URL)) {
+            return SQL_VARCHAR;
+        } else if (djangoField.contains(FIELD_INTEGER) || djangoField.contains(FIELD_SMALL_INTEGER) ||
+                   djangoField.contains(FIELD_POSITIVE_INTEGER)) {
+            return SQL_INTEGER;
+        } else if (djangoField.contains(FIELD_BIG_INTEGER)) {
+            return SQL_BIGINT;
+        } else if (djangoField.contains(FIELD_BOOLEAN)) {
+            return SQL_BOOLEAN;
+        } else if (djangoField.contains(FIELD_DATETIME)) {
+            return SQL_DATETIME;
+        } else if (djangoField.contains(FIELD_DATE)) {
+            return SQL_DATE;
+        } else if (djangoField.contains(FIELD_TIME)) {
+            return SQL_TIME;
+        } else if (djangoField.contains(FIELD_DECIMAL)) {
+            return SQL_DECIMAL;
+        } else if (djangoField.contains(FIELD_FLOAT)) {
+            return SQL_FLOAT;
+        } else if (djangoField.contains(FIELD_BINARY)) {
+            return SQL_BLOB;
+        } else if (djangoField.contains(FIELD_JSON)) {
+            return SQL_JSON;
+        } else if (djangoField.contains(FIELD_UUID)) {
+            return SQL_UUID;
+        } else if (djangoField.contains(FIELD_AUTO) || djangoField.contains(FIELD_BIG_AUTO)) {
+            return SQL_SERIAL;
+        }
+
+        return djangoField;
     }
 
     /**
-     * Checks if the field is nullable.
+     * Checks if the field is nullable based on its value.
      */
-    private boolean isNullable(String fieldArgs) {
-        Matcher nullMatcher = NULL_PATTERN.matcher(fieldArgs);
-        if (nullMatcher.find()) {
-            return "True".equals(nullMatcher.group(1));
+    private boolean isNullableField(String fieldValue) {
+        if (fieldValue == null) {
+            return false;
         }
 
-        // Check blank=True as well (implies nullable in practice)
-        Matcher blankMatcher = BLANK_PATTERN.matcher(fieldArgs);
-        if (blankMatcher.find()) {
-            return "True".equals(blankMatcher.group(1));
+        if (fieldValue.contains(PARAM_NULL_TRUE)) {
+            return true;
         }
 
-        return false; // Django fields are NOT NULL by default
+        if (fieldValue.contains(PARAM_BLANK_TRUE)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**
      * Checks if the field is a primary key.
      */
-    private boolean isPrimaryKey(String fieldArgs) {
-        return PRIMARY_KEY_PATTERN.matcher(fieldArgs).find();
+    private boolean isPrimaryKeyField(String fieldValue) {
+        return fieldValue != null && fieldValue.contains(PARAM_PRIMARY_KEY_TRUE);
     }
 
     /**
      * Converts CamelCase to snake_case.
      */
     private String toSnakeCase(String camelCase) {
-        return camelCase.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+        return camelCase.replaceAll(REGEX_CAMEL_TO_SNAKE, "$1_$2").toLowerCase();
     }
 }

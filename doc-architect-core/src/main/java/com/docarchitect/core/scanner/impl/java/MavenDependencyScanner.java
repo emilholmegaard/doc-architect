@@ -1,5 +1,16 @@
 package com.docarchitect.core.scanner.impl.java;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.model.Dependency;
@@ -7,12 +18,7 @@ import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractJacksonScanner;
 import com.docarchitect.core.util.IdGenerator;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for Maven dependency declarations in pom.xml files.
@@ -69,7 +75,7 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("java", "kotlin", "groovy", "scala");
+        return Set.of(Technologies.JAVA, Technologies.KOTLIN, Technologies.GROOVY, Technologies.SCALA);
     }
 
     @Override

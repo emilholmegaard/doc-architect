@@ -1,5 +1,14 @@
 package com.docarchitect.core.scanner.impl.python;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.model.Dependency;
@@ -7,14 +16,9 @@ import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractJacksonScanner;
 import com.docarchitect.core.util.IdGenerator;
+import com.docarchitect.core.util.Technologies;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.toml.TomlMapper;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Scanner for Python dependency files (requirements.txt, pyproject.toml, setup.py, Pipfile).
@@ -83,7 +87,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("python");
+        return Set.of(Technologies.PYTHON);
     }
 
     @Override
@@ -205,17 +209,21 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                 String packageName = matcher.group(1);
                 String versionSpec = matcher.group(3);
 
-                Dependency dep = new Dependency(
-                    sourceComponentId,
-                    packageName,
-                    null, // Python packages don't have groupId
-                    versionSpec,
-                    "compile",
-                    true
-                );
+                if (packageName != null && !packageName.isEmpty()) {
+                    Dependency dep = new Dependency(
+                        sourceComponentId,
+                        "pypi", // Python packages use PyPI as groupId
+                        packageName, // artifactId
+                        versionSpec, // version
+                        "compile", // scope
+                        true // direct
+                    );
 
-                dependencies.add(dep);
-                log.debug("Found dependency from {}: {} {}", file.getFileName(), packageName, versionSpec);
+                    dependencies.add(dep);
+                    log.debug("Found dependency from {}: {} {}", file.getFileName(), packageName, versionSpec);
+                } else {
+                    log.warn("Matched requirements pattern but packageName is null/empty for line: {}", line);
+                }
             }
         }
     }
@@ -264,11 +272,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                             String version = extractVersionFromPoetryDep(entry.getValue());
                             Dependency dep = new Dependency(
                                 sourceComponentId,
-                                packageName,
-                                null,
-                                version,
-                                "compile",
-                                true
+                                "pypi", // Python packages use PyPI as groupId
+                                packageName, // artifactId
+                                version, // version
+                                "compile", // scope
+                                true // direct
                             );
                             dependencies.add(dep);
                         }
@@ -283,11 +291,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                         String version = extractVersionFromPoetryDep(entry.getValue());
                         Dependency dep = new Dependency(
                             sourceComponentId,
-                            packageName,
-                            null,
-                            version,
-                            "test",
-                            true
+                            "pypi", // Python packages use PyPI as groupId
+                            packageName, // artifactId
+                            version, // version
+                            "test", // scope
+                            true // direct
                         );
                         dependencies.add(dep);
                     });
@@ -330,11 +338,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
                 Dependency dep = new Dependency(
                     sourceComponentId,
-                    packageName,
-                    null,
-                    versionSpec,
-                    "compile",
-                    true
+                    "pypi", // Python packages use PyPI as groupId
+                    packageName, // artifactId
+                    versionSpec, // version
+                    "compile", // scope
+                    true // direct
                 );
 
                 dependencies.add(dep);
@@ -360,11 +368,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
                 Dependency dep = new Dependency(
                     sourceComponentId,
-                    packageName,
-                    null,
-                    version,
-                    "compile",
-                    true
+                    "pypi", // Python packages use PyPI as groupId
+                    packageName, // artifactId
+                    version, // version
+                    "compile", // scope
+                    true // direct
                 );
 
                 dependencies.add(dep);
@@ -381,11 +389,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
                 Dependency dep = new Dependency(
                     sourceComponentId,
-                    packageName,
-                    null,
-                    version,
-                    "test",
-                    true
+                    "pypi", // Python packages use PyPI as groupId
+                    packageName, // artifactId
+                    version, // version
+                    "test", // scope
+                    true // direct
                 );
 
                 dependencies.add(dep);
@@ -420,11 +428,11 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
             Dependency dep = new Dependency(
                 sourceComponentId,
-                packageName,
-                null,
-                versionSpec,
-                scope,
-                true
+                "pypi", // Python packages use PyPI as groupId
+                packageName, // artifactId
+                versionSpec, // version
+                scope, // scope
+                true // direct
             );
 
             dependencies.add(dep);

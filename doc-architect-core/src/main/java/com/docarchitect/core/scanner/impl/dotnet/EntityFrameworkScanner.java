@@ -5,7 +5,10 @@ import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
-import com.docarchitect.core.scanner.base.AbstractRegexScanner;
+import com.docarchitect.core.scanner.ast.AstParserFactory;
+import com.docarchitect.core.scanner.ast.DotNetAst;
+import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.util.Technologies;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -63,84 +66,107 @@ import java.util.regex.Pattern;
  * @see DataEntity
  * @since 1.0.0
  */
-public class EntityFrameworkScanner extends AbstractRegexScanner {
+public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
+
+    // Scanner identification constants
+    private static final String SCANNER_ID = "entity-framework";
+    private static final String SCANNER_NAME = "Entity Framework Scanner";
+    private static final int SCANNER_PRIORITY = 60;
+
+    public EntityFrameworkScanner() {
+        super(AstParserFactory.getDotNetParser());
+    }
+    
+    // File pattern constants
+    private static final String DBCONTEXT_FILE_PATTERN = "**/*DbContext.cs";
+    private static final String CS_FILE_PATTERN = "**/*.cs";
+    
+    // Regex pattern strings
+    private static final String DBCONTEXT_REGEX = "public\\s+class\\s+(\\w+)\\s*:\\s*DbContext";
+    private static final String DBSET_REGEX = "public\\s+DbSet<(\\w+)>\\s+(\\w+)\\s*\\{[^}]*get;[^}]*set;[^}]*\\}";
+    private static final String CLASS_REGEX = "public\\s+class\\s+(\\w+)\\s*(?::\\s*\\w+)?\\s*(?:\\{|$)";
+    private static final String PROPERTY_REGEX = "public\\s+(\\w+(?:<[^>]+>)?)\\s+(\\w+)\\s*\\{[^}]*get;[^}]*set;[^}]*\\}";
+    private static final String COLLECTION_NAV_REGEX = "public\\s+(?:ICollection|List)<(\\w+)>\\s+(\\w+)\\s*\\{[^}]*get;[^}]*set;[^}]*\\}";
+    private static final String SINGLE_NAV_REGEX = "public\\s+(\\w+)\\s+(\\w+)\\s*\\{[^}]*get;[^}]*set;[^}]*\\}";
+    
+    // Relationship type constants
+    private static final String ONE_TO_MANY_DESCRIPTION = "One-to-Many relationship";
+    private static final String MANY_TO_ONE_DESCRIPTION = "Many-to-One relationship";
+    private static final String RELATIONSHIP_SOURCE = "Entity Framework";
+    private static final String ENTITY_TYPE = "table";
+    private static final String DEFAULT_PRIMARY_KEY = "Id";
+    
+    // Type name constants
+    private static final String ICOLLECTION_TYPE = "ICollection<";
+    private static final String LIST_TYPE = "List<";
+    
+    // Regex compile flags
+    private static final int REGEX_FLAGS = Pattern.DOTALL;
 
     /**
      * Regex to match DbContext class: public class AppDbContext : DbContext.
      * Captures: (1) class name.
      */
-    private static final Pattern DBCONTEXT_PATTERN = Pattern.compile(
-        "public\\s+class\\s+(\\w+)\\s*:\\s*DbContext"
-    );
+    private static final Pattern DBCONTEXT_PATTERN = Pattern.compile(DBCONTEXT_REGEX);
 
     /**
      * Regex to match DbSet property: public DbSet<User> Users { get; set; }.
      * Captures: (1) entity type, (2) property name.
      */
-    private static final Pattern DBSET_PATTERN = Pattern.compile(
-        "public\\s+DbSet<(\\w+)>\\s+(\\w+)\\s*\\{\\s*get;\\s*set;"
-    );
+    private static final Pattern DBSET_PATTERN = Pattern.compile(DBSET_REGEX, REGEX_FLAGS);
 
     /**
      * Regex to match class declaration: public class User.
      * Captures: (1) class name.
      */
-    private static final Pattern CLASS_PATTERN = Pattern.compile(
-        "public\\s+class\\s+(\\w+)\\s*(?::\\s*\\w+)?\\s*(?:\\{|$)"
-    );
+    private static final Pattern CLASS_PATTERN = Pattern.compile(CLASS_REGEX);
 
     /**
      * Regex to match property: public string Name { get; set; }.
      * Captures: (1) type, (2) name.
      */
-    private static final Pattern PROPERTY_PATTERN = Pattern.compile(
-        "public\\s+(\\w+(?:<[^>]+>)?)\\s+(\\w+)\\s*\\{\\s*get;\\s*set;"
-    );
+    private static final Pattern PROPERTY_PATTERN = Pattern.compile(PROPERTY_REGEX, REGEX_FLAGS);
 
     /**
      * Regex to match collection navigation property: public ICollection<Post> Posts { get; set; }.
      * Captures: (1) entity type, (2) property name.
      */
-    private static final Pattern COLLECTION_NAV_PATTERN = Pattern.compile(
-        "public\\s+(?:ICollection|List)<(\\w+)>\\s+(\\w+)\\s*\\{\\s*get;\\s*set;"
-    );
+    private static final Pattern COLLECTION_NAV_PATTERN = Pattern.compile(COLLECTION_NAV_REGEX, REGEX_FLAGS);
 
     /**
      * Regex to match single navigation property: public User Author { get; set; }.
-     * We'll detect these by checking if the type is a known entity.
+     * Captures: (1) type, (2) name.
      */
-    private static final Pattern SINGLE_NAV_PATTERN = Pattern.compile(
-        "public\\s+(\\w+)\\s+(\\w+)\\s*\\{\\s*get;\\s*set;"
-    );
+    private static final Pattern SINGLE_NAV_PATTERN = Pattern.compile(SINGLE_NAV_REGEX, REGEX_FLAGS);
 
     @Override
     public String getId() {
-        return "entity-framework";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Entity Framework Scanner";
+        return SCANNER_NAME;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("csharp", "dotnet");
+        return Set.of(Technologies.CSHARP, Technologies.DOTNET);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*DbContext.cs", "**/*.cs");
+        return Set.of(DBCONTEXT_FILE_PATTERN, CS_FILE_PATTERN);
     }
 
     @Override
     public int getPriority() {
-        return 60;
+        return SCANNER_PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*DbContext.cs", "**/*.cs");
+        return hasAnyFiles(context, DBCONTEXT_FILE_PATTERN, CS_FILE_PATTERN);
     }
 
     @Override
@@ -151,7 +177,7 @@ public class EntityFrameworkScanner extends AbstractRegexScanner {
         List<Relationship> relationships = new ArrayList<>();
         Set<String> entityNames = new HashSet<>();
 
-        List<Path> csFiles = context.findFiles("**/*.cs").toList();
+        List<Path> csFiles = context.findFiles(CS_FILE_PATTERN).toList();
 
         if (csFiles.isEmpty()) {
             return emptyResult();
@@ -211,113 +237,34 @@ public class EntityFrameworkScanner extends AbstractRegexScanner {
      */
     private void parseEntityClasses(Path file, Set<String> entityNames,
                                     List<DataEntity> dataEntities, List<Relationship> relationships) throws IOException {
-        List<String> lines = readFileLines(file);
-        String content = String.join("\n", lines);
+        // Use AST parser to parse C# file
+        List<DotNetAst.CSharpClass> classes = parseAstFile(file);
 
-        // Find all classes
-        Matcher classMatcher = CLASS_PATTERN.matcher(content);
-        while (classMatcher.find()) {
-            String className = classMatcher.group(1);
+        for (DotNetAst.CSharpClass csharpClass : classes) {
+            String className = csharpClass.name();
 
             // Only process if this is a known entity
             if (!entityNames.contains(className)) {
                 continue;
             }
 
-            int classStartPos = classMatcher.start();
-
-            // Extract class body
-            String classBody = extractClassBody(lines, classStartPos, content);
-
             // Extract properties
-            List<DataEntity.Field> fields = new ArrayList<>();
-            String primaryKey = null;
+            List<DataEntity.Field> fields = extractEntityFieldsFromAst(csharpClass, entityNames);
 
-            Matcher propertyMatcher = PROPERTY_PATTERN.matcher(classBody);
-            while (propertyMatcher.find()) {
-                String type = propertyMatcher.group(1);
-                String name = propertyMatcher.group(2);
-
-                // Skip navigation properties (will be handled separately)
-                if (type.startsWith("ICollection<") || type.startsWith("List<")) {
-                    continue;
-                }
-
-                // Skip single navigation properties (references to other entities)
-                if (entityNames.contains(type)) {
-                    continue;
-                }
-
-                // Map C# type to SQL type
-                String sqlType = mapCSharpTypeToSql(type);
-                boolean nullable = type.contains("?");
-
-                DataEntity.Field field = new DataEntity.Field(
-                    name,
-                    sqlType,
-                    nullable,
-                    null
-                );
-
-                fields.add(field);
-
-                // Assume "Id" or "ClassName + Id" is primary key
-                if (name.equals("Id") || name.equals(className + "Id")) {
-                    primaryKey = name;
-                }
-
-                log.debug("Found field: {}.{} ({})", className, name, sqlType);
-            }
-
-            // Extract collection navigation properties (one-to-many)
-            Matcher collectionNavMatcher = COLLECTION_NAV_PATTERN.matcher(classBody);
-            while (collectionNavMatcher.find()) {
-                String targetEntity = collectionNavMatcher.group(1);
-                String propertyName = collectionNavMatcher.group(2);
-
-                Relationship rel = new Relationship(
-                    className,
-                    targetEntity,
-                    RelationshipType.DEPENDS_ON,
-                    "One-to-Many relationship",
-                    "Entity Framework"
-                );
-
-                relationships.add(rel);
-                log.debug("Found one-to-many relationship: {} -> {}", className, targetEntity);
-            }
-
-            // Extract single navigation properties (many-to-one)
-            Matcher singleNavMatcher = SINGLE_NAV_PATTERN.matcher(classBody);
-            while (singleNavMatcher.find()) {
-                String type = singleNavMatcher.group(1);
-                String name = singleNavMatcher.group(2);
-
-                // Only if type is a known entity
-                if (entityNames.contains(type)) {
-                    Relationship rel = new Relationship(
-                        className,
-                        type,
-                        RelationshipType.DEPENDS_ON,
-                        "Many-to-One relationship",
-                        "Entity Framework"
-                    );
-
-                    relationships.add(rel);
-                    log.debug("Found many-to-one relationship: {} -> {}", className, type);
-                }
-            }
+            // Extract relationships
+            extractNavigationRelationshipsFromAst(csharpClass, entityNames, relationships);
 
             // Create DataEntity
-            if (!fields.isEmpty() || !relationships.isEmpty()) {
-                String tableName = toPlural(className); // EF convention: pluralize table names
+            String primaryKey = findPrimaryKey(fields);
+            if (!fields.isEmpty()) {
+                String tableName = toPlural(className);
 
                 DataEntity entity = new DataEntity(
                     className,
                     tableName,
-                    "table",
+                    ENTITY_TYPE,
                     fields,
-                    primaryKey != null ? primaryKey : "Id",
+                    primaryKey,
                     "Entity Framework Entity: " + className
                 );
 
@@ -328,30 +275,131 @@ public class EntityFrameworkScanner extends AbstractRegexScanner {
     }
 
     /**
+     * Extracts entity fields from AST, filtering out navigation properties.
+     */
+    private List<DataEntity.Field> extractEntityFieldsFromAst(DotNetAst.CSharpClass csharpClass, Set<String> entityNames) {
+        List<DataEntity.Field> fields = new ArrayList<>();
+
+        for (DotNetAst.Property property : csharpClass.properties()) {
+            String type = property.type();
+            String name = property.name();
+
+            // Skip navigation properties
+            if (isNavigationProperty(type, entityNames)) {
+                continue;
+            }
+
+            String sqlType = mapCSharpTypeToSql(type);
+            boolean nullable = type.contains("?");
+
+            DataEntity.Field field = new DataEntity.Field(name, sqlType, nullable, null);
+            fields.add(field);
+
+            log.debug("Found field: {}.{} ({})", csharpClass.name(), name, sqlType);
+        }
+
+        return fields;
+    }
+
+    /**
+     * Determines if a type is a navigation property.
+     */
+    private boolean isNavigationProperty(String type, Set<String> entityNames) {
+        return type.startsWith(ICOLLECTION_TYPE) || 
+               type.startsWith(LIST_TYPE) || 
+               entityNames.contains(type);
+    }
+
+    /**
+     * Finds the primary key field from the field list.
+     */
+    private String findPrimaryKey(List<DataEntity.Field> fields) {
+        return fields.stream()
+            .map(DataEntity.Field::name)
+            .filter(name -> name.equals(DEFAULT_PRIMARY_KEY))
+            .findFirst()
+            .orElse(DEFAULT_PRIMARY_KEY);
+    }
+
+    /**
+     * Extracts navigation relationships from AST properties.
+     */
+    private void extractNavigationRelationshipsFromAst(DotNetAst.CSharpClass csharpClass,
+                                                       Set<String> entityNames, List<Relationship> relationships) {
+        String className = csharpClass.name();
+
+        for (DotNetAst.Property property : csharpClass.properties()) {
+            String type = property.type();
+
+            // Check for collection navigation properties (one-to-many)
+            if (type.startsWith(ICOLLECTION_TYPE) || type.startsWith(LIST_TYPE)) {
+                // Extract generic type parameter
+                String targetEntity = extractGenericType(type);
+                if (targetEntity != null && entityNames.contains(targetEntity)) {
+                    addRelationship(className, targetEntity, ONE_TO_MANY_DESCRIPTION, relationships);
+                }
+            }
+            // Check for single navigation properties (many-to-one)
+            else if (entityNames.contains(type)) {
+                addRelationship(className, type, MANY_TO_ONE_DESCRIPTION, relationships);
+            }
+        }
+    }
+
+    /**
+     * Extracts generic type parameter from a generic type (e.g., "ICollection<Post>" -> "Post").
+     */
+    private String extractGenericType(String type) {
+        int start = type.indexOf('<');
+        int end = type.lastIndexOf('>');
+        if (start != -1 && end != -1 && end > start) {
+            return type.substring(start + 1, end).trim();
+        }
+        return null;
+    }
+
+    /**
+     * Adds a relationship between two entities.
+     */
+    private void addRelationship(String sourceEntity, String targetEntity, String description, 
+                                List<Relationship> relationships) {
+        Relationship rel = new Relationship(
+            sourceEntity,
+            targetEntity,
+            RelationshipType.DEPENDS_ON,
+            description,
+            RELATIONSHIP_SOURCE
+        );
+        
+        relationships.add(rel);
+        log.debug("Found relationship: {} -> {} ({})", sourceEntity, targetEntity, description);
+    }
+
+    /**
      * Extracts the class body from the source code.
      */
     private String extractClassBody(List<String> lines, int classStartPos, String content) {
         int lineNumber = content.substring(0, classStartPos).split("\n").length - 1;
 
         StringBuilder classBody = new StringBuilder();
-        int braceCount = 0;
-        boolean inClass = false;
+        int openBraces = 0;
+        boolean classBodyStarted = false;
 
         for (int i = lineNumber; i < lines.size(); i++) {
             String line = lines.get(i);
 
             for (char c : line.toCharArray()) {
                 if (c == '{') {
-                    braceCount++;
-                    inClass = true;
+                    openBraces++;
+                    classBodyStarted = true;
                 } else if (c == '}') {
-                    braceCount--;
+                    openBraces--;
                 }
             }
 
             classBody.append(line).append("\n");
 
-            if (inClass && braceCount == 0) {
+            if (classBodyStarted && openBraces == 0) {
                 break;
             }
         }

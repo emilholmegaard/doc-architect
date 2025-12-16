@@ -4,7 +4,10 @@ import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
-import com.docarchitect.core.scanner.base.AbstractRegexScanner;
+import com.docarchitect.core.scanner.ast.AstParserFactory;
+import com.docarchitect.core.scanner.ast.DotNetAst;
+import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.util.Technologies;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -66,14 +69,65 @@ import java.util.regex.Pattern;
  * @see ApiEndpoint
  * @since 1.0.0
  */
-public class AspNetCoreApiScanner extends AbstractRegexScanner {
+public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
+
+    // Scanner identification constants
+    private static final String SCANNER_ID = "aspnetcore-rest";
+    private static final String SCANNER_DISPLAY_NAME = "ASP.NET Core API Scanner";
+
+    public AspNetCoreApiScanner() {
+        super(AstParserFactory.getDotNetParser());
+    }
+    
+    // File patterns
+    private static final String CONTROLLER_FILE_PATTERN = "**/*Controller.cs";
+    private static final String CS_FILE_PATTERN = "**/*.cs";
+    
+    // C# keywords and identifiers
+    private static final String CONTROLLER_SUFFIX = "Controller";
+    private static final String CONTROLLER_PLACEHOLDER = "[controller]";
+    private static final String DEFAULT_API_PREFIX = "api/";
+    private static final String PUBLIC_KEYWORD = "public ";
+    
+    // Parameter source types
+    private static final String PARAM_SOURCE_ROUTE = "Route";
+    private static final String PARAM_SOURCE_QUERY = "Query";
+    private static final String PARAM_SOURCE_BODY = "Body";
+    private static final String PARAM_SOURCE_HEADER = "Header";
+    
+    // Schema labels
+    private static final String SCHEMA_LABEL_ROUTE = "Route: ";
+    private static final String SCHEMA_LABEL_QUERY = "Query: ";
+    private static final String SCHEMA_LABEL_BODY = "Body: ";
+    private static final String SCHEMA_SEPARATOR = "; ";
+    private static final String PARAM_SEPARATOR = ", ";
+    private static final String TYPE_SEPARATOR = ": ";
+    
+    // Default values
+    private static final String DEFAULT_RETURN_TYPE = "object";
+    private static final String LINE_SEPARATOR = "\n";
+    private static final String PATH_SEPARATOR = "/";
+    
+    // Search limits
+    private static final int MAX_METHOD_DECLARATION_LINES = 10;
+    private static final int MAX_MULTILINE_METHOD_LINES = 5;
+    
+    // Primitive C# types
+    private static final Set<String> PRIMITIVE_TYPES = Set.of(
+        "int", "long", "short", "byte", "sbyte",
+        "uint", "ulong", "ushort",
+        "float", "double", "decimal",
+        "bool", "char", "string",
+        "datetime", "guid", "timespan"
+    );
 
     /**
-     * Regex to match controller class: public class UsersController : ControllerBase.
+     * Regex to match controller class: public class UsersController : ControllerBase or public class ProductController.
      * Captures: (1) class name.
+     * Made more flexible to match controllers that may or may not explicitly extend ControllerBase.
      */
     private static final Pattern CLASS_PATTERN = Pattern.compile(
-        "public\\s+class\\s+(\\w+)\\s*:\\s*ControllerBase"
+        "public\\s+class\\s+(\\w+Controller)(?:\\s*:\\s*\\w+)?"
     );
 
     /**
@@ -116,24 +170,30 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
         "(\\w+(?:<[^>]+>)?)\\s+(\\w+)"
     );
 
+    /**
+     * Regex to match route parameters: {id}, {id:int}.
+     * Captures: (1) parameter name.
+     */
+    private static final Pattern ROUTE_PARAM_PATTERN = Pattern.compile("\\{(\\w+)(?::\\w+)?\\}");
+
     @Override
     public String getId() {
-        return "aspnetcore-rest";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "ASP.NET Core API Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("csharp", "dotnet");
+        return Set.of(Technologies.CSHARP, Technologies.DOTNET);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*Controller.cs", "**/*.cs");
+        return Set.of(CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN);
     }
 
     @Override
@@ -143,7 +203,7 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*Controller.cs", "**/*.cs");
+        return hasAnyFiles(context, CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN);
     }
 
     @Override
@@ -151,7 +211,7 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
         log.info("Scanning ASP.NET Core API endpoints in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
-        List<Path> csFiles = context.findFiles("**/*.cs").toList();
+        List<Path> csFiles = context.findFiles(CS_FILE_PATTERN).toList();
 
         if (csFiles.isEmpty()) {
             return emptyResult();
@@ -179,23 +239,22 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
     }
 
     private void parseCSharpFile(Path file, List<ApiEndpoint> apiEndpoints) throws IOException {
-        List<String> lines = readFileLines(file);
-        String content = String.join("\n", lines);
+        // Use AST parser to parse C# file
+        List<DotNetAst.CSharpClass> classes = parseAstFile(file);
 
-        // Find controller classes
-        Matcher classMatcher = CLASS_PATTERN.matcher(content);
-        while (classMatcher.find()) {
-            String className = classMatcher.group(1);
-            int classStartPos = classMatcher.start();
+        for (DotNetAst.CSharpClass csharpClass : classes) {
+            String className = csharpClass.name();
 
-            // Extract class body
-            String classBody = extractClassBody(lines, classStartPos, content);
+            // Only process controller classes
+            if (!className.endsWith("Controller")) {
+                continue;
+            }
 
             // Extract base route from [Route] attribute
-            String baseRoute = extractBaseRoute(classBody, className);
+            String baseRoute = extractBaseRouteFromAst(csharpClass);
 
             // Extract action methods
-            extractActionMethods(classBody, className, baseRoute, apiEndpoints);
+            extractActionMethodsFromAst(csharpClass, baseRoute, apiEndpoints);
         }
     }
 
@@ -203,7 +262,7 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
      * Extracts the class body from the source code.
      */
     private String extractClassBody(List<String> lines, int classStartPos, String content) {
-        int lineNumber = content.substring(0, classStartPos).split("\n").length - 1;
+        int lineNumber = content.substring(0, classStartPos).split(LINE_SEPARATOR).length - 1;
 
         StringBuilder classBody = new StringBuilder();
         int braceCount = 0;
@@ -221,7 +280,7 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
                 }
             }
 
-            classBody.append(line).append("\n");
+            classBody.append(line).append(LINE_SEPARATOR);
 
             if (inClass && braceCount == 0) {
                 break;
@@ -232,69 +291,71 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
     }
 
     /**
-     * Extracts base route from [Route] attribute or generates from controller name.
+     * Extracts base route from [Route] attribute using AST.
      */
-    private String extractBaseRoute(String classBody, String className) {
-        Matcher routeMatcher = ROUTE_PATTERN.matcher(classBody);
-        if (routeMatcher.find()) {
-            String route = routeMatcher.group(1);
-            // Replace [controller] placeholder with actual controller name
-            if (route.contains("[controller]")) {
-                String controllerName = className.replace("Controller", "").toLowerCase();
-                route = route.replace("[controller]", controllerName);
+    private String extractBaseRouteFromAst(DotNetAst.CSharpClass csharpClass) {
+        // Look for Route attribute
+        for (DotNetAst.Attribute attribute : csharpClass.attributes()) {
+            if (attribute.name().equals("Route")) {
+                if (!attribute.arguments().isEmpty()) {
+                    String route = attribute.arguments().get(0).replace("\"", "");
+                    // Replace [controller] placeholder with actual controller name
+                    if (route.contains(CONTROLLER_PLACEHOLDER)) {
+                        String controllerName = csharpClass.name().replace(CONTROLLER_SUFFIX, "").toLowerCase();
+                        route = route.replace(CONTROLLER_PLACEHOLDER, controllerName);
+                    }
+                    return route;
+                }
             }
-            return route;
         }
 
         // Default route from controller name
-        return "api/" + className.replace("Controller", "").toLowerCase();
+        return DEFAULT_API_PREFIX + csharpClass.name().replace(CONTROLLER_SUFFIX, "").toLowerCase();
     }
 
     /**
-     * Extracts action methods from class body.
+     * Extracts action methods from AST.
      */
-    private void extractActionMethods(String classBody, String className, String baseRoute,
-                                      List<ApiEndpoint> apiEndpoints) {
-        String[] lines = classBody.split("\n");
+    private void extractActionMethodsFromAst(DotNetAst.CSharpClass csharpClass, String baseRoute,
+                                             List<ApiEndpoint> apiEndpoints) {
+        String className = csharpClass.name();
 
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
+        for (DotNetAst.Method method : csharpClass.methods()) {
+            // Look for HTTP method attributes (HttpGet, HttpPost, etc.)
+            String httpMethod = null;
+            String methodRoute = null;
 
-            // Look for HTTP method attributes
-            Matcher httpMatcher = HTTP_METHOD_PATTERN.matcher(line);
-            if (httpMatcher.find()) {
-                String httpMethod = httpMatcher.group(1).toUpperCase();
-                String methodRoute = httpMatcher.group(2);
-
-                // Find the method declaration (within next 10 lines)
-                String methodDeclaration = findNextMethodDeclaration(lines, i + 1, 10);
-                if (methodDeclaration != null) {
-                    Matcher methodMatcher = METHOD_PATTERN.matcher(methodDeclaration);
-                    if (methodMatcher.find()) {
-                        String methodName = methodMatcher.group(1);
-                        String parameters = methodMatcher.group(2);
-
-                        // Build full path
-                        String fullPath = combinePaths(baseRoute, methodRoute);
-
-                        // Extract parameters
-                        String requestSchema = buildRequestSchema(parameters, fullPath);
-
-                        ApiEndpoint endpoint = new ApiEndpoint(
-                            className,
-                            ApiType.REST,
-                            fullPath,
-                            httpMethod,
-                            className + "." + methodName,
-                            requestSchema,
-                            "object", // Default return type
-                            null
-                        );
-
-                        apiEndpoints.add(endpoint);
-                        log.debug("Found ASP.NET Core endpoint: {} {} -> {}", httpMethod, fullPath, methodName);
+            for (DotNetAst.Attribute attribute : method.attributes()) {
+                String attrName = attribute.name();
+                if (attrName.startsWith("Http")) {
+                    httpMethod = attrName.substring(4).toUpperCase(); // HttpGet -> GET
+                    if (!attribute.arguments().isEmpty()) {
+                        methodRoute = attribute.arguments().get(0).replace("\"", "");
                     }
+                    break;
                 }
+            }
+
+            if (httpMethod != null) {
+                // Build full path
+                String fullPath = combinePaths(baseRoute, methodRoute);
+
+                // Extract parameters
+                String requestSchema = buildRequestSchemaFromAst(method.parameters(), fullPath);
+
+                ApiEndpoint endpoint = new ApiEndpoint(
+                    className,
+                    ApiType.REST,
+                    fullPath,
+                    httpMethod,
+                    className + "." + method.name(),
+                    requestSchema,
+                    method.returnType(),
+                    null
+                );
+
+                apiEndpoints.add(endpoint);
+                log.debug("Found ASP.NET Core endpoint: {} {} -> {}", httpMethod, fullPath, method.name());
             }
         }
     }
@@ -305,14 +366,14 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
     private String findNextMethodDeclaration(String[] lines, int startIndex, int maxLines) {
         for (int i = startIndex; i < Math.min(startIndex + maxLines, lines.length); i++) {
             String line = lines[i].trim();
-            if (line.startsWith("public ")) {
+            if (line.startsWith(PUBLIC_KEYWORD)) {
                 // Collect multi-line method declarations
                 StringBuilder method = new StringBuilder(line);
                 int j = i + 1;
                 while (j < lines.length && !lines[j].trim().contains("{")) {
                     method.append(" ").append(lines[j].trim());
                     j++;
-                    if (j - i > 5) break; // Limit multi-line search
+                    if (j - i > MAX_MULTILINE_METHOD_LINES) break;
                 }
                 return method.toString();
             }
@@ -334,30 +395,30 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
         baseRoute = baseRoute.trim();
         methodRoute = methodRoute.trim();
 
-        if (!baseRoute.startsWith("/")) {
-            baseRoute = "/" + baseRoute;
+        if (!baseRoute.startsWith(PATH_SEPARATOR)) {
+            baseRoute = PATH_SEPARATOR + baseRoute;
         }
 
         if (methodRoute.isEmpty()) {
             return baseRoute;
         }
 
-        if (methodRoute.startsWith("/")) {
+        if (methodRoute.startsWith(PATH_SEPARATOR)) {
             return methodRoute; // Absolute path
         }
 
-        if (baseRoute.endsWith("/")) {
+        if (baseRoute.endsWith(PATH_SEPARATOR)) {
             return baseRoute + methodRoute;
         }
 
-        return baseRoute + "/" + methodRoute;
+        return baseRoute + PATH_SEPARATOR + methodRoute;
     }
 
     /**
-     * Builds request schema from method parameters.
+     * Builds request schema from AST parameters.
      */
-    private String buildRequestSchema(String parameters, String fullPath) {
-        if (parameters == null || parameters.trim().isEmpty()) {
+    private String buildRequestSchemaFromAst(List<DotNetAst.Parameter> parameters, String fullPath) {
+        if (parameters == null || parameters.isEmpty()) {
             return null;
         }
 
@@ -366,80 +427,65 @@ public class AspNetCoreApiScanner extends AbstractRegexScanner {
         List<String> bodyParams = new ArrayList<>();
 
         // Extract path parameters from route
-        Pattern routeParamPattern = Pattern.compile("\\{(\\w+)(?::\\w+)?\\}");
-        Matcher routeMatcher = routeParamPattern.matcher(fullPath);
+        Matcher routeMatcher = ROUTE_PARAM_PATTERN.matcher(fullPath);
         while (routeMatcher.find()) {
             routeParams.add(routeMatcher.group(1));
         }
 
-        // Parse method parameters
-        String[] paramArray = parameters.split(",");
-        for (String param : paramArray) {
-            param = param.trim();
-            if (param.isEmpty()) {
-                continue;
-            }
+        // Process method parameters from AST
+        for (DotNetAst.Parameter parameter : parameters) {
+            String type = parameter.type();
+            String name = parameter.name();
 
             // Check for From* attributes
-            Matcher fromMatcher = PARAM_PATTERN.matcher(param);
-            if (fromMatcher.find()) {
-                String source = fromMatcher.group(1);
-                String type = fromMatcher.group(2);
-                String name = fromMatcher.group(3);
+            String source = null;
+            for (DotNetAst.Attribute attribute : parameter.attributes()) {
+                if (attribute.name().startsWith("From")) {
+                    source = attribute.name().substring(4); // FromBody -> Body
+                    break;
+                }
+            }
 
+            if (source != null) {
                 switch (source) {
-                    case "Route" -> routeParams.add(name + ": " + type);
-                    case "Query" -> queryParams.add(name + ": " + type);
-                    case "Body" -> bodyParams.add(name + ": " + type);
+                    case PARAM_SOURCE_ROUTE -> routeParams.add(name + TYPE_SEPARATOR + type);
+                    case PARAM_SOURCE_QUERY -> queryParams.add(name + TYPE_SEPARATOR + type);
+                    case PARAM_SOURCE_BODY -> bodyParams.add(name + TYPE_SEPARATOR + type);
                 }
             } else {
-                // Simple parameter without From* attribute
-                Matcher simpleMatcher = SIMPLE_PARAM_PATTERN.matcher(param);
-                if (simpleMatcher.find()) {
-                    String type = simpleMatcher.group(1);
-                    String name = simpleMatcher.group(2);
+                // No From* attribute - infer from type and route
+                if (routeParams.contains(name)) {
+                    continue; // Already in route
+                }
 
-                    // If parameter is in route, it's a route param
-                    if (routeParams.contains(name)) {
-                        continue; // Already added
-                    }
-
-                    // Complex types are body parameters
-                    if (!isPrimitiveType(type)) {
-                        bodyParams.add(name + ": " + type);
-                    } else {
-                        // Simple types default to query parameters (unless in route)
-                        queryParams.add(name + ": " + type);
-                    }
+                // Complex types are body parameters
+                if (!isPrimitiveType(type)) {
+                    bodyParams.add(name + TYPE_SEPARATOR + type);
+                } else {
+                    // Simple types default to query parameters
+                    queryParams.add(name + TYPE_SEPARATOR + type);
                 }
             }
         }
 
         List<String> allParams = new ArrayList<>();
         if (!routeParams.isEmpty()) {
-            allParams.add("Route: " + String.join(", ", routeParams));
+            allParams.add(SCHEMA_LABEL_ROUTE + String.join(PARAM_SEPARATOR, routeParams));
         }
         if (!queryParams.isEmpty()) {
-            allParams.add("Query: " + String.join(", ", queryParams));
+            allParams.add(SCHEMA_LABEL_QUERY + String.join(PARAM_SEPARATOR, queryParams));
         }
         if (!bodyParams.isEmpty()) {
-            allParams.add("Body: " + String.join(", ", bodyParams));
+            allParams.add(SCHEMA_LABEL_BODY + String.join(PARAM_SEPARATOR, bodyParams));
         }
 
-        return allParams.isEmpty() ? null : String.join("; ", allParams);
+        return allParams.isEmpty() ? null : String.join(SCHEMA_SEPARATOR, allParams);
     }
 
     /**
      * Checks if a type is a primitive C# type.
      */
     private boolean isPrimitiveType(String type) {
-        return switch (type.toLowerCase()) {
-            case "int", "long", "short", "byte", "sbyte",
-                 "uint", "ulong", "ushort",
-                 "float", "double", "decimal",
-                 "bool", "char", "string",
-                 "datetime", "guid", "timespan" -> true;
-            default -> false;
-        };
+        return PRIMITIVE_TYPES.contains(type.toLowerCase());
     }
 }

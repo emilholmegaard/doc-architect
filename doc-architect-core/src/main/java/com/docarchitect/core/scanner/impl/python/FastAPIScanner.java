@@ -1,16 +1,19 @@
 package com.docarchitect.core.scanner.impl.python;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for FastAPI REST endpoints in Python source files.
@@ -48,6 +51,32 @@ import java.util.regex.Pattern;
  * @since 1.0.0
  */
 public class FastAPIScanner extends AbstractRegexScanner {
+
+    private static final String SCANNER_ID = "fastapi-rest";
+    private static final String SCANNER_DISPLAY_NAME = "FastAPI REST Scanner";
+    private static final String PATTERN_PYTHON_FILES = "**/*.py";
+    
+    private static final String DEFAULT_RESPONSE_SCHEMA = "dict";
+    private static final String PYTHON_FILE_EXTENSION = "\\.py$";
+    
+    private static final String FUNCTION_PREFIX = "def ";
+    
+    private static final String PARAM_REQUEST = "request:";
+    private static final String PARAM_RESPONSE = "response:";
+    private static final String PARAM_QUERY = "Query(";
+    private static final String PARAM_PATH = "Path(";
+    private static final String PARAM_HEADER = "Header(";
+    
+    private static final String PRIMITIVE_TYPES_REGEX = "int|str|float|bool";
+    
+    private static final String SCHEMA_PATH_PREFIX = "Path: ";
+    private static final String SCHEMA_QUERY_PREFIX = "Query: ";
+    private static final String SCHEMA_BODY_PREFIX = "Body: ";
+    private static final String SCHEMA_SEPARATOR = "; ";
+    private static final String PARAM_SEPARATOR = ", ";
+    private static final String TYPE_SEPARATOR = ": ";
+    
+    private static final int MAX_FUNCTION_SEARCH_LINES = 5;
 
     /**
      * Regex to match FastAPI decorator: @app.get("/users") or @router.post("/items").
@@ -91,22 +120,22 @@ public class FastAPIScanner extends AbstractRegexScanner {
 
     @Override
     public String getId() {
-        return "fastapi-rest";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "FastAPI REST Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("python");
+        return Set.of(Technologies.PYTHON);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.py");
+        return Set.of(PATTERN_PYTHON_FILES);
     }
 
     @Override
@@ -116,7 +145,7 @@ public class FastAPIScanner extends AbstractRegexScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.py");
+        return hasAnyFiles(context, PATTERN_PYTHON_FILES);
     }
 
     @Override
@@ -124,7 +153,7 @@ public class FastAPIScanner extends AbstractRegexScanner {
         log.info("Scanning FastAPI endpoints in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
-        List<Path> pythonFiles = context.findFiles("**/*.py").toList();
+        List<Path> pythonFiles = context.findFiles(PATTERN_PYTHON_FILES).toList();
 
         if (pythonFiles.isEmpty()) {
             return emptyResult();
@@ -178,7 +207,7 @@ public class FastAPIScanner extends AbstractRegexScanner {
                         List<String> bodyParams = extractBodyParameters(parameters);
 
                         String requestSchema = buildRequestSchema(pathParams, queryParams, bodyParams);
-                        String responseSchema = "dict"; // Default, could be enhanced
+                        String responseSchema = DEFAULT_RESPONSE_SCHEMA;
 
                         ApiEndpoint endpoint = new ApiEndpoint(
                             componentId,
@@ -203,9 +232,9 @@ public class FastAPIScanner extends AbstractRegexScanner {
      * Finds the next function definition starting from the given line index.
      */
     private String findNextFunctionDefinition(List<String> lines, int startIndex) {
-        for (int i = startIndex; i < Math.min(startIndex + 5, lines.size()); i++) {
+        for (int i = startIndex; i < Math.min(startIndex + MAX_FUNCTION_SEARCH_LINES, lines.size()); i++) {
             String line = lines.get(i).trim();
-            if (line.startsWith("def ")) {
+            if (line.startsWith(FUNCTION_PREFIX)) {
                 return line;
             }
         }
@@ -248,12 +277,12 @@ public class FastAPIScanner extends AbstractRegexScanner {
 
         for (String param : paramList) {
             param = param.trim();
-            if (param.isEmpty() || param.startsWith("request:") || param.startsWith("response:")) {
+            if (param.isEmpty() || param.startsWith(PARAM_REQUEST) || param.startsWith(PARAM_RESPONSE)) {
                 continue;
             }
 
             // Skip if it's a Query, Path, or Header parameter
-            if (param.contains("Query(") || param.contains("Path(") || param.contains("Header(")) {
+            if (param.contains(PARAM_QUERY) || param.contains(PARAM_PATH) || param.contains(PARAM_HEADER)) {
                 continue;
             }
 
@@ -264,8 +293,8 @@ public class FastAPIScanner extends AbstractRegexScanner {
                 String paramType = matcher.group(2);
 
                 // Skip primitive types that are likely path/query params
-                if (!paramType.matches("int|str|float|bool")) {
-                    params.add(paramName + ": " + paramType);
+                if (!paramType.matches(PRIMITIVE_TYPES_REGEX)) {
+                    params.add(paramName + TYPE_SEPARATOR + paramType);
                 }
             }
         }
@@ -279,16 +308,16 @@ public class FastAPIScanner extends AbstractRegexScanner {
         List<String> allParams = new ArrayList<>();
 
         if (!pathParams.isEmpty()) {
-            allParams.add("Path: " + String.join(", ", pathParams));
+            allParams.add(SCHEMA_PATH_PREFIX + String.join(PARAM_SEPARATOR, pathParams));
         }
         if (!queryParams.isEmpty()) {
-            allParams.add("Query: " + String.join(", ", queryParams));
+            allParams.add(SCHEMA_QUERY_PREFIX + String.join(PARAM_SEPARATOR, queryParams));
         }
         if (!bodyParams.isEmpty()) {
-            allParams.add("Body: " + String.join(", ", bodyParams));
+            allParams.add(SCHEMA_BODY_PREFIX + String.join(PARAM_SEPARATOR, bodyParams));
         }
 
-        return allParams.isEmpty() ? null : String.join("; ", allParams);
+        return allParams.isEmpty() ? null : String.join(SCHEMA_SEPARATOR, allParams);
     }
 
     /**
@@ -296,6 +325,6 @@ public class FastAPIScanner extends AbstractRegexScanner {
      */
     private String extractModuleName(Path file) {
         String fileName = file.getFileName().toString();
-        return fileName.replaceAll("\\.py$", "");
+        return fileName.replaceAll(PYTHON_FILE_EXTENSION, "");
     }
 }

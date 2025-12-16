@@ -1,11 +1,19 @@
 package com.docarchitect.core.scanner.impl.java;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
@@ -14,10 +22,6 @@ import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.MemberValuePair;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
 
 /**
  * Scanner for Spring MVC REST API endpoints in Java source files.
@@ -80,7 +84,7 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("java");
+        return Set.of(Technologies.JAVA);
     }
 
     @Override

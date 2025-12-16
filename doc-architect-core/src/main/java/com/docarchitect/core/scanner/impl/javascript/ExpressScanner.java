@@ -1,27 +1,33 @@
 package com.docarchitect.core.scanner.impl.javascript;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
-import com.docarchitect.core.scanner.base.AbstractRegexScanner;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.docarchitect.core.scanner.ast.AstParserFactory;
+import com.docarchitect.core.scanner.ast.JavaScriptAst;
+import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for Express.js REST endpoints in JavaScript and TypeScript source files.
  *
- * <p>This scanner uses regex patterns to extract Express.js route definitions from JavaScript/TypeScript files.
+ * <p>This scanner uses ANTLR-based AST parsing to extract Express.js route definitions from JavaScript/TypeScript files.
  * It identifies route registrations using both {@code app} and {@code router} objects.
  *
  * <p><b>Parsing Strategy:</b>
  * <ol>
  *   <li>Locate JavaScript and TypeScript files using pattern matching</li>
- *   <li>Parse source files as text using regex patterns (no AST parser needed)</li>
+ *   <li>Parse source files using ANTLR JavaScript grammar (with regex fallback)</li>
  *   <li>Find Express route definitions: {@code app.get()}, {@code router.post()}, etc.</li>
  *   <li>Extract HTTP method and path from each route</li>
  *   <li>Create ApiEndpoint records for each discovered endpoint</li>
@@ -42,12 +48,6 @@ import java.util.regex.Pattern;
  *   <li>Path parameters: {@code '/users/:id'}, {@code '/users/:userId/posts/:postId'}</li>
  *   <li>String literals: {@code '/api/v1/users'}</li>
  *   <li>Template literals (basic): {@code `/users/${version}`} (captured as-is)</li>
- * </ul>
- *
- * <p><b>Regex Pattern:</b>
- * <ul>
- *   <li>{@code ROUTE_PATTERN}: {@code (app|router)\.(get|post|put|delete|patch)\s*\(\s*['"`]([^'"`]+)['"`]}</li>
- *   <li>Captures: (1) app|router, (2) HTTP method, (3) path</li>
  * </ul>
  *
  * <p><b>Limitations:</b>
@@ -74,17 +74,11 @@ import java.util.regex.Pattern;
  * @see ApiEndpoint
  * @since 1.0.0
  */
-public class ExpressScanner extends AbstractRegexScanner {
+public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRoute> {
 
-    /**
-     * Regex to match Express route definitions: app.get('/path') or router.post('/path').
-     * Captures: (1) app|router, (2) HTTP method, (3) path.
-     *
-     * <p>Supports single quotes, double quotes, and backticks (template literals).
-     */
-    private static final Pattern ROUTE_PATTERN = Pattern.compile(
-        "(app|router)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"`]([^'\"`]+)['\"`]"
-    );
+    public ExpressScanner() {
+        super(AstParserFactory.getJavaScriptParser());
+    }
 
     @Override
     public String getId() {
@@ -98,12 +92,12 @@ public class ExpressScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("javascript", "typescript");
+        return Set.of(Technologies.JAVASCRIPT, Technologies.TYPESCRIPT);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.js", "**/*.ts");
+        return Set.of("*.js", "**/*.js", "*.ts", "**/*.ts");
     }
 
     @Override
@@ -113,8 +107,8 @@ public class ExpressScanner extends AbstractRegexScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        // Check if any JavaScript or TypeScript files exist
-        return hasAnyFiles(context, "**/*.js", "**/*.ts");
+        // Check if any JavaScript or TypeScript files exist (both root and subdirectories)
+        return hasAnyFiles(context, "*.js", "**/*.js", "*.ts", "**/*.ts");
     }
 
     @Override
@@ -126,7 +120,6 @@ public class ExpressScanner extends AbstractRegexScanner {
         // Find all JavaScript and TypeScript files
         List<Path> jsFiles = context.findFiles("**/*.js").toList();
         List<Path> tsFiles = context.findFiles("**/*.ts").toList();
-
         List<Path> allFiles = new ArrayList<>();
         allFiles.addAll(jsFiles);
         allFiles.addAll(tsFiles);
@@ -139,7 +132,7 @@ public class ExpressScanner extends AbstractRegexScanner {
         int parsedFiles = 0;
         for (Path file : allFiles) {
             try {
-                parseFile(file, apiEndpoints);
+                parseJavaScriptFile(file, apiEndpoints);
                 parsedFiles++;
             } catch (Exception e) {
                 log.warn("Failed to parse file: {} - {}", file, e.getMessage());
@@ -162,25 +155,22 @@ public class ExpressScanner extends AbstractRegexScanner {
     }
 
     /**
-     * Parses a single JavaScript or TypeScript file and extracts Express routes.
+     * Parses a single JavaScript or TypeScript file and extracts Express routes using AST.
      *
      * @param file path to JS/TS file
      * @param apiEndpoints list to add discovered API endpoints
      * @throws IOException if file cannot be read
      */
-    private void parseFile(Path file, List<ApiEndpoint> apiEndpoints) throws IOException {
-        String content = readFileContent(file);
+    private void parseJavaScriptFile(Path file, List<ApiEndpoint> apiEndpoints) throws IOException {
         String componentId = extractModuleName(file);
 
-        // Find all route definitions
-        Matcher matcher = ROUTE_PATTERN.matcher(content);
+        // Use AST parser to parse JavaScript file
+        List<JavaScriptAst.ExpressRoute> routes = parseAstFile(file);
 
-        while (matcher.find()) {
-            String routerType = matcher.group(1); // app or router
-            String method = matcher.group(2); // get, post, put, delete, patch
-            String path = matcher.group(3);
-
-            String httpMethod = method.toUpperCase();
+        for (JavaScriptAst.ExpressRoute route : routes) {
+            String httpMethod = route.httpMethod().toUpperCase();
+            String path = route.path();
+            String routerName = route.routerName();
 
             // Create API endpoint
             ApiEndpoint endpoint = new ApiEndpoint(
@@ -188,7 +178,7 @@ public class ExpressScanner extends AbstractRegexScanner {
                 ApiType.REST,
                 path,
                 httpMethod,
-                componentId + "." + routerType + "." + method,
+                componentId + "." + routerName + "." + route.httpMethod(),
                 null, // Request schema not extracted
                 null, // Response schema not extracted
                 null  // Authentication not detected

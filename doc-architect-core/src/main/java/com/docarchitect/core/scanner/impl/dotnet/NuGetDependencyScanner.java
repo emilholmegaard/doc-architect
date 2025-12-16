@@ -1,5 +1,12 @@
 package com.docarchitect.core.scanner.impl.dotnet;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.model.Dependency;
@@ -7,11 +14,8 @@ import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractJacksonScanner;
 import com.docarchitect.core.util.IdGenerator;
+import com.docarchitect.core.util.Technologies;
 import com.fasterxml.jackson.databind.JsonNode;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
 
 /**
  * Scanner for NuGet package dependencies in .NET projects.
@@ -65,24 +69,69 @@ import java.util.*;
  */
 public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
+    // XML Element Names
+    private static final String ITEM_GROUP = "ItemGroup";
+    private static final String PACKAGE_REFERENCE = "PackageReference";
+    private static final String REFERENCE = "Reference";
+    private static final String PACKAGE = "package";
+    private static final String HINT_PATH = "HintPath";
+
+    // XML Attribute Names
+    private static final String INCLUDE = "Include";
+    private static final String UPDATE = "Update";
+    private static final String VERSION = "Version";
+    private static final String ID = "id";
+    private static final String VERSION_ATTRIBUTE = "version";
+
+    // Dependency Properties
+    private static final String GROUP_ID_NUGET = "nuget";
+    private static final String SCOPE_COMPILE = "compile";
+    private static final String UNKNOWN_VERSION = "*";
+
+    // File Patterns
+    private static final String CSPROJ_PATTERN = "**/*.csproj";
+    private static final String PACKAGES_CONFIG_PATTERN = "**/packages.config";
+    private static final String BUILD_PROPS_PATTERN = "**/Directory.Build.props";
+
+    // Prefixes and Delimiters
+    private static final String VERSION_PREFIX = "Version=";
+    private static final String SYSTEM_ASSEMBLY_PREFIX = "System.";
+    private static final String MSCORLIB = "mscorlib";
+    private static final String COMMA_DELIMITER = ",";
+    private static final String VERSION_SEPARATOR = "\\.";
+    private static final String PATH_SEPARATOR_REGEX = "[\\\\\\\\|\\\\/]";
+    private static final String DOT = ".";
+
+    // Component Properties
+    private static final String DOTNET_PROJECT_TYPE = ".NET Project";
+    private static final String DOTNET_TECHNOLOGY = ".NET";
+    private static final String SCANNER_ID = "nuget-dependencies";
+    private static final String SCANNER_NAME = "NuGet Dependency Scanner";
+
+    // Version formatting constants
+    private static final int MIN_VERSION_PARTS = 3;
+    private static final int VERSION_MAJOR_INDEX = 0;
+    private static final int VERSION_MINOR_INDEX = 1;
+    private static final int VERSION_PATCH_INDEX = 2;
+
     @Override
     public String getId() {
-        return "nuget-dependencies";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "NuGet Dependency Scanner";
+        return SCANNER_NAME;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("csharp", "dotnet");
+        return Set.of(Technologies.CSHARP, Technologies.DOTNET);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/*.csproj", "**/packages.config", "**/Directory.Build.props");
+        return Set.of(CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN);
     }
 
     @Override
@@ -92,7 +141,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, "**/*.csproj", "**/packages.config");
+        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN);
     }
 
     @Override
@@ -103,20 +152,18 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
         List<Component> components = new ArrayList<>();
         String sourceComponentId = IdGenerator.generate(context.rootPath().toString());
 
-        // Create component for the .NET project
         Component dotnetProject = new Component(
             sourceComponentId,
             context.rootPath().getFileName().toString(),
             ComponentType.LIBRARY,
-            ".NET Project",
-            ".NET",
+            DOTNET_PROJECT_TYPE,
+            DOTNET_TECHNOLOGY,
             null,
             Map.of()
         );
         components.add(dotnetProject);
 
-        // Parse .csproj files
-        context.findFiles("**/*.csproj").forEach(file -> {
+        context.findFiles(CSPROJ_PATTERN).forEach(file -> {
             try {
                 parseCsprojFile(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -124,8 +171,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
             }
         });
 
-        // Parse packages.config files
-        context.findFiles("**/packages.config").forEach(file -> {
+        context.findFiles(PACKAGES_CONFIG_PATTERN).forEach(file -> {
             try {
                 parsePackagesConfig(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -133,8 +179,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
             }
         });
 
-        // Parse Directory.Build.props files
-        context.findFiles("**/Directory.Build.props").forEach(file -> {
+        context.findFiles(BUILD_PROPS_PATTERN).forEach(file -> {
             try {
                 parseDirectoryBuildProps(file, sourceComponentId, dependencies);
             } catch (IOException e) {
@@ -155,228 +200,157 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
         );
     }
 
-    /**
-     * Parses .csproj file for PackageReference elements (SDK-style)
-     * and Reference elements (legacy .NET Framework).
-     */
     private void parseCsprojFile(Path file, String sourceComponentId, List<Dependency> dependencies) throws IOException {
         JsonNode root = parseXml(file);
-
-        // SDK-style: <PackageReference Include="..." Version="..." />
         extractPackageReferences(root, sourceComponentId, dependencies, file);
-
-        // Legacy: <Reference Include="PackageName, Version=...">
         extractLegacyReferences(root, sourceComponentId, dependencies, file);
     }
 
-    /**
-     * Extracts PackageReference elements from SDK-style projects.
-     */
     private void extractPackageReferences(JsonNode root, String sourceComponentId,
                                          List<Dependency> dependencies, Path file) {
-        JsonNode itemGroups = root.get("ItemGroup");
+        JsonNode itemGroups = ensureArray(root.get(ITEM_GROUP));
         if (itemGroups == null) {
             return;
         }
 
-        // ItemGroup can be single object or array
-        if (!itemGroups.isArray()) {
-            itemGroups = xmlMapper.createArrayNode().add(itemGroups);
-        }
-
         for (JsonNode itemGroup : itemGroups) {
-            JsonNode packageRefs = itemGroup.get("PackageReference");
+            JsonNode packageRefs = ensureArray(itemGroup.get(PACKAGE_REFERENCE));
             if (packageRefs == null) {
                 continue;
             }
 
-            // PackageReference can be single or array
-            if (!packageRefs.isArray()) {
-                packageRefs = xmlMapper.createArrayNode().add(packageRefs);
-            }
-
             for (JsonNode pkgRef : packageRefs) {
-                String packageId = extractAttribute(pkgRef, "Include");
-                String version = extractAttribute(pkgRef, "Version");
+                String packageId = extractAttribute(pkgRef, INCLUDE);
+                String version = extractAttribute(pkgRef, VERSION);
 
                 if (packageId != null && version != null) {
-                    Dependency dep = new Dependency(
-                        sourceComponentId,
-                        "nuget", // groupId
-                        packageId, // artifactId
-                        version,
-                        "compile",
-                        true
-                    );
-
-                    dependencies.add(dep);
+                    addDependency(sourceComponentId, packageId, version, dependencies);
                     log.debug("Found NuGet package from {}: {} {}", file.getFileName(), packageId, version);
                 }
             }
         }
     }
 
-    /**
-     * Extracts Reference elements from legacy .NET Framework projects.
-     */
     private void extractLegacyReferences(JsonNode root, String sourceComponentId,
                                         List<Dependency> dependencies, Path file) {
-        JsonNode itemGroups = root.get("ItemGroup");
+        JsonNode itemGroups = ensureArray(root.get(ITEM_GROUP));
         if (itemGroups == null) {
             return;
         }
 
-        if (!itemGroups.isArray()) {
-            itemGroups = xmlMapper.createArrayNode().add(itemGroups);
-        }
-
         for (JsonNode itemGroup : itemGroups) {
-            JsonNode references = itemGroup.get("Reference");
+            JsonNode references = ensureArray(itemGroup.get(REFERENCE));
             if (references == null) {
                 continue;
             }
 
-            if (!references.isArray()) {
-                references = xmlMapper.createArrayNode().add(references);
-            }
-
             for (JsonNode reference : references) {
-                String include = extractAttribute(reference, "Include");
+                String include = extractAttribute(reference, INCLUDE);
                 if (include == null) {
                     continue;
                 }
 
-                // Extract package name from: "Newtonsoft.Json, Version=13.0.0.0, ..."
-                String[] parts = include.split(",");
-                if (parts.length == 0) {
+                String packageId = extractPackageNameFromInclude(include);
+                if (isSystemAssembly(packageId)) {
                     continue;
                 }
 
-                String packageId = parts[0].trim();
-
-                // Extract version from Include attribute or HintPath
                 String version = extractVersionFromInclude(include);
                 if (version == null) {
-                    JsonNode hintPath = reference.get("HintPath");
+                    JsonNode hintPath = reference.get(HINT_PATH);
                     if (hintPath != null) {
                         version = extractVersionFromHintPath(hintPath.asText());
                     }
                 }
 
-                if (version == null) {
-                    version = "*"; // Unknown version
-                }
+                version = version != null ? version : UNKNOWN_VERSION;
 
-                // Skip system assemblies
-                if (packageId.startsWith("System.") || packageId.equals("mscorlib")) {
-                    continue;
-                }
-
-                Dependency dep = new Dependency(
-                    sourceComponentId,
-                    "nuget", // groupId
-                    packageId, // artifactId
-                    version,
-                    "compile",
-                    true
-                );
-
-                dependencies.add(dep);
+                addDependency(sourceComponentId, packageId, version, dependencies);
                 log.debug("Found legacy reference from {}: {} {}", file.getFileName(), packageId, version);
             }
         }
     }
 
-    /**
-     * Parses packages.config file.
-     */
     private void parsePackagesConfig(Path file, String sourceComponentId, List<Dependency> dependencies) throws IOException {
         JsonNode root = parseXml(file);
 
-        JsonNode packages = root.get("package");
+        JsonNode packages = ensureArray(root.get(PACKAGE));
         if (packages == null) {
             return;
         }
 
-        if (!packages.isArray()) {
-            packages = xmlMapper.createArrayNode().add(packages);
-        }
-
         for (JsonNode pkg : packages) {
-            String packageId = extractAttribute(pkg, "id");
-            String version = extractAttribute(pkg, "version");
+            String packageId = extractAttribute(pkg, ID);
+            String version = extractAttribute(pkg, VERSION_ATTRIBUTE);
 
             if (packageId != null && version != null) {
-                Dependency dep = new Dependency(
-                    sourceComponentId,
-                    "nuget", // groupId
-                    packageId, // artifactId
-                    version,
-                    "compile",
-                    true
-                );
-
-                dependencies.add(dep);
+                addDependency(sourceComponentId, packageId, version, dependencies);
                 log.debug("Found package from packages.config: {} {}", packageId, version);
             }
         }
     }
 
-    /**
-     * Parses Directory.Build.props for centralized package management.
-     */
     private void parseDirectoryBuildProps(Path file, String sourceComponentId, List<Dependency> dependencies) throws IOException {
         JsonNode root = parseXml(file);
 
-        JsonNode itemGroups = root.get("ItemGroup");
+        JsonNode itemGroups = ensureArray(root.get(ITEM_GROUP));
         if (itemGroups == null) {
             return;
         }
 
-        if (!itemGroups.isArray()) {
-            itemGroups = xmlMapper.createArrayNode().add(itemGroups);
-        }
-
         for (JsonNode itemGroup : itemGroups) {
-            JsonNode packageRefs = itemGroup.get("PackageReference");
+            JsonNode packageRefs = ensureArray(itemGroup.get(PACKAGE_REFERENCE));
             if (packageRefs == null) {
                 continue;
             }
 
-            if (!packageRefs.isArray()) {
-                packageRefs = xmlMapper.createArrayNode().add(packageRefs);
-            }
-
             for (JsonNode pkgRef : packageRefs) {
-                // Directory.Build.props uses Update instead of Include
-                String packageId = extractAttribute(pkgRef, "Update");
+                String packageId = extractAttribute(pkgRef, UPDATE);
                 if (packageId == null) {
-                    packageId = extractAttribute(pkgRef, "Include");
+                    packageId = extractAttribute(pkgRef, INCLUDE);
                 }
 
-                String version = extractAttribute(pkgRef, "Version");
+                String version = extractAttribute(pkgRef, VERSION);
 
                 if (packageId != null && version != null) {
-                    Dependency dep = new Dependency(
-                        sourceComponentId,
-                        "nuget", // groupId
-                        packageId, // artifactId
-                        version,
-                        "compile",
-                        true
-                    );
-
-                    dependencies.add(dep);
+                    addDependency(sourceComponentId, packageId, version, dependencies);
                     log.debug("Found centralized package: {} {}", packageId, version);
                 }
             }
         }
     }
 
-    /**
-     * Extracts attribute value from Jackson JsonNode.
-     * Jackson XML represents attributes as empty strings with attribute name.
-     */
+    private JsonNode ensureArray(JsonNode node) {
+        if (node == null) {
+            return null;
+        }
+        if (node.isArray()) {
+            return node;
+        }
+        return xmlMapper.createArrayNode().add(node);
+    }
+
+    private void addDependency(String sourceComponentId, String packageId, String version, List<Dependency> dependencies) {
+        Dependency dep = new Dependency(
+            sourceComponentId,
+            GROUP_ID_NUGET,
+            packageId,
+            version,
+            SCOPE_COMPILE,
+            true
+        );
+        dependencies.add(dep);
+    }
+
+    private boolean isSystemAssembly(String packageId) {
+        return packageId.startsWith(SYSTEM_ASSEMBLY_PREFIX) || packageId.equals(MSCORLIB);
+    }
+
+    private String extractPackageNameFromInclude(String include) {
+        String[] parts = include.split(COMMA_DELIMITER);
+        return parts.length > 0 ? parts[0].trim() : include;
+    }
+
     @Override
     protected String extractAttribute(JsonNode node, String attributeName) {
         JsonNode attr = node.get(attributeName);
@@ -386,19 +360,17 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
         return null;
     }
 
-    /**
-     * Extracts version from Include attribute: "PackageName, Version=13.0.0.0".
-     */
     private String extractVersionFromInclude(String include) {
-        String[] parts = include.split(",");
+        String[] parts = include.split(COMMA_DELIMITER);
         for (String part : parts) {
             part = part.trim();
-            if (part.startsWith("Version=")) {
-                String version = part.substring("Version=".length());
-                // Simplify assembly version to package version (13.0.0.0 -> 13.0.0)
-                String[] versionParts = version.split("\\.");
-                if (versionParts.length >= 3) {
-                    return versionParts[0] + "." + versionParts[1] + "." + versionParts[2];
+            if (part.startsWith(VERSION_PREFIX)) {
+                String version = part.substring(VERSION_PREFIX.length());
+                String[] versionParts = version.split(VERSION_SEPARATOR);
+                if (versionParts.length >= MIN_VERSION_PARTS) {
+                    return versionParts[VERSION_MAJOR_INDEX] + DOT + 
+                           versionParts[VERSION_MINOR_INDEX] + DOT + 
+                           versionParts[VERSION_PATCH_INDEX];
                 }
                 return version;
             }
@@ -406,21 +378,14 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
         return null;
     }
 
-    /**
-     * Extracts version from HintPath: "..\packages\PackageName.13.0.3\lib\...".
-     */
     private String extractVersionFromHintPath(String hintPath) {
-        // Pattern: packages\PackageName.Version\lib\...
-        String[] parts = hintPath.split("[\\\\/]");
+        String[] parts = hintPath.split(PATH_SEPARATOR_REGEX);
         for (String part : parts) {
-            if (part.contains(".")) {
-                // Try to find package folder: PackageName.13.0.3
+            if (part.contains(DOT)) {
                 int lastDot = part.lastIndexOf('.');
                 if (lastDot > 0) {
                     String possibleVersion = part.substring(lastDot + 1);
-                    // Check if it looks like a version (starts with digit)
                     if (!possibleVersion.isEmpty() && Character.isDigit(possibleVersion.charAt(0))) {
-                        // Extract full version by going backwards
                         int versionStart = part.lastIndexOf('.', lastDot - 1);
                         while (versionStart > 0) {
                             char c = part.charAt(versionStart - 1);

@@ -1,5 +1,13 @@
 package com.docarchitect.core.scanner.impl.javascript;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.model.Dependency;
@@ -7,10 +15,7 @@ import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractJacksonScanner;
 import com.docarchitect.core.util.IdGenerator;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for npm dependency declarations in package.json files.
@@ -76,7 +81,7 @@ public class NpmDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("javascript", "typescript");
+        return Set.of(Technologies.JAVASCRIPT, Technologies.TYPESCRIPT);
     }
 
     @Override

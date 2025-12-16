@@ -13,6 +13,8 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.docarchitect.core.util.Technologies;
+
 /**
  * Scanner for SQL migration files to extract table definitions and relationships.
  *
@@ -120,7 +122,7 @@ public class SqlMigrationScanner extends AbstractRegexScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("sql", "java", "go", "python", "csharp", "ruby");
+        return Set.of(Technologies.SQL, Technologies.JAVA, Technologies.GO, Technologies.PYTHON, Technologies.CSHARP, Technologies.RUBY);
     }
 
     @Override

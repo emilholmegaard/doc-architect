@@ -1,5 +1,16 @@
 package com.docarchitect.core.scanner.impl.go;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.model.Dependency;
@@ -7,12 +18,7 @@ import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
 import com.docarchitect.core.util.IdGenerator;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.docarchitect.core.util.Technologies;
 
 /**
  * Scanner for Go module dependencies in go.mod files.
@@ -81,6 +87,18 @@ import java.util.regex.Pattern;
  * @since 1.0.0
  */
 public class GoModScanner extends AbstractRegexScanner {
+    private static final String SCANNER_ID = "go-modules";
+    private static final String SCANNER_DISPLAY_NAME = "Go Module Scanner";
+    private static final String GO_LANGUAGE = "go";
+    private static final String GO_MOD_FILE = "go.mod";
+    private static final String GO_MOD_GLOB = "**/go.mod";
+    private static final Set<String> GO_MOD_PATTERNS = Set.of(GO_MOD_FILE, GO_MOD_GLOB);
+    private static final String UNKNOWN_MODULE = "unknown";
+    private static final String MODULE_DESCRIPTION_PREFIX = "Go module: ";
+    private static final String META_MODULE_PATH = "modulePath";
+    private static final String META_PACKAGE_MANAGER = "packageManager";
+    private static final String SCOPE_COMPILE = "compile";
+    private static final int PRIORITY = 10;
 
     /**
      * Regex to extract module name: module github.com/user/repo.
@@ -103,50 +121,50 @@ public class GoModScanner extends AbstractRegexScanner {
     /**
      * Regex to extract single require statement: require github.com/pkg/errors v0.9.1.
      * Captures: (1) module path, (2) version.
+     * Supports pseudo-versions: v0.0.0-20230101120000-abcdef123456
      */
     private static final Pattern SINGLE_REQUIRE_PATTERN = Pattern.compile(
-        "^require\\s+([\\w./-]+)\\s+(v[\\d.]+(?:-[\\w.]+)?(?:\\+[\\w.]+)?)",
+        "^require\\s+([\\w./-]+)\\s+(v[\\w.-]+)",
         Pattern.MULTILINE
     );
 
     /**
      * Regex to parse individual require lines within a block.
      * Captures: (1) module path, (2) version.
-     * Handles optional // indirect comment.
+     * Handles optional // indirect comment and pseudo-versions.
      */
     private static final Pattern REQUIRE_LINE_PATTERN = Pattern.compile(
-        "([\\w./-]+)\\s+(v[\\d.]+(?:-[\\w.]+)?(?:\\+[\\w.]+)?)"
+        "([\\w./-]+)\\s+(v[\\w.-]+)"
     );
 
     @Override
     public String getId() {
-        return "go-modules";
+        return SCANNER_ID;
     }
 
     @Override
     public String getDisplayName() {
-        return "Go Module Scanner";
+        return SCANNER_DISPLAY_NAME;
     }
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("go");
+        return Set.of(Technologies.GO, Technologies.GOLANG);
     }
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of("**/go.mod");
+        return GO_MOD_PATTERNS;
     }
 
     @Override
     public int getPriority() {
-        return 10;
+        return PRIORITY;
     }
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        // Check if any go.mod files exist
-        return hasAnyFiles(context, "**/go.mod");
+        return hasAnyFiles(context, GO_MOD_PATTERNS.toArray(new String[0]));
     }
 
     @Override
@@ -156,8 +174,8 @@ public class GoModScanner extends AbstractRegexScanner {
         List<Dependency> dependencies = new ArrayList<>();
         List<Component> components = new ArrayList<>();
 
-        // Find all go.mod files
-        List<Path> goModFiles = context.findFiles("**/go.mod").toList();
+        Set<Path> goModFiles = new LinkedHashSet<>();
+        GO_MOD_PATTERNS.forEach(pattern -> context.findFiles(pattern).forEach(goModFiles::add));
 
         if (goModFiles.isEmpty()) {
             log.warn("No go.mod files found in project");
@@ -197,25 +215,23 @@ public class GoModScanner extends AbstractRegexScanner {
     private void parseGoMod(Path goModFile, List<Dependency> dependencies, List<Component> components) throws IOException {
         String content = readFileContent(goModFile);
 
-        // Extract module name
         String moduleName = extractModuleName(content);
         if (moduleName == null) {
             log.warn("go.mod missing module declaration: {}", goModFile);
-            moduleName = "unknown";
+            moduleName = UNKNOWN_MODULE;
         }
 
-        // Create component for this Go module
         String moduleShortName = extractModuleShortName(moduleName);
         Component component = new Component(
-            IdGenerator.generate("go", moduleName),
+            IdGenerator.generate(GO_LANGUAGE, moduleName),
             moduleShortName,
             ComponentType.SERVICE,
-            "Go module: " + moduleName,
-            "go",
+            MODULE_DESCRIPTION_PREFIX + moduleName,
+            GO_LANGUAGE,
             goModFile.getParent().toString(),
             Map.of(
-                "modulePath", moduleName,
-                "packageManager", "go"
+                META_MODULE_PATH, moduleName,
+                META_PACKAGE_MANAGER, GO_LANGUAGE
             )
         );
         components.add(component);
@@ -250,7 +266,7 @@ public class GoModScanner extends AbstractRegexScanner {
      */
     private String extractModuleShortName(String modulePath) {
         if (modulePath == null) {
-            return "unknown";
+            return UNKNOWN_MODULE;
         }
         String[] parts = modulePath.split("/");
         return parts[parts.length - 1];
@@ -320,7 +336,7 @@ public class GoModScanner extends AbstractRegexScanner {
             artifactId = modulePath.substring(lastSlash + 1);
         } else {
             // If no slash, treat the whole path as artifactId with "go" as groupId
-            groupId = "go";
+            groupId = GO_LANGUAGE;
             artifactId = modulePath;
         }
 
@@ -337,8 +353,8 @@ public class GoModScanner extends AbstractRegexScanner {
             groupId,
             artifactId,
             version,
-            "compile", // Go modules don't have test/provided scopes, all are compile
-            true // All go.mod dependencies are direct dependencies
+            SCOPE_COMPILE,
+            true
         );
         dependencies.add(dependency);
     }

@@ -1,20 +1,25 @@
 package com.docarchitect.core.scanner.impl.java;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Scanner;
+import java.util.Set;
+
 import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
 
 /**
  * Scanner for JPA entity declarations in Java source files.
@@ -43,7 +48,7 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
     @Override
     public Set<String> getSupportedLanguages() {
-        return Set.of("java");
+        return Set.of(Technologies.JAVA);
     }
 
     @Override
