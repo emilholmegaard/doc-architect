@@ -1,4 +1,4 @@
-# DiagramGenerator implementations should be registered here
-# Example:
-# com.example.MermaidGenerator
-# com.example.PlantUmlGenerator
+# DiagramGenerator implementations
+com.docarchitect.core.generator.impl.MermaidGenerator
+com.docarchitect.core.generator.impl.MarkdownGenerator
+com.docarchitect.core.generator.impl.SokratesGenerator
