@@ -1,19 +1,26 @@
 # Multi-stage Docker build for DocArchitect
 # Stage 1: Build the application
-FROM maven:3-eclipse-temurin-25-alpine AS build
+FROM maven:3-eclipse-temurin-21-alpine AS build
 
 WORKDIR /app
 
-# Copy POM first for better layer caching
+# Copy parent POM and module POMs for better layer caching
 COPY pom.xml .
+COPY doc-architect-core/pom.xml ./doc-architect-core/
+COPY doc-architect-cli/pom.xml ./doc-architect-cli/
+
+# Download dependencies for all modules
 RUN mvn dependency:go-offline -B
 
-# Copy source code and build
-COPY src ./src
+# Copy source code for all modules
+COPY doc-architect-core/src ./doc-architect-core/src
+COPY doc-architect-cli/src ./doc-architect-cli/src
+
+# Build the multi-module project (skip tests in Docker build)
 RUN mvn clean package -DskipTests -B
 
 # Stage 2: Runtime image
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 LABEL maintainer="DocArchitect Team"
 LABEL org.opencontainers.image.source="https://github.com/emilholmegaard/doc-architect"
@@ -32,8 +39,8 @@ RUN addgroup -S docarchitect && \
 
 WORKDIR /app
 
-# Copy built JAR from build stage
-COPY --from=build /app/target/*.jar app.jar
+# Copy built CLI JAR from build stage (the executable artifact)
+COPY --from=build /app/doc-architect-cli/target/*.jar app.jar
 
 # Create necessary directories
 RUN mkdir -p /workspace /output && \

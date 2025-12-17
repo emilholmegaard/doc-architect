@@ -22,17 +22,15 @@ jobs:
     permissions:
       contents: read
       packages: write
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-      
-      - name: Download build artifact
-        uses: actions/download-artifact@v7
-        with:
-          name: application-jar
-          path: target/
-      
+
+      # NOTE: Dockerfile uses multi-stage build (maven:3-eclipse-temurin-25-alpine)
+      # that compiles from source. No need to download artifacts here.
+      # The multi-stage approach ensures consistent build environment and layer caching.
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       

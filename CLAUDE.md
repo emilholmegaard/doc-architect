@@ -171,6 +171,9 @@ mvn clean compile
 # Run tests
 mvn test
 
+# Verify quality gates (coverage ≥60%, checkstyle, spotbugs)
+mvn verify
+
 # Package (creates JARs)
 mvn clean package
 
@@ -178,9 +181,41 @@ mvn clean package
 mvn clean package -DskipTests
 ```
 
-**CI checks (future):**
+### CI/CD Pipeline (GitHub Actions)
 
-- Maven compile → JUnit tests → JaCoCo coverage → Javadoc generation → JAR packaging
+**Quality Gates Enforced:**
+
+1. **Test Coverage:** JaCoCo ≥60% per package (enforced in `mvn verify`)
+2. **Code Style:** Checkstyle with Google Java Style Guide
+3. **Static Analysis:** SpotBugs (Max effort, Low threshold)
+4. **Unit Tests:** All JUnit 5 tests must pass
+
+**Workflows:**
+
+- **PR Check** (`.github/workflows/pr.yml`): Build → Test → Verify → Docker Build
+- **Merge** (`.github/workflows/merge.yml`): Same as PR + Push Docker image + Security scan
+- **TechDocs** (`.github/workflows/techdocs.yml`): Build MkDocs → Deploy to GitHub Pages
+
+**Local Testing:**
+
+Test workflows locally before pushing using Act:
+
+```bash
+# Install Act (nektos/act)
+choco install act-cli  # Windows
+brew install act       # macOS
+
+# Test PR workflow
+act pull_request
+
+# Test specific job
+act pull_request -j build
+
+# See what would run
+act pull_request -n
+```
+
+See [LOCAL_CI_TESTING.md](LOCAL_CI_TESTING.md) for detailed instructions.
 
 ---
 

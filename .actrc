@@ -1,0 +1,11 @@
+# Act Configuration for Local GitHub Actions Testing
+# This file configures nektos/act to run GitHub Actions workflows locally
+
+# Use medium-sized container for better compatibility
+-P ubuntu-latest=catthehacker/ubuntu:act-latest
+
+# Container options for better performance
+--container-options="--cpus 2 --memory 4g"
+
+# Verbose output for debugging
+-v

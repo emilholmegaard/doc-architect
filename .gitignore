@@ -50,3 +50,7 @@ CLAUDE.local.md
 *.key
 *.crt
 secrets/
+.secrets
+
+# Act (local GitHub Actions testing)
+.act/
