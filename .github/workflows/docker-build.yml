@@ -50,8 +50,8 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=${{ inputs.image-tag }}
+            type=sha
+            type=raw,value=${{ inputs.image-tag }},enable=${{ inputs.image-tag != 'latest' }}
       
       - name: Build and push
         uses: docker/build-push-action@v6
