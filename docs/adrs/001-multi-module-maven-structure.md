@@ -1,9 +1,24 @@
+---
+# Backstage TechDocs metadata
+id: adr-001-multi-module-maven-structure
+title: ADR-001: Multi-Module Maven Structure
+description: Establish a parent POM with core and CLI modules for DocArchitect
+tags:
+  - adr
+  - architecture
+  - maven
+  - build
+---
 # ADR-001: Multi-Module Maven Structure
 
-**Status:** Accepted
-**Date:** 2025-12-12
-**Deciders:** Development Team
-**Related:** [Phase 1 Implementation](https://github.com/emilholmegaard/doc-architect/issues/1)
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-12 |
+| **Deciders** | Development Team |
+| **Technical Story** | Phase 1 Implementation |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
 ---
 
@@ -90,6 +105,10 @@ doc-architect/
 **Output:**
 - `docarchitect.jar` - Executable fat JAR with all dependencies
 
+## Rationale
+
+Separates core abstractions from CLI to improve reuse, testing, and extensibility across future plugins.
+
 ## Alternatives Considered
 
 ### Single Module
@@ -169,7 +188,7 @@ doc-architect/
 - **Dependency management** - Parent POM centralizes versions (reduces duplication)
 - **Reactor builds** - Maven automatically builds modules in dependency order
 
-## Implementation Details
+## Implementation Notes
 
 ### Parent POM Configuration
 
@@ -279,6 +298,10 @@ This structure allows for future modules:
 
 Each module can independently depend on `doc-architect-core` without pulling in CLI dependencies.
 
+## Compliance
+
+_TBD_
+
 ## References
 
 - [Maven Multi-Module Projects](https://maven.apache.org/guides/mini/guide-multiple-modules.html)
@@ -289,4 +312,3 @@ Each module can independently depend on `doc-architect-core` without pulling in 
 
 **Decision:** Use multi-module Maven structure with `doc-architect-core` and `doc-architect-cli`
 **Impact:** High - Affects project structure, build process, and extensibility
-**Review Date:** After Phase 4 completion

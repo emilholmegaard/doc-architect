@@ -1,8 +1,24 @@
-# ADR-0004: Logback Logging Configuration
+---
+# Backstage TechDocs metadata
+id: adr-005-logback-logging-configuration
+title: ADR-005: Logback Logging Configuration
+description: Adopt Logback Classic with environment-specific configurations for scanner logging
+tags:
+  - adr
+  - architecture
+  - logging
+  - slf4j
+---
+# ADR-005: Logback Logging Configuration
 
-**Status:** Accepted
-**Date:** 2025-12-14
-**Context:** Week 3 Architecture Refactoring
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-14 |
+| **Deciders** | Development Team |
+| **Technical Story** | Week 3 Architecture Refactoring |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
 ---
 
@@ -69,6 +85,12 @@ Support fine-grained log level control via environment variables:
 - `RENDERER_LOG_LEVEL` - Renderer package log level
 
 **Rationale:** Allows users to increase verbosity for specific subsystems without flooding logs from other components.
+
+---
+
+## Rationale
+
+Provides consistent, configurable logging across scanners with environment-specific defaults.
 
 ---
 
@@ -143,7 +165,7 @@ Support fine-grained log level control via environment variables:
 
 ---
 
-## Implementation Details
+## Implementation Notes
 
 ### File Structure
 

@@ -1,11 +1,26 @@
-# ADR-0005: Technology-Based Package Organization
+---
+# Backstage TechDocs metadata
+id: adr-006-technology-based-package-organization
+title: ADR-006: Technology-Based Package Organization
+description: Reorganize scanner implementations by technology-based subpackages
+tags:
+  - adr
+  - architecture
+  - packaging
+  - organization
+---
+# ADR-006: Technology-Based Package Organization
 
-**Status:** Accepted
-**Date:** 2025-12-15
-**Context:** Week 4 Architecture Refactoring
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-15 |
+| **Deciders** | Architecture Team |
+| **Technical Story** | Week 4 Architecture Refactoring |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
 ---
-
 ## Context
 
 After completing Week 3 refactoring (base class extraction), the scanner implementations were all located in a flat `com.docarchitect.core.scanner.impl` package:
@@ -119,6 +134,12 @@ test/java/com/docarchitect/core/scanner/
 - **javascript**: JavaScript/TypeScript and Node.js
 - **go**: Go language and tooling
 - **schema**: Language-agnostic schema and API definition formats
+
+---
+
+## Rationale
+
+Improves discoverability, ownership clarity, and scalability by grouping scanners per ecosystem.
 
 ---
 
@@ -356,12 +377,26 @@ No specific monitoring needed - this is a structural change with no runtime impa
 
 ---
 
+## Compliance
+
+_TBD_
+
+---
+
 ## References
 
 - Java Package Naming Conventions: https://docs.oracle.com/javase/specs/jls/se21/html/jls-6.html#jls-6.1
 - ServiceLoader Documentation: https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html
 - Week 4 Refactoring Plan: `.github/ISSUE_TEMPLATE/refactoring-proposal.md`
 - ADR-0003: Base Class Extraction (Week 3)
+
+---
+
+## Metadata
+
+- **Review Date:** 2026-12-15
+- **Last Updated:** 2025-12-15
+- **Version:** 1.0
 
 ---
 
