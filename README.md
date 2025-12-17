@@ -1,13 +1,3 @@
----
-id: readme
-title: Documentation Architecture Repository
-description: Central repository for architecture documentation, ADRs, and design decisions
-tags:
-  - documentation
-  - adr
-  - architecture
----
-
 # Documentation Architecture
 
 # DocArchitect
