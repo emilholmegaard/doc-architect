@@ -67,8 +67,8 @@ import com.docarchitect.core.util.Technologies;
  * List<ApiEndpoint> endpoints = result.apiEndpoints();
  * }</pre>
  *
- * @see Scanner
- * @see ApiEndpoint
+ * @see com.docarchitect.core.scanner.Scanner
+ * @see com.docarchitect.core.model.ApiEndpoint
  * @since 1.0.0
  */
 public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRoute> {

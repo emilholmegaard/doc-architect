@@ -1,12 +1,27 @@
+---
+# Backstage TechDocs metadata
+id: adr-003-jvm-scanner-implementation-strategy
+title: ADR-003: JVM Scanner Implementation Strategy
+description: Define parsing strategies for JVM ecosystem scanners using JavaParser, Jackson XML, and regex
+tags:
+  - adr
+  - architecture
+  - jvm
+  - parsing
+  - scanners
+---
 # ADR-003: JVM Scanner Implementation Strategy
 
-**Status:** Accepted
-**Date:** 2025-12-12
-**Deciders:** Development Team
-**Related:** [Phase 3 Implementation](https://github.com/emilholmegaard/doc-architect/issues/3)
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-12 |
+| **Deciders** | Development Team |
+| **Technical Story** | Phase 3 Implementation |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
 ---
-
 ## Context
 
 DocArchitect needs to extract architectural information from Java/JVM codebases, including:
@@ -27,6 +42,7 @@ The challenge is that we're running in Java and have access to powerful Java par
 6. No external process execution (all parsing in-JVM)
 7. Handle property placeholders like `${project.version}`
 
+---
 ## Decision
 
 We will implement **5 specialized scanners** using different parsing strategies optimized for each file type:
@@ -177,6 +193,12 @@ method.findAll(MethodCallExpr.class).forEach(call -> {
 - Producers: `kafkaTemplate.send("topic", message)`
 - Message types from method parameters
 
+---
+## Rationale
+
+Selects fit-for-purpose parsers (AST, XML, regex) to balance accuracy, safety, and performance across JVM artifacts.
+
+---
 ## Alternatives Considered
 
 ### Using Gradle Tooling API for Gradle Parsing
@@ -237,6 +259,7 @@ method.findAll(MethodCallExpr.class).forEach(call -> {
 
 **Verdict:** ❌ Rejected - JavaParser works on source code directly
 
+---
 ## Consequences
 
 ### Positive
@@ -260,7 +283,8 @@ method.findAll(MethodCallExpr.class).forEach(call -> {
 - **Jackson version** - Locked to 2.18.2 (matches other Jackson modules)
 - **Test coverage** - Integration tests would require fixture projects (deferred to Phase 5)
 
-## Implementation Details
+---
+## Implementation Notes
 
 ### Dependency Versions
 
@@ -315,47 +339,12 @@ private String resolveProperties(String value, Map<String, String> properties) {
 - `${spring.version}` → from `<properties><spring.version>`
 - Custom properties defined in `<properties>`
 
-## Performance Characteristics
+---
+## Compliance
 
-Based on typical projects:
+_TBD_
 
-| Scanner | File Size | Parse Time | Memory |
-|---------|-----------|------------|--------|
-| Maven   | 50KB POM  | ~50ms      | 5MB    |
-| Gradle  | 20KB      | ~10ms      | 2MB    |
-| Spring  | 200 lines | ~80ms      | 8MB    |
-| JPA     | 150 lines | ~70ms      | 7MB    |
-| Kafka   | 100 lines | ~60ms      | 6MB    |
-
-**Total:** ~30MB RAM, ~300ms for typical microservice project
-
-## Future Improvements
-
-1. **Gradle improvements:**
-   - Parse `buildSrc` for custom dependency logic
-   - Handle version catalogs (`libs.versions.toml`)
-   - Support Gradle Kotlin DSL plugins block
-
-2. **Maven improvements:**
-   - Resolve remote parent POMs via Maven Central
-   - Handle BOM imports (`<scope>import</scope>`)
-   - Support profiles (`<profiles>`)
-
-3. **Spring improvements:**
-   - Extract OpenAPI/Swagger annotations
-   - Support Spring WebFlux (`@RouterFunction`)
-   - Extract security annotations (`@PreAuthorize`)
-
-4. **JPA improvements:**
-   - Extract database indexes (`@Index`)
-   - Extract column constraints (`@Check`)
-   - Support Hibernate-specific annotations
-
-5. **Kafka improvements:**
-   - Extract consumer group IDs
-   - Support Spring Cloud Stream
-   - Extract schema registry references
-
+---
 ## References
 
 - [JavaParser Documentation](https://javaparser.org/)
@@ -367,7 +356,6 @@ Based on typical projects:
 - [Kafka Spring Integration](https://docs.spring.io/spring-kafka/reference/html/)
 
 ---
-
 **Decision:** Use JavaParser for Java source analysis, Jackson XML for Maven, and regex for Gradle
 **Impact:** High - Defines parsing strategy for all JVM scanners
 **Review Date:** After Phase 5 completion (diagram generators)

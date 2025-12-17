@@ -1,12 +1,26 @@
+---
+# Backstage TechDocs metadata
+id: adr-002-cli-framework-picocli
+title: ADR-002: CLI Framework - Picocli
+description: Choose Picocli as the command-line framework for DocArchitect
+tags:
+  - adr
+  - architecture
+  - cli
+  - picocli
+---
 # ADR-002: CLI Framework - Picocli
 
-**Status:** Accepted
-**Date:** 2025-12-12
-**Deciders:** Development Team
-**Related:** [Phase 2 Implementation](https://github.com/emilholmegaard/doc-architect/issues/2)
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-12 |
+| **Deciders** | Development Team |
+| **Technical Story** | Phase 2 Implementation |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
 ---
-
 ## Context
 
 DocArchitect needs a command-line interface to provide users with an intuitive way to:
@@ -26,6 +40,7 @@ The CLI must support:
 - Argument validation and error messages
 - Native GraalVM compilation (future requirement)
 
+---
 ## Decision
 
 We will use **Picocli** as the CLI framework for DocArchitect.
@@ -66,6 +81,12 @@ Commands:
 - **Annotation processing**: Enable picocli-codegen for reflection-free metadata
 - **Fat JAR**: Maven Shade Plugin with `ServicesResourceTransformer` for SPI merging
 
+---
+## Rationale
+
+Picocli offers declarative annotations, subcommand support, rich help text, and GraalVM readiness with minimal boilerplate.
+
+---
 ## Alternatives Considered
 
 ### JCommander
@@ -118,6 +139,7 @@ Commands:
 - Less mature than Picocli
 - Smaller community
 
+---
 ## Consequences
 
 ### Positive
@@ -139,6 +161,7 @@ Commands:
 - **Reflection-free metadata** - Annotation processing generates metadata at compile time
 - **Fat JAR required** - Maven Shade Plugin bundles all dependencies (necessary anyway for CLI distribution)
 
+---
 ## Implementation Notes
 
 ### Maven Configuration
@@ -209,6 +232,12 @@ public class InitCommand implements Callable<Integer> {
 }
 ```
 
+---
+## Compliance
+
+_TBD_
+
+---
 ## References
 
 - [Picocli Documentation](https://picocli.info/)
@@ -217,7 +246,13 @@ public class InitCommand implements Callable<Integer> {
 - [Maven Shade Plugin](https://maven.apache.org/plugins/maven-shade-plugin/)
 
 ---
+## Metadata
+
+- **Review Date:** After Phase 3 completion
+- **Last Updated:** 2025-12-12
+- **Version:** 1.0
+
+---
 
 **Decision:** Use Picocli as the CLI framework for DocArchitect
 **Impact:** High - Affects all user interactions with the tool
-**Review Date:** After Phase 3 completion

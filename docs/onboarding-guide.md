@@ -487,7 +487,7 @@ docker run doc-architect --help
 
 - **Architecture Overview:** [architecture-overview.md](architecture-overview.md)
 - **API Documentation:** Generated Javadoc in `target/site/apidocs/`
-- **Development Guidelines:** [CLAUDE.md](CLAUDE.md)
+- **Development Guidelines:** [claude-development-guide.md](claude-development-guide.md)
 - **GitHub Issues:** [Issues](https://github.com/emilholmegaard/doc-architect/issues)
 
 ## Getting Help
@@ -500,7 +500,7 @@ docker run doc-architect --help
 ## Next Steps
 
 1. ✅ Read this guide (you are here!)
-2. ⏭️ Read [CLAUDE.md](CLAUDE.md) for technical standards
+2. ⏭️ Read [claude-development-guide.md](claude-development-guide.md) for technical standards
 3. ⏭️ Read [architecture-overview.md](architecture-overview.md) to understand components
 4. ⏭️ Pick a `good-first-issue` and create your first PR
 5. ⏭️ Attend code review to learn team practices

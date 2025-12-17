@@ -1,9 +1,24 @@
+---
+# Backstage TechDocs metadata
+id: adr-004-python-scanner-text-based-parsing
+title: ADR-004: Python Scanner Text-Based Parsing Strategy
+description: Define text-based parsing (regex + TOML) for Python scanners without executing Python code
+tags:
+  - adr
+  - architecture
+  - parsing
+  - python
+---
 # ADR-004: Python Scanner Text-Based Parsing Strategy
 
-**Status:** Accepted
-**Date:** 2025-12-12
-**Deciders:** Development Team
-**Related:** [Phase 4 Implementation](https://github.com/emilholmegaard/doc-architect/issues/4)
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-12 |
+| **Deciders** | Development Team |
+| **Technical Story** | Phase 4 Implementation |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
 ---
 
@@ -233,6 +248,14 @@ String mapDjangoFieldToSql(String djangoField) {
 }
 ```
 
+---
+
+## Rationale
+
+Balances accuracy and safety by avoiding code execution while covering common Python patterns.
+
+---
+
 ## Alternatives Considered
 
 ### Using Python AST via Jython
@@ -295,6 +318,8 @@ String mapDjangoFieldToSql(String djangoField) {
 
 **Verdict:** ❌ Rejected - Regex is sufficient
 
+---
+
 ## Consequences
 
 ### Positive
@@ -330,7 +355,9 @@ String mapDjangoFieldToSql(String djangoField) {
 - **Maintenance** - Regex patterns need updates for new framework versions
 - **Accuracy** - Sufficient for architecture documentation, not code execution
 
-## Implementation Details
+---
+
+## Implementation Notes
 
 ### Class Body Extraction
 
@@ -407,94 +434,13 @@ private String extractVersionFromPoetryDep(JsonNode depNode) {
 }
 ```
 
-## Performance Characteristics
+---
 
-Based on typical projects:
+## Compliance
 
-| Scanner | File Size | Parse Time | Memory |
-|---------|-----------|------------|--------|
-| Pip/Poetry | 100 lines | ~20ms | 3MB |
-| FastAPI | 200 lines | ~30ms | 4MB |
-| Flask | 200 lines | ~30ms | 4MB |
-| SQLAlchemy | 150 lines | ~25ms | 3MB |
-| Django | 200 lines | ~35ms | 4MB |
+_TBD_
 
-**Total:** ~18MB RAM, ~140ms for typical Python project
-
-**Comparison to Java scanners:**
-- Python scanners: ~140ms, 18MB
-- Java scanners: ~300ms, 30MB
-- **Python is faster** - Regex vs AST parsing
-
-## Regex Pattern Documentation
-
-All regex patterns are documented in Javadoc with:
-- **Pattern string** - Full regex
-- **Capture groups** - What each group captures
-- **Example matches** - Sample code
-- **Non-matches** - What it doesn't catch
-
-**Example:**
-```java
-/**
- * Regex to match FastAPI decorator: @app.get("/users") or @router.post("/items").
- * Captures: (1) app|router, (2) HTTP method, (3) path.
- *
- * Examples:
- * - @app.get("/users/{user_id}") → ("app", "get", "/users/{user_id}")
- * - @router.post("/items") → ("router", "post", "/items")
- */
-private static final Pattern DECORATOR_PATTERN = Pattern.compile(
-    "@(app|router)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"](.+?)['\"]"
-);
-```
-
-## Future Improvements
-
-1. **Pip/Poetry:**
-   - Support PEP 735 dependency groups
-   - Parse `constraints.txt`
-   - Handle `-r requirements-dev.txt` includes
-
-2. **FastAPI:**
-   - Extract Pydantic models for request/response schemas
-   - Support `APIRouter` prefix paths
-   - Extract OpenAPI/Swagger annotations
-
-3. **Flask:**
-   - Extract Flask-RESTful resources
-   - Support Flask blueprints with URL prefixes
-   - Extract Flask-CORS configurations
-
-4. **SQLAlchemy:**
-   - Extract database indexes
-   - Support composite primary keys
-   - Extract column constraints (CHECK, UNIQUE)
-
-5. **Django:**
-   - Extract model Meta options (ordering, constraints)
-   - Support abstract models and mixins
-   - Extract signals and receivers
-
-## Testing Strategy
-
-Each scanner includes fixture files in test resources:
-
-```
-src/test/resources/fixtures/
-├── requirements.txt
-├── pyproject.toml
-├── setup.py
-├── fastapi_sample.py
-├── flask_sample.py
-├── sqlalchemy_sample.py
-└── django_sample.py
-```
-
-**Test approach:**
-1. Parse fixture file
-2. Assert extracted entities match expected
-3. Verify regex patterns with edge cases
+---
 
 ## References
 
@@ -508,6 +454,8 @@ src/test/resources/fixtures/
 
 ---
 
-**Decision:** Use text-based parsing (regex + TOML) for all Python scanners
-**Impact:** High - Defines parsing strategy for all Python scanners, accepts accuracy tradeoffs
-**Review Date:** After Phase 5 completion, reassess if accuracy issues arise
+## Metadata
+
+- **Review Date:** After Phase 5 completion
+- **Last Updated:** 2025-12-12
+- **Version:** 1.0

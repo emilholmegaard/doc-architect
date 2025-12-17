@@ -278,6 +278,6 @@ public class FlaskScanner extends AbstractAstScanner<PythonAst.PythonClass> {
 
 ## Metadata
 
-- **Review Date:** 2026-12-16 (annual review)
+- **Review Date:** 2026-12-16
 - **Last Updated:** 2025-12-16
 - **Version:** 1.0

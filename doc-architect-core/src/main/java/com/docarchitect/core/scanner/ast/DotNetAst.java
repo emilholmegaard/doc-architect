@@ -10,9 +10,9 @@ import java.util.List;
  * a clean, type-safe API for working with C# AST.
  *
  * <p><b>Parser Implementation:</b></p>
- * <p>Uses Roslyn compiler API or external process execution for parsing C# source files.</p>
+ * <p>Uses ANTLR4-based C# grammar for parsing C# source files.</p>
  *
- * @see com.docarchitect.core.scanner.impl.dotnet.util.DotNetAstParser
+ * @see com.docarchitect.core.scanner.impl.dotnet.util.CSharpAstParser
  * @since 1.0.0
  */
 public final class DotNetAst {
@@ -78,7 +78,7 @@ public final class DotNetAst {
      * }</pre>
      *
      * @param name property name (e.g., "Users")
-     * @param type property type (e.g., "DbSet<User>")
+     * @param type property type (e.g., "DbSet&lt;User&gt;")
      * @param hasGetter true if property has getter
      * @param hasSetter true if property has setter
      * @param attributes list of attributes applied to this property

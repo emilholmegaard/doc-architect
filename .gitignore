@@ -12,10 +12,11 @@
 target/
 *.class
 *.jar
-!.mvn/wrapper/maven-wrapper.jar
 *.war
 *.ear
 mypypy_cache/
+.mypy_cache/
+
 java-upgrade/
 
 # Logs
@@ -50,3 +51,7 @@ CLAUDE.local.md
 *.key
 *.crt
 secrets/
+.secrets
+
+# Act (local GitHub Actions testing)
+.act/

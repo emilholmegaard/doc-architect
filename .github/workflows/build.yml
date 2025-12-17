@@ -38,11 +38,23 @@ jobs:
         run: chmod +x ./mvnw
 
       - name: Build with Maven
-        run: ./mvnw clean package -DskipTests
-      
+        run: ./mvnw clean compile
+
       - name: Run tests with coverage
         if: inputs.run-tests
-        run: ./mvnw verify
+        run: ./mvnw test
+
+      - name: Verify quality gates
+        if: inputs.run-tests
+        run: |
+          echo "=== Running Quality Gates ==="
+          echo "1. JaCoCo Coverage Check (≥60%)"
+          echo "2. Checkstyle Validation"
+          echo "3. SpotBugs Static Analysis"
+          ./mvnw verify -DskipTests
+
+      - name: Package JARs
+        run: ./mvnw package -DskipTests
       
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
