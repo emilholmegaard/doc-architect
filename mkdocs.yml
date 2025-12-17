@@ -4,10 +4,12 @@ repo_url: 'https://github.com/emilholmegaard/doc-architect'
 edit_uri: 'edit/main/'
 
 nav:
-  - Home: '../README.md'
+  - Home: 'index.md'
   - Architecture Overview: 'architecture-overview.md'
   - Onboarding Guide: 'onboarding-guide.md'
   - CI/CD Setup: 'ci-cd-setup.md'
+  - Local CI Testing: 'local-ci-testing.md'
+  - Claude Development Guide: 'claude-development-guide.md'
   - Extending: 'extending.md'
   - Testing: 'testing.md'
   - ADRs:
