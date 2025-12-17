@@ -25,8 +25,8 @@ import com.github.javaparser.ast.expr.NormalAnnotationExpr;
  *
  * <p>Uses JavaParser to extract JPA entities, fields, and relationships from @Entity classes.
  *
- * @see Scanner
- * @see DataEntity
+ * @see com.docarchitect.core.scanner.Scanner
+ * @see com.docarchitect.core.model.DataEntity
  * @since 1.0.0
  */
 public class JpaEntityScanner extends AbstractJavaParserScanner {

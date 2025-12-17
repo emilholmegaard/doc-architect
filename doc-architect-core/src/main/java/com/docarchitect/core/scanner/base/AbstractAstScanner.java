@@ -58,6 +58,7 @@ import java.util.List;
  *
  * <p><b>Comparison with Other Base Classes:</b></p>
  * <table border="1">
+ *   <caption>Scanner Base Class Comparison</caption>
  *   <tr>
  *     <th>Base Class</th>
  *     <th>Parsing Strategy</th>
