@@ -75,6 +75,12 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
     private static final String SCANNER_ID = "aspnetcore-rest";
     private static final String SCANNER_DISPLAY_NAME = "ASP.NET Core API Scanner";
 
+    /**
+     * Constructs a new AspNetCoreApiScanner with the DotNet AST parser.
+     *
+     * <p>The scanner uses ANTLR-based C# parsing to accurately extract ASP.NET Core
+     * REST API endpoint information from controller attributes and action methods.
+     */
     public AspNetCoreApiScanner() {
         super(AstParserFactory.getDotNetParser());
     }

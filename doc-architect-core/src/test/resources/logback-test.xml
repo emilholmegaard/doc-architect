@@ -27,4 +27,7 @@
     <!-- Silence 3rd party libraries during tests -->
     <logger name="com.fasterxml.jackson" level="ERROR" />
     <logger name="com.github.javaparser" level="ERROR" />
+
+    <!-- Silence ArchUnit Java 21 class file version warnings (harmless) -->
+    <logger name="com.tngtech.archunit.core.importer.ClassFileProcessor" level="ERROR" />
 </configuration>

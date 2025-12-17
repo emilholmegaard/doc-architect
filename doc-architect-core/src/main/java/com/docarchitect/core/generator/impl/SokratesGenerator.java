@@ -19,17 +19,53 @@ import com.docarchitect.core.model.Component;
 /**
  * Generates Sokrates configuration files for code analysis integration.
  *
- * <p>Produces {@code sokrates.json} configuration files that enable integration
- * with the Sokrates code analysis platform. The configuration organizes components
- * with source file patterns for automated code quality analysis.
+ * <p>Sokrates is an open-source code analysis platform that provides insights into
+ * codebase structure, complexity, and quality metrics. This generator produces JSON
+ * configuration files that define logical components and analysis rules.
  *
- * <p>Sokrates configuration includes:
+ * <h2>Generated Configuration</h2>
+ * <p>The sokrates.json configuration file includes:
  * <ul>
- *   <li>Logical components with source file patterns</li>
- *   <li>Technology stack definitions</li>
- *   <li>File extensions and scoping rules</li>
- *   <li>Component organization and grouping</li>
+ *   <li><b>Project Metadata:</b> Name, version, and description</li>
+ *   <li><b>File Extensions:</b> Automatically inferred from component technologies</li>
+ *   <li><b>Source Scope:</b> Root directory and ignore patterns (build artifacts, node_modules, etc.)</li>
+ *   <li><b>Logical Components:</b> Components mapped to source file path patterns</li>
+ *   <li><b>Cross-Cutting Concerns:</b> Test code and generated code patterns</li>
+ *   <li><b>Analysis Configuration:</b> Duplication detection, dependency analysis settings</li>
+ *   <li><b>Goals:</b> Architecture quality goals and metrics</li>
  * </ul>
+ *
+ * <h2>Path Pattern Generation</h2>
+ * <p>Path patterns are automatically generated based on component properties:
+ * <ul>
+ *   <li><b>SERVICE/MODULE:</b> Patterns for service directories and Java source paths</li>
+ *   <li><b>LIBRARY:</b> Patterns for library directories</li>
+ *   <li><b>DATABASE:</b> Patterns for migrations, schema, and database scripts</li>
+ *   <li><b>API_GATEWAY:</b> Patterns for gateway and API directories</li>
+ *   <li><b>MESSAGE_BROKER:</b> Patterns for messaging and event directories</li>
+ * </ul>
+ *
+ * <h2>Technology to Extension Mapping</h2>
+ * <p>File extensions are inferred from component technology strings:
+ * <ul>
+ *   <li>Java, Spring, Spring Boot → java</li>
+ *   <li>Python, Django, Flask, FastAPI → py</li>
+ *   <li>JavaScript, Node.js, Express, React, Vue → js, jsx</li>
+ *   <li>TypeScript, Angular → ts, tsx</li>
+ *   <li>C#, .NET, ASP.NET → cs</li>
+ *   <li>Golang → go</li>
+ *   <li>Kotlin → kt, kts</li>
+ * </ul>
+ *
+ * <h2>Usage Example</h2>
+ * <pre>{@code
+ * SokratesGenerator generator = new SokratesGenerator();
+ * ArchitectureModel model = ...; // populated model
+ * GeneratorConfig config = GeneratorConfig.defaults();
+ *
+ * GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
+ * // diagram.content() contains sokrates.json configuration
+ * }</pre>
  *
  * @see <a href="https://d3axxy9bcycpv7.cloudfront.net/java/html/index.html">Sokrates Documentation</a>
  */
@@ -189,22 +225,60 @@ public class SokratesGenerator implements DiagramGenerator {
 
     /**
      * Generates the complete Sokrates JSON configuration.
+     *
+     * <p>Delegates to specialized methods to build each configuration section:
+     * metadata, extensions, scope, logical components, cross-cutting concerns,
+     * analysis settings, and goals.
+     *
+     * @param model the architecture model
+     * @param config generator configuration (currently unused)
+     * @return JSON-formatted Sokrates configuration
      */
     private String generateSokratesConfig(ArchitectureModel model, GeneratorConfig config) {
         StringBuilder sb = new StringBuilder();
-
         sb.append("{\n");
+
+        appendProjectMetadata(sb, model);
+        appendExtensionsSection(sb, model);
+        appendScopeSection(sb);
+        appendLogicalComponentsSection(sb, model);
+        appendCrossCuttingConcernsSection(sb);
+        appendAnalysisSection(sb);
+        appendGoalsSection(sb);
+
+        sb.append("}\n");
+        return sb.toString();
+    }
+
+    /**
+     * Appends project metadata (name, description, version) to the JSON.
+     *
+     * @param sb the string builder
+     * @param model the architecture model
+     */
+    private void appendProjectMetadata(StringBuilder sb, ArchitectureModel model) {
         sb.append("  \"").append(KEY_NAME).append("\": ").append(jsonString(model.projectName())).append(",\n");
-        sb.append("  \"").append(KEY_DESCRIPTION).append("\": \"Architecture analysis for ").append(escape(model.projectName())).append("\",\n");
+        sb.append("  \"").append(KEY_DESCRIPTION).append("\": \"Architecture analysis for ")
+            .append(escape(model.projectName())).append("\",\n");
 
         if (!model.projectVersion().equals("unknown")) {
-            sb.append("  \"").append(KEY_VERSION).append("\": ").append(jsonString(model.projectVersion())).append(",\n");
+            sb.append("  \"").append(KEY_VERSION).append("\": ")
+                .append(jsonString(model.projectVersion())).append(",\n");
         }
+    }
 
-        // Extensions configuration
+    /**
+     * Appends file extensions section inferred from component technologies.
+     *
+     * @param sb the string builder
+     * @param model the architecture model
+     */
+    private void appendExtensionsSection(StringBuilder sb, ArchitectureModel model) {
         sb.append("  \"").append(KEY_EXTENSIONS).append("\": [\n");
+
         Set<String> extensions = inferExtensions(model);
         List<String> extList = new ArrayList<>(extensions);
+
         for (int i = 0; i < extList.size(); i++) {
             sb.append("    ").append(jsonString(extList.get(i)));
             if (i < extList.size() - 1) {
@@ -212,9 +286,16 @@ public class SokratesGenerator implements DiagramGenerator {
             }
             sb.append("\n");
         }
-        sb.append("  ],\n");
 
-        // Scope configuration
+        sb.append("  ],\n");
+    }
+
+    /**
+     * Appends scope configuration (source root and ignore patterns).
+     *
+     * @param sb the string builder
+     */
+    private void appendScopeSection(StringBuilder sb) {
         sb.append("  \"").append(KEY_SCOPE).append("\": {\n");
         sb.append("    \"").append(KEY_SRC_ROOT).append("\": \".\",\n");
         sb.append("    \"").append(KEY_IGNORE).append("\": [\n");
@@ -227,95 +308,182 @@ public class SokratesGenerator implements DiagramGenerator {
         sb.append("      \"").append(PATTERN_SPEC).append("\"\n");
         sb.append("    ]\n");
         sb.append("  },\n");
+    }
 
-        // Logical components
+    /**
+     * Appends logical components section with path patterns.
+     *
+     * @param sb the string builder
+     * @param model the architecture model
+     */
+    private void appendLogicalComponentsSection(StringBuilder sb, ArchitectureModel model) {
         sb.append("  \"").append(KEY_LOGICAL_COMPONENTS).append("\": [\n");
 
         if (model.components().isEmpty()) {
-            sb.append("    {\n");
-            sb.append("      \"").append(KEY_NAME).append("\": ").append(jsonString(VALUE_DEFAULT)).append(",\n");
-            sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\"").append(PATTERN_ALL).append("\"]\n");
-            sb.append("    }\n");
+            appendDefaultComponent(sb);
         } else {
-            List<Component> components = model.components();
-            for (int i = 0; i < components.size(); i++) {
-                Component comp = components.get(i);
-                sb.append("    {\n");
-                sb.append("      \"").append(KEY_NAME).append("\": ").append(jsonString(comp.name())).append(",\n");
-
-                if (comp.description() != null) {
-                    sb.append("      \"").append(KEY_DESCRIPTION).append("\": ").append(jsonString(comp.description())).append(",\n");
-                }
-
-                // Generate path patterns based on component name and type
-                List<String> patterns = generatePathPatterns(comp, model);
-                sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\n");
-                for (int j = 0; j < patterns.size(); j++) {
-                    sb.append("        ").append(jsonString(patterns.get(j)));
-                    if (j < patterns.size() - 1) {
-                        sb.append(",");
-                    }
-                    sb.append("\n");
-                }
-                sb.append("      ]");
-
-                // Add metadata
-                if (comp.technology() != null) {
-                    sb.append(",\n");
-                    sb.append("      \"").append(KEY_METADATA).append("\": {\n");
-                    sb.append("        \"").append(KEY_TECHNOLOGY).append("\": ").append(jsonString(comp.technology()));
-                    if (comp.repository() != null) {
-                        sb.append(",\n");
-                        sb.append("        \"").append(KEY_REPOSITORY).append("\": ").append(jsonString(comp.repository()));
-                    }
-                    sb.append("\n      }\n");
-                } else {
-                    sb.append("\n");
-                }
-
-                sb.append("    }");
-                if (i < components.size() - 1) {
-                    sb.append(",");
-                }
-                sb.append("\n");
-            }
+            appendComponents(sb, model);
         }
 
         sb.append("  ],\n");
+    }
 
-        // Cross-cutting concerns (if any)
+    /**
+     * Appends a default component for empty models.
+     *
+     * @param sb the string builder
+     */
+    private void appendDefaultComponent(StringBuilder sb) {
+        sb.append("    {\n");
+        sb.append("      \"").append(KEY_NAME).append("\": ").append(jsonString(VALUE_DEFAULT)).append(",\n");
+        sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\"").append(PATTERN_ALL).append("\"]\n");
+        sb.append("    }\n");
+    }
+
+    /**
+     * Appends all components with their patterns and metadata.
+     *
+     * @param sb the string builder
+     * @param model the architecture model
+     */
+    private void appendComponents(StringBuilder sb, ArchitectureModel model) {
+        List<Component> components = model.components();
+
+        for (int i = 0; i < components.size(); i++) {
+            Component comp = components.get(i);
+            appendSingleComponent(sb, comp, model);
+
+            if (i < components.size() - 1) {
+                sb.append(",");
+            }
+            sb.append("\n");
+        }
+    }
+
+    /**
+     * Appends a single component's JSON definition.
+     *
+     * @param sb the string builder
+     * @param comp the component to append
+     * @param model the architecture model (for pattern generation)
+     */
+    private void appendSingleComponent(StringBuilder sb, Component comp, ArchitectureModel model) {
+        sb.append("    {\n");
+        sb.append("      \"").append(KEY_NAME).append("\": ").append(jsonString(comp.name())).append(",\n");
+
+        if (comp.description() != null) {
+            sb.append("      \"").append(KEY_DESCRIPTION).append("\": ")
+                .append(jsonString(comp.description())).append(",\n");
+        }
+
+        appendComponentPathPatterns(sb, comp, model);
+        appendComponentMetadata(sb, comp);
+
+        sb.append("    }");
+    }
+
+    /**
+     * Appends path patterns for a component.
+     *
+     * @param sb the string builder
+     * @param comp the component
+     * @param model the architecture model
+     */
+    private void appendComponentPathPatterns(StringBuilder sb, Component comp, ArchitectureModel model) {
+        List<String> patterns = generatePathPatterns(comp, model);
+        sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\n");
+
+        for (int j = 0; j < patterns.size(); j++) {
+            sb.append("        ").append(jsonString(patterns.get(j)));
+            if (j < patterns.size() - 1) {
+                sb.append(",");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("      ]");
+    }
+
+    /**
+     * Appends metadata (technology, repository) for a component if available.
+     *
+     * @param sb the string builder
+     * @param comp the component
+     */
+    private void appendComponentMetadata(StringBuilder sb, Component comp) {
+        if (comp.technology() != null) {
+            sb.append(",\n");
+            sb.append("      \"").append(KEY_METADATA).append("\": {\n");
+            sb.append("        \"").append(KEY_TECHNOLOGY).append("\": ")
+                .append(jsonString(comp.technology()));
+
+            if (comp.repository() != null) {
+                sb.append(",\n");
+                sb.append("        \"").append(KEY_REPOSITORY).append("\": ")
+                    .append(jsonString(comp.repository()));
+            }
+
+            sb.append("\n      }\n");
+        } else {
+            sb.append("\n");
+        }
+    }
+
+    /**
+     * Appends cross-cutting concerns (test code, generated code).
+     *
+     * @param sb the string builder
+     */
+    private void appendCrossCuttingConcernsSection(StringBuilder sb) {
         sb.append("  \"").append(KEY_CROSS_CUTTING_CONCERNS).append("\": [\n");
         sb.append("    {\n");
         sb.append("      \"").append(KEY_NAME).append("\": ").append(jsonString(VALUE_TEST_CODE)).append(",\n");
-        sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\"").append(PATTERN_TEST_FILES).append("\", \"").append(PATTERN_SPEC_FILES).append("\", \"").append(PATTERN_TEST_DIR).append("\"]\n");
+        sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\"")
+            .append(PATTERN_TEST_FILES).append("\", \"")
+            .append(PATTERN_SPEC_FILES).append("\", \"")
+            .append(PATTERN_TEST_DIR).append("\"]\n");
         sb.append("    },\n");
         sb.append("    {\n");
         sb.append("      \"").append(KEY_NAME).append("\": ").append(jsonString(VALUE_GENERATED_CODE)).append(",\n");
-        sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\"").append(PATTERN_GENERATED).append("\", \"").append(PATTERN_TARGET).append("\", \"").append(PATTERN_BUILD).append("\"]\n");
+        sb.append("      \"").append(KEY_PATH_PATTERNS).append("\": [\"")
+            .append(PATTERN_GENERATED).append("\", \"")
+            .append(PATTERN_TARGET).append("\", \"")
+            .append(PATTERN_BUILD).append("\"]\n");
         sb.append("    }\n");
         sb.append("  ],\n");
+    }
 
-        // Analysis configuration
+    /**
+     * Appends analysis configuration settings.
+     *
+     * @param sb the string builder
+     */
+    private void appendAnalysisSection(StringBuilder sb) {
         sb.append("  \"").append(KEY_ANALYSIS).append("\": {\n");
         sb.append("    \"").append(KEY_SKIP_DUPLICATION).append("\": false,\n");
         sb.append("    \"").append(KEY_SKIP_DEPENDENCIES).append("\": false,\n");
         sb.append("    \"").append(KEY_CACHE_SOURCE_FILES).append("\": true\n");
         sb.append("  },\n");
+    }
 
-        // Goals (optional)
+    /**
+     * Appends quality goals section.
+     *
+     * @param sb the string builder
+     */
+    private void appendGoalsSection(StringBuilder sb) {
         sb.append("  \"").append(KEY_GOALS).append("\": {\n");
         sb.append("    \"").append(KEY_MAIN).append("\": [\n");
         sb.append("      {\n");
-        sb.append("        \"").append(KEY_DESCRIPTION).append("\": ").append(jsonString(VALUE_MAINTAIN_COMPONENT)).append(",\n");
-        sb.append("        \"").append(KEY_TYPE).append("\": ").append(jsonString(VALUE_METRIC)).append(",\n");
-        sb.append("        \"").append(KEY_TARGET).append("\": ").append(jsonString(VALUE_COMPONENT_DEPENDENCIES)).append("\n");
+        sb.append("        \"").append(KEY_DESCRIPTION).append("\": ")
+            .append(jsonString(VALUE_MAINTAIN_COMPONENT)).append(",\n");
+        sb.append("        \"").append(KEY_TYPE).append("\": ")
+            .append(jsonString(VALUE_METRIC)).append(",\n");
+        sb.append("        \"").append(KEY_TARGET).append("\": ")
+            .append(jsonString(VALUE_COMPONENT_DEPENDENCIES)).append("\n");
         sb.append("      }\n");
         sb.append("    ]\n");
         sb.append("  }\n");
-
-        sb.append("}\n");
-
-        return sb.toString();
     }
 
     /**
