@@ -290,7 +290,7 @@ newgrp docker
 - [Act Documentation](https://nektosact.com/)
 - [GitHub Actions Documentation](https://docs.github.com/en/actions)
 - [Docker Desktop](https://www.docker.com/products/docker-desktop)
-- [Original Guide](../LOCAL_CI_TESTING.md) (to be deprecated)
+- [Local CI Testing Guide](../../LOCAL_CI_TESTING.md)
 
 ---
 
