@@ -185,10 +185,10 @@ mvn clean package -DskipTests
 
 **Quality Gates Enforced:**
 
-1. **Test Coverage:** JaCoCo ≥60% per package (enforced in `mvn verify`)
+1. **Test Coverage:** JaCoCo ≥65% overall (bundle level, excludes generated code)
 2. **Code Style:** Checkstyle with Google Java Style Guide
 3. **Static Analysis:** SpotBugs (Max effort, Low threshold)
-4. **Unit Tests:** All JUnit 5 tests must pass
+4. **Unit Tests:** All JUnit 5 tests must pass (465 tests)
 
 **Workflows:**
 

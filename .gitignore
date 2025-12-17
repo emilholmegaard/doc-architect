@@ -12,10 +12,11 @@
 target/
 *.class
 *.jar
-!.mvn/wrapper/maven-wrapper.jar
 *.war
 *.ear
 mypypy_cache/
+.mypy_cache/
+
 java-upgrade/
 
 # Logs

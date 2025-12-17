@@ -258,14 +258,18 @@
                                 <goal>check</goal>
                             </goals>
                             <configuration>
+                                <excludes>
+                                    <!-- Exclude ANTLR-generated code from coverage checks -->
+                                    <exclude>com/docarchitect/parser/**</exclude>
+                                </excludes>
                                 <rules>
                                     <rule>
-                                        <element>PACKAGE</element>
+                                        <element>BUNDLE</element>
                                         <limits>
                                             <limit>
                                                 <counter>LINE</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.60</minimum>
+                                                <minimum>0.65</minimum>
                                             </limit>
                                         </limits>
                                     </rule>
