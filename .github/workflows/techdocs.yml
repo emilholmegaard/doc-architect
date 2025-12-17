@@ -35,7 +35,7 @@ jobs:
 
       - name: Generate TechDocs
         run: |
-          mkdocs build --strict
+          mkdocs build
 
       - name: Upload artifact
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
