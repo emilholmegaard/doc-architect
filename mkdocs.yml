@@ -26,6 +26,7 @@ nav:
     - 'ADR-010: Event Driven Integration': 'adrs/010-event-driven-integration.md'
     - 'ADR-011: AST-First Parsing Strategy': 'adrs/011-ast-first-parsing-strategy.md'
     - 'ADR-012: Local CI Testing with Act': 'adrs/012-local-ci-testing-with-act.md'
+    - 'ADR-013: Renderer Output Destinations': 'adrs/013-renderer-output-destinations.md'
 plugins:
   - search
   - techdocs-core
