@@ -182,8 +182,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <source>${java.version}</source>
-                        <target>${java.version}</target>
+                        <release>21</release>
                     </configuration>
                 </plugin>
 
@@ -250,6 +249,12 @@
                             <goals>
                                 <goal>report</goal>
                             </goals>
+                            <configuration>
+                                <excludes>
+                                    <!-- Exclude generated parser code -->
+                                    <exclude>com/docarchitect/parser/**</exclude>
+                                </excludes>
+                            </configuration>
                         </execution>
                         <execution>
                             <id>jacoco-check</id>
@@ -259,7 +264,7 @@
                             </goals>
                             <configuration>
                                 <excludes>
-                                    <!-- Exclude ANTLR-generated code from coverage checks -->
+                                    <!-- Exclude generated parser code from coverage checks -->
                                     <exclude>com/docarchitect/parser/**</exclude>
                                 </excludes>
                                 <rules>
@@ -287,6 +292,7 @@
                     <configuration>
                         <show>public</show>
                         <failOnError>true</failOnError>
+                        <excludePackageNames>com.docarchitect.parser:com.docarchitect.parser.*</excludePackageNames>
                     </configuration>
                     <executions>
                         <execution>

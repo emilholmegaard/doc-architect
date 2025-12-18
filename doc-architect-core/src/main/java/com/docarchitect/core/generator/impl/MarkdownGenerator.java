@@ -22,19 +22,71 @@ import com.docarchitect.core.model.Dependency;
 import com.docarchitect.core.model.MessageFlow;
 
 /**
- * Generates Markdown documentation from architecture models.
+ * Generates comprehensive Markdown documentation from architecture models.
  *
- * <p>Creates comprehensive documentation including:
+ * <p>This generator produces structured Markdown documentation with tables, navigation
+ * links, and detailed catalogs. The output is designed for static site generators,
+ * GitHub wikis, and documentation platforms that render Markdown.
+ *
+ * <h2>Generated Documentation</h2>
  * <ul>
- *   <li>Central index.md entry point with navigation</li>
- *   <li>Component-specific documentation pages</li>
- *   <li>API endpoint reference tables</li>
- *   <li>Dependency matrices</li>
- *   <li>Data entity catalogs</li>
+ *   <li><b>Index Page:</b> Central entry point with architecture statistics and navigation</li>
+ *   <li><b>API Catalog:</b> Complete reference of all API endpoints grouped by component</li>
+ *   <li><b>Component Catalog:</b> Detailed component documentation with metadata</li>
+ *   <li><b>Dependency Matrix:</b> External library dependencies with version tracking</li>
+ *   <li><b>Data Entity Catalog:</b> Database schema documentation with field definitions</li>
+ *   <li><b>Message Flow Catalog:</b> Event-driven communication patterns and topics</li>
  * </ul>
  *
- * <p>Supports organizing output into subdirectories:
- * overview/, components/, dependencies/, api/, data/, messaging/
+ * <h2>Documentation Structure</h2>
+ * <p>The generator creates hierarchical documentation suitable for organizing into
+ * subdirectories:
+ * <pre>
+ * docs/
+ * ├── index.md                    # Main entry point
+ * ├── overview/                   # Architecture overview
+ * ├── components/
+ * │   ├── catalog.md             # Component list
+ * │   └── relationships.md       # Inter-component dependencies
+ * ├── api/
+ * │   ├── catalog.md             # Endpoint catalog
+ * │   └── reference.md           # Detailed API docs
+ * ├── data/
+ * │   ├── catalog.md             # Entity catalog
+ * │   └── dictionary.md          # Data dictionary
+ * ├── dependencies/
+ * │   ├── matrix.md              # Dependency matrix
+ * │   └── analysis.md            # Dependency insights
+ * └── messaging/
+ *     ├── flows.md               # Message flows
+ *     └── topics.md              # Topic reference
+ * </pre>
+ *
+ * <h2>Design Principles</h2>
+ * <ul>
+ *   <li><b>Table-Driven:</b> Uses Markdown tables for structured data presentation</li>
+ *   <li><b>Navigation-First:</b> Provides clear navigation links between sections</li>
+ *   <li><b>Statistics Summary:</b> Shows quantitative architecture metrics</li>
+ *   <li><b>Safe Escaping:</b> Handles special Markdown characters (|, \n)</li>
+ *   <li><b>Extensive Constants:</b> 155+ constants ensure consistency</li>
+ * </ul>
+ *
+ * <h2>Usage Example</h2>
+ * <pre>{@code
+ * MarkdownGenerator generator = new MarkdownGenerator();
+ * ArchitectureModel model = ...; // populated model
+ * GeneratorConfig config = GeneratorConfig.defaults();
+ *
+ * // Generate different documentation types
+ * GeneratedDiagram apiCatalog = generator.generate(model, DiagramType.API_CATALOG, config);
+ * GeneratedDiagram componentCatalog = generator.generate(model, DiagramType.C4_COMPONENT, config);
+ * GeneratedDiagram depMatrix = generator.generate(model, DiagramType.DEPENDENCY_GRAPH, config);
+ *
+ * // Generate index page
+ * String index = generator.generateIndex(model);
+ * }</pre>
+ *
+ * @see <a href="https://www.markdownguide.org/">Markdown Guide</a>
  */
 public class MarkdownGenerator implements DiagramGenerator {
 
@@ -214,7 +266,18 @@ public class MarkdownGenerator implements DiagramGenerator {
     }
 
     /**
-     * Generates the main index page with navigation.
+     * Generates the main index page with navigation links and architecture statistics.
+     *
+     * <p>The index page serves as the entry point for all documentation, providing:
+     * <ul>
+     *   <li>Project name and version</li>
+     *   <li>Architecture statistics table (component counts, API counts, etc.)</li>
+     *   <li>Navigation sections with links to detailed catalogs</li>
+     *   <li>Empty state messages for missing sections</li>
+     * </ul>
+     *
+     * @param model the architecture model containing all project data
+     * @return Markdown-formatted index page content
      */
     public String generateIndex(ArchitectureModel model) {
         StringBuilder sb = new StringBuilder();
@@ -244,7 +307,18 @@ public class MarkdownGenerator implements DiagramGenerator {
     }
 
     /**
-     * Generates API catalog with all endpoints.
+     * Generates API catalog with all endpoints grouped by component.
+     *
+     * <p>The API catalog includes:
+     * <ul>
+     *   <li>Endpoints organized by component (service/module)</li>
+     *   <li>Summary table with method, path, type, authentication, and description</li>
+     *   <li>Detailed endpoint sections with request/response schemas</li>
+     * </ul>
+     *
+     * @param model the architecture model containing API endpoints
+     * @param config generator configuration (currently unused)
+     * @return Markdown-formatted API catalog
      */
     private String generateApiCatalog(ArchitectureModel model, GeneratorConfig config) {
         StringBuilder sb = new StringBuilder();
@@ -285,6 +359,17 @@ public class MarkdownGenerator implements DiagramGenerator {
 
     /**
      * Generates dependency matrix showing all external dependencies.
+     *
+     * <p>The dependency matrix includes:
+     * <ul>
+     *   <li>Dependencies grouped by component</li>
+     *   <li>Table with group ID, artifact ID, version, scope, and type (direct/transitive)</li>
+     *   <li>Summary statistics (total, direct, transitive counts)</li>
+     * </ul>
+     *
+     * @param model the architecture model containing dependencies
+     * @param config generator configuration (currently unused)
+     * @return Markdown-formatted dependency matrix
      */
     private String generateDependencyMatrix(ArchitectureModel model, GeneratorConfig config) {
         StringBuilder sb = new StringBuilder();
@@ -325,6 +410,17 @@ public class MarkdownGenerator implements DiagramGenerator {
 
     /**
      * Generates component catalog with detailed information.
+     *
+     * <p>The component catalog includes:
+     * <ul>
+     *   <li>Components grouped by type (SERVICE, DATABASE, CACHE, etc.)</li>
+     *   <li>Summary table with name, technology, repository, and description</li>
+     *   <li>Detailed component sections with metadata, exposed APIs, and data entities</li>
+     * </ul>
+     *
+     * @param model the architecture model containing components
+     * @param config generator configuration (currently unused)
+     * @return Markdown-formatted component catalog
      */
     private String generateComponentCatalog(ArchitectureModel model, GeneratorConfig config) {
         StringBuilder sb = new StringBuilder();
@@ -368,6 +464,17 @@ public class MarkdownGenerator implements DiagramGenerator {
 
     /**
      * Generates data entity catalog with field details.
+     *
+     * <p>The data catalog includes:
+     * <ul>
+     *   <li>Each entity as a separate section with description</li>
+     *   <li>Entity type (table, view, collection) and primary key</li>
+     *   <li>Owning component reference</li>
+     *   <li>Field table with name, data type, nullable flag, and description</li>
+     * </ul>
+     *
+     * @param model the architecture model containing data entities
+     * @return Markdown-formatted data entity catalog
      */
     public String generateDataCatalog(ArchitectureModel model) {
         StringBuilder sb = new StringBuilder();
@@ -400,7 +507,17 @@ public class MarkdownGenerator implements DiagramGenerator {
     }
 
     /**
-     * Generates message flow catalog.
+     * Generates message flow catalog for event-driven architectures.
+     *
+     * <p>The message flow catalog includes:
+     * <ul>
+     *   <li>Flows grouped by topic (Kafka, RabbitMQ, etc.)</li>
+     *   <li>Broker type for each topic</li>
+     *   <li>Table showing publishers, subscribers, message types, and schemas</li>
+     * </ul>
+     *
+     * @param model the architecture model containing message flows
+     * @return Markdown-formatted message flow catalog
      */
     public String generateMessageFlowCatalog(ArchitectureModel model) {
         StringBuilder sb = new StringBuilder();

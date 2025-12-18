@@ -1,4 +1,3 @@
-# OutputRenderer implementations should be registered here
-# Example:
-# com.example.FileSystemRenderer
-# com.example.ConfluenceRenderer
+# OutputRenderer implementations
+com.docarchitect.core.renderer.impl.FileSystemRenderer
+com.docarchitect.core.renderer.impl.ConsoleRenderer
