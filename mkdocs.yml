@@ -1,41 +1,107 @@
-site_name: 'Documentation Architecture'
-site_description: 'Architecture Decision Records and documentation for the organization'
+site_name: 'DocArchitect Documentation'
+site_description: 'Automated Architecture Documentation Generator from Source Code'
+site_url: 'https://emilholmegaard.github.io/doc-architect/'
 repo_url: 'https://github.com/emilholmegaard/doc-architect'
-edit_uri: 'edit/main/'
+repo_name: 'emilholmegaard/doc-architect'
+edit_uri: 'edit/main/docs/'
 
 nav:
   - Home: 'index.md'
-  - Architecture Overview: 'architecture-overview.md'
-  - Onboarding Guide: 'onboarding-guide.md'
-  - CI/CD Setup: 'ci-cd-setup.md'
-  - Docker usages: 'docker-usages.md'
-  - Local CI Testing: 'local-ci-testing.md'
-  - Claude Development Guide: 'claude-development-guide.md'
-  - Extending: 'extending.md'
-  - Testing: 'testing.md'
-  - ADRs:
+  - Getting Started:
+    - 'Architecture Overview': 'architecture-overview.md'
+    - 'Onboarding Guide': 'onboarding-guide.md'
+  - User Guides:
+    - 'Docker Usage': 'docker-usage.md'
+    - 'Local CI Testing': 'local-ci-testing.md'
+    - 'Extending DocArchitect': 'extending.md'
+    - 'Testing Guide': 'testing.md'
+  - Development:
+    - 'CI/CD Setup': 'ci-cd-setup.md'
+    - 'Claude Development Guide': 'claude-development-guide.md'
+  - Architecture Decision Records:
     - 'ADR Template': 'adrs/TEMPLATE.md'
     - 'ADR-001: Multi-Module Maven Structure': 'adrs/001-multi-module-maven-structure.md'
-    - 'ADR-002: CLI Framework': 'adrs/002-cli-framework-picocli.md'
+    - 'ADR-002: CLI Framework (Picocli)': 'adrs/002-cli-framework-picocli.md'
     - 'ADR-003: JVM Scanner Implementation Strategy': 'adrs/003-jvm-scanner-implementation-strategy.md'
-    - 'ADR-004: Python Scanner Implementation Strategy': 'adrs/004-python-scanner-text-based-parsing.md'
+    - 'ADR-004: Python Scanner Text-Based Parsing': 'adrs/004-python-scanner-text-based-parsing.md'
     - 'ADR-005: Logback Logging Configuration': 'adrs/005-logback-logging-configuration.md'
-    - 'ADR-006: Technology Based Package Organization': 'adrs/006-technology-based-package-organization.md'
+    - 'ADR-006: Technology-Based Package Organization': 'adrs/006-technology-based-package-organization.md'
     - 'ADR-007: TechDocs as Documentation Solution': 'adrs/007-techdocs-as-documentation-solution.md'
     - 'ADR-008: Adopt ADR for Decisions': 'adrs/008-adopt-adr-for-decisions.md'
     - 'ADR-009: Use C4 Model': 'adrs/009-use-c4-model.md'
-    - 'ADR-010: Event Driven Integration': 'adrs/010-event-driven-integration.md'
+    - 'ADR-010: Event-Driven Integration': 'adrs/010-event-driven-integration.md'
     - 'ADR-011: AST-First Parsing Strategy': 'adrs/011-ast-first-parsing-strategy.md'
     - 'ADR-012: Local CI Testing with Act': 'adrs/012-local-ci-testing-with-act.md'
     - 'ADR-013: Renderer Output Destinations': 'adrs/013-renderer-output-destinations.md'
-    - 'ADR-014: Integration Testing and Docker Packaging Strategy': 'adrs/014-integration-testing-docker-packaging.md'
+    - 'ADR-014: Integration Testing and Docker Packaging': 'adrs/014-integration-testing-docker-packaging.md'
 
 plugins:
-  - search
+  - search:
+      lang: en
+      separator: '[\s\-\.]+'
   - techdocs-core
 
 theme:
   name: material
+  language: en
   palette:
-    primary: 'indigo'
-    accent: 'indigo'
+    - scheme: default
+      primary: 'indigo'
+      accent: 'indigo'
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: 'indigo'
+      accent: 'indigo'
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - search.share
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - footnotes
+  - meta
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
