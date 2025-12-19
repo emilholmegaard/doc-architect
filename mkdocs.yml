@@ -8,6 +8,7 @@ nav:
   - Architecture Overview: 'architecture-overview.md'
   - Onboarding Guide: 'onboarding-guide.md'
   - CI/CD Setup: 'ci-cd-setup.md'
+  - Docker usages: 'docker-usages.md'
   - Local CI Testing: 'local-ci-testing.md'
   - Claude Development Guide: 'claude-development-guide.md'
   - Extending: 'extending.md'
@@ -27,6 +28,8 @@ nav:
     - 'ADR-011: AST-First Parsing Strategy': 'adrs/011-ast-first-parsing-strategy.md'
     - 'ADR-012: Local CI Testing with Act': 'adrs/012-local-ci-testing-with-act.md'
     - 'ADR-013: Renderer Output Destinations': 'adrs/013-renderer-output-destinations.md'
+    - 'ADR-014: Integration Testing and Docker Packaging Strategy': 'adrs/014-integration-testing-docker-packaging.md'
+
 plugins:
   - search
   - techdocs-core

@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  # DocArchitect CLI Application
+  doc-architect:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: doc-architect:local
+    container_name: doc-architect
+    volumes:
+      # Mount workspace directory (where code to scan is located)
+      - ./workspace:/workspace:ro
+      # Mount output directory (where generated documentation will be saved)
+      - ./output:/output
+    environment:
+      - LOGBACK_LEVEL=INFO
+      - SCANNER_LOG_LEVEL=DEBUG
+    command: ["scan", "/workspace", "--output", "/output"]
+    networks:
+      - doc-architect-network
+
+  # PostgreSQL Database (for testing database scanners)
+  postgres:
+    image: postgres:16-alpine
+    container_name: doc-architect-postgres
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - doc-architect-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Kafka (for testing Kafka scanners)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: doc-architect-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - doc-architect-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: doc-architect-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - doc-architect-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  doc-architect-network:
+    driver: bridge
+
+volumes:
+  postgres-data:

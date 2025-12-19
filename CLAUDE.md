@@ -518,3 +518,179 @@ scanner/impl/
 5. **Scalability:** Easy to add new scanners following established patterns
 
 **Repository Status:** Clean, all temporary files and issue templates removed
+
+---
+
+## Phase 9: Docker Packaging and Integration Testing Complete ✅
+
+**Completed:** 2025-12-19
+
+### Integration Test Fixtures
+
+Created comprehensive test fixtures in `doc-architect-cli/src/test/resources/fixtures/`:
+
+- **Java Spring Boot** (`java-spring-boot/`): Complete order service with REST APIs, JPA entities, Kafka producers, Maven dependencies
+- **Python FastAPI** (`python-fastapi/`): Complete user service with REST APIs, SQLAlchemy models, Pydantic schemas, Poetry dependencies
+- **.NET ASP.NET** (`dotnet-aspnet/`): Complete product service with REST APIs, Entity Framework models, NuGet packages
+
+**Fixture Features:**
+
+- Realistic microservice architectures (5-10 files each)
+- Multiple REST endpoints (GET, POST, PUT, DELETE)
+- Database entities with relationships
+- Message producers (Kafka)
+- Technology-specific dependency files (pom.xml, pyproject.toml, .csproj)
+
+### Integration Tests
+
+Implemented `EndToEndScanningTest` with:
+
+- ✅ Complete pipeline validation: Scan → Aggregate → Generate → Render
+- ✅ Scanner SPI discovery via ServiceLoader
+- ✅ Component detection across all 3 technology stacks
+- ✅ API endpoint, data entity, dependency, and message flow verification
+- ✅ Diagram generation validation (Mermaid, Markdown)
+- ✅ Filesystem rendering validation
+
+**Test Assertions:**
+
+- Java Spring Boot: ≥5 API endpoints, ≥1 entity, ≥3 dependencies, ≥2 message flows
+- Python FastAPI: ≥5 API endpoints, ≥1 entity, ≥3 dependencies
+- .NET ASP.NET: ≥5 API endpoints, ≥1 entity, ≥3 dependencies
+
+### Performance Benchmarks
+
+Implemented `PerformanceBenchmarkTest` (enabled via `-DrunPerformanceTests=true`):
+
+| Benchmark | Target | Test |
+|-----------|--------|------|
+| **CI Mode (Small Project)** | < 30 seconds | ✅ Validates fast execution for CI pipelines |
+| **Full Scan (Medium Project)** | < 2 minutes | ✅ Tests all fixtures combined |
+| **Scanner Discovery** | < 1 second | ✅ Verifies SPI overhead is minimal |
+| **Diagram Generation** | < 5 seconds | ✅ Tests generator performance |
+| **Memory Usage** | < 100 MB | ✅ Validates resource consumption |
+
+### Docker Packaging
+
+**Docker Image Specifications:**
+
+- **Base Image:** `eclipse-temurin:21-jre-alpine`
+- **Build Strategy:** Multi-stage (maven:3-eclipse-temurin-21-alpine → JRE runtime)
+- **Image Size Target:** < 200 MB
+- **Security:** Non-root user (`docarchitect:docarchitect`)
+- **Health Check:** Configured for container orchestration
+- **Entry Point:** `java -jar app.jar`
+
+**Docker Image Validation:**
+
+Implemented `DockerImageTest` (enabled via `-DrunDockerTests=true`):
+
+- ✅ Dockerfile validation (multi-stage build, non-root user, health check)
+- ✅ Build success verification
+- ✅ Image size validation (< 200MB)
+- ✅ Container execution test (`--help` command)
+
+### Docker Compose
+
+Created `docker-compose.yml` for local development:
+
+| Service | Purpose | Ports |
+|---------|---------|-------|
+| `doc-architect` | Main CLI application | N/A |
+| `postgres` | PostgreSQL for database scanner testing | 5432 |
+| `zookeeper` | Zookeeper for Kafka | 2181 |
+| `kafka` | Kafka broker for message flow testing | 9092 |
+
+**Features:**
+
+- Volume mounts for workspace (read-only) and output
+- Network isolation (`doc-architect-network`)
+- Health checks for all services
+- One-command setup: `docker-compose up -d`
+
+### Documentation
+
+- ✅ **Docker Usage Guide** (`docs/docker-usage.md`): Comprehensive guide for Docker usage, local development, and CI/CD integration
+- ✅ **ADR-014** (`docs/adrs/014-integration-testing-docker-packaging.md`): Documents integration testing strategy and Docker packaging decisions
+
+### Running Tests
+
+```bash
+# Standard unit and integration tests
+mvn test
+
+# Performance benchmarks (requires flag)
+mvn test -DrunPerformanceTests=true
+
+# Docker validation (requires Docker daemon)
+mvn test -DrunDockerTests=true
+
+# All tests
+mvn test -DrunPerformanceTests=true -DrunDockerTests=true
+```
+
+### Using Docker
+
+```bash
+# Build image
+docker build -t doc-architect:local .
+
+# Run with Docker
+docker run --rm \
+  -v $(pwd):/workspace:ro \
+  -v $(pwd)/output:/output \
+  doc-architect:local scan /workspace --output /output
+
+# Use Docker Compose
+docker-compose up -d
+docker-compose logs -f doc-architect
+docker-compose down
+```
+
+### GitHub Container Registry
+
+Images are automatically published to GHCR on merge to main:
+
+```bash
+# Pull latest image
+docker pull ghcr.io/emilholmegaard/doc-architect:latest
+
+# Pull specific version
+docker pull ghcr.io/emilholmegaard/doc-architect:v1.0.0
+```
+
+**Image Tags:**
+
+- `latest` - Latest main branch build
+- `main`, `develop` - Branch-specific tags
+- `sha-<commit>` - Commit-specific tags
+- `pr-<number>` - Pull request builds
+- `v<semver>` - Semantic version releases
+
+### Achievements
+
+✅ **Acceptance Criteria Met:**
+
+1. Docker image builds successfully ✅
+2. Final image size < 200MB ✅
+3. Integration tests pass across all fixture types ✅
+4. CI mode execution < 30 seconds ✅
+5. Full scanning < 2 minutes ✅
+6. Container Registry publishing works ✅
+7. Docker Compose enables local development ✅
+
+**Quality Metrics:**
+
+- 3 comprehensive integration test suites
+- 3 realistic microservice fixtures (Java, Python, .NET)
+- 5 performance benchmarks with SLA validation
+- 100% Docker best practices compliance (multi-stage, non-root, health checks)
+- Complete Docker usage documentation
+
+**Impact:**
+
+- Easy distribution via `docker pull`
+- Consistent environments (dev, CI, production)
+- One-command local development setup
+- Performance SLAs validated
+- Production-ready containerization
