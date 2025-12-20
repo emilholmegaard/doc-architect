@@ -56,7 +56,7 @@ docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
     -v "$(pwd)/output/fastapi:/output" \
     ghcr.io/emilholmegaard/doc-architect:latest \
-    scan --config /workspace/docarchitect.yaml --output /output
+    scan /workspace --config /workspace/docarchitect.yaml --output /output
 
 echo ""
 echo "✓ FastAPI scan complete."
