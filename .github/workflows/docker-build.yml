@@ -51,6 +51,7 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
             type=raw,value=${{ inputs.image-tag }},enable=${{ inputs.image-tag != 'latest' }}
       
       - name: Build and push

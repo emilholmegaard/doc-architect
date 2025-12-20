@@ -694,3 +694,157 @@ docker pull ghcr.io/emilholmegaard/doc-architect:v1.0.0
 - One-command local development setup
 - Performance SLAs validated
 - Production-ready containerization
+
+---
+
+## Phase 10: Real-World Open Source Project Testing Complete ✅
+
+**Completed:** 2025-12-20
+
+### Test Scripts and Examples
+
+Created comprehensive test scripts in `examples/` directory for validating DocArchitect against production-grade open source projects:
+
+**Test Scripts:**
+
+- `test-spring-microservices.sh` - Tests PiggyMetrics (7 Spring Boot microservices)
+- `test-dotnet-solution.sh` - Tests eShopOnWeb (.NET Clean Architecture)
+- `test-python-fastapi.sh` - Tests Full-Stack-FastAPI-PostgreSQL
+- `run-all-tests.sh` - Master test runner executing all tests sequentially
+- `validate-outputs.sh` - Comprehensive output validation with quality checks
+
+**Script Features:**
+
+- Automatic project cloning with git depth=1 for efficiency
+- DocArchitect YAML configuration generation
+- Docker-based execution using published GHCR image
+- Expected output validation (components, endpoints, entities)
+- Color-coded validation results with pass/fail metrics
+
+### Test Projects Overview
+
+| Project | Repository | Technology | Components | Endpoints | Entities |
+| ------- | ---------- | ---------- | ---------- | --------- | -------- |
+| **PiggyMetrics** | sqshq/piggymetrics | Spring Boot | 7+ | 20+ | 10+ |
+| **eShopOnWeb** | dotnet-architecture/eShopOnWeb | .NET Core | 5+ | 15+ | 20+ |
+| **Full-Stack FastAPI** | tiangolo/full-stack-fastapi-postgresql | Python | 1 | 20+ | 5+ |
+
+**What Gets Validated:**
+
+- Multi-module Maven/NuGet/Poetry dependency scanning
+- REST API endpoint detection (Spring MVC, ASP.NET Core, FastAPI)
+- ORM entity relationships (JPA, EF Core, SQLAlchemy)
+- Service-to-service communication patterns
+- Clean Architecture and microservice patterns
+- Mermaid diagram generation quality
+
+### CI/CD Automation
+
+Implemented `.github/workflows/real-world-tests.yml`:
+
+**Workflow Features:**
+
+- ✅ Weekly scheduled execution (Mondays at 6 AM UTC)
+- ✅ Manual trigger with project selection (all/spring/dotnet/python)
+- ✅ Parallel test execution (3 jobs running simultaneously)
+- ✅ 10-minute timeout per test (prevents hanging)
+- ✅ Artifact upload with 30-day retention
+- ✅ Comprehensive validation job aggregating all results
+- ✅ GitHub Step Summary with test status
+
+**Workflow Jobs:**
+
+1. `test-spring` - Validates Spring Boot microservices scanning
+2. `test-dotnet` - Validates .NET Clean Architecture scanning
+3. `test-python` - Validates Python FastAPI scanning
+4. `validate-all` - Downloads all artifacts and runs comprehensive validation
+
+### Documentation
+
+Created comprehensive documentation:
+
+- ✅ **Real-World Testing Guide** (`docs/real-world-testing.md`):
+  - Detailed project descriptions
+  - Setup instructions and prerequisites
+  - Validation process explanation
+  - Troubleshooting common issues
+  - Performance benchmarks and success metrics
+  - Extending with new test projects
+
+- ✅ **Examples README** (`examples/README.md`):
+  - Quick start guide
+  - Script descriptions
+  - Output structure
+  - CI/CD integration instructions
+
+- ✅ **MkDocs Navigation Update**: Added "Real-World Testing" to User Guides section
+
+### Validation Metrics
+
+The `validate-outputs.sh` script checks:
+
+| Check | Description |
+|-------|-------------|
+| **Structure** | Output directories exist with index.md |
+| **Directories** | dependencies/, api/, data/ directories present |
+| **Content** | Endpoint count ≥ minimum threshold |
+| **Content** | Entity count ≥ minimum threshold |
+| **Quality** | Mermaid diagrams present and valid |
+| **Files** | No empty files, proper markdown format |
+
+**Validation Output Example:**
+
+```
+==========================================
+Validating: PiggyMetrics (Spring Boot)
+==========================================
+✓ Output directory exists
+✓ index.md exists
+✓ dependencies/ directory exists
+  Found 15 dependency files
+✓ api/ directory exists
+  Found approximately 25 endpoint references
+✓ Endpoint count (25) meets minimum (10)
+✓ Found 8 Mermaid diagrams
+
+✓ PiggyMetrics validation complete
+```
+
+### Performance Targets
+
+| Metric | Target | Purpose |
+|--------|--------|---------|
+| Scan Time (Spring Boot) | < 90s | Validates multi-module performance |
+| Scan Time (.NET) | < 90s | Validates Clean Architecture parsing |
+| Scan Time (Python) | < 60s | Validates Python ecosystem scanning |
+| Total Suite Runtime | < 5m | Ensures CI/CD efficiency |
+| Memory Usage | < 512 MB | Validates resource consumption |
+
+### Achievements
+
+✅ **Acceptance Criteria Met:**
+
+1. All three test scripts execute without errors ✅
+2. Generated documentation is human-readable ✅
+3. Mermaid diagrams render correctly in GitHub/GitLab ✅
+4. Entity relationships are correctly identified ✅
+5. No major components are missed ✅
+6. Scan completes in under 2 minutes per project ✅
+7. Weekly CI/CD validation runs automatically ✅
+8. Comprehensive validation with quality metrics ✅
+
+**Quality Metrics:**
+
+- 5 test scripts (3 projects + master runner + validator)
+- 3 production-grade OSS projects tested
+- 4-job GitHub Actions workflow with parallel execution
+- Comprehensive documentation (2 guides, 1 README)
+- Color-coded validation output with pass/fail tracking
+
+**Impact:**
+
+- **Confidence:** Validates scanners work on real production codebases
+- **Quality Assurance:** Weekly automated testing catches regressions
+- **Documentation:** Users can reference real examples
+- **Onboarding:** New contributors can run examples locally
+- **Transparency:** Public validation results via GitHub Actions artifacts
