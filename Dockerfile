@@ -39,8 +39,9 @@ RUN addgroup -S docarchitect && \
 
 WORKDIR /app
 
-# Copy built CLI JAR from build stage (the executable artifact)
-COPY --from=build /app/doc-architect-cli/target/*.jar app.jar
+# Copy built CLI JAR from build stage (the shaded JAR with all dependencies)
+# Note: Maven Shade plugin creates doc-architect-cli-*.jar (shaded) and original-*.jar (without deps)
+COPY --from=build /app/doc-architect-cli/target/doc-architect-cli-*.jar app.jar
 
 # Create necessary directories
 RUN mkdir -p /workspace /output && \
