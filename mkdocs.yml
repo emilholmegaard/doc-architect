@@ -13,6 +13,7 @@ nav:
   - User Guides:
     - 'Docker Usage': 'docker-usage.md'
     - 'Local CI Testing': 'local-ci-testing.md'
+    - 'Real-World Testing': 'real-world-testing.md'
     - 'Extending DocArchitect': 'extending.md'
     - 'Testing Guide': 'testing.md'
   - Development:

@@ -28,6 +28,8 @@ logs/
 *.bak
 coverage/
 test-output/
+test-projects/
+output/
 
 # Maven
 .mvn/wrapper/maven-wrapper.jar

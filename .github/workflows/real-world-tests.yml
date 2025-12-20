@@ -1,0 +1,186 @@
+name: Real-World Project Tests
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 6 AM UTC
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: 'Projects to test (comma-separated: spring,dotnet,python or "all")'
+        required: false
+        default: 'all'
+
+jobs:
+  test-spring:
+    name: Spring Boot (PiggyMetrics)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.projects == 'all' || contains(github.event.inputs.projects, 'spring') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pull DocArchitect image
+        run: docker pull ghcr.io/emilholmegaard/doc-architect:latest
+
+      - name: Run Spring Boot test
+        run: bash examples/test-spring-microservices.sh
+        timeout-minutes: 10
+
+      - name: Upload Spring Boot results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: spring-results
+          path: output/piggymetrics/
+          retention-days: 30
+
+      - name: Validate Spring Boot output
+        run: |
+          # Basic validation
+          if [ ! -f "output/piggymetrics/index.md" ]; then
+            echo "Error: Missing index.md"
+            exit 1
+          fi
+          echo "✓ Spring Boot validation passed"
+
+  test-dotnet:
+    name: .NET (eShopOnWeb)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.projects == 'all' || contains(github.event.inputs.projects, 'dotnet') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pull DocArchitect image
+        run: docker pull ghcr.io/emilholmegaard/doc-architect:latest
+
+      - name: Run .NET test
+        run: bash examples/test-dotnet-solution.sh
+        timeout-minutes: 10
+
+      - name: Upload .NET results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dotnet-results
+          path: output/eshopweb/
+          retention-days: 30
+
+      - name: Validate .NET output
+        run: |
+          # Basic validation
+          if [ ! -f "output/eshopweb/index.md" ]; then
+            echo "Error: Missing index.md"
+            exit 1
+          fi
+          echo "✓ .NET validation passed"
+
+  test-python:
+    name: Python (FastAPI)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.projects == 'all' || contains(github.event.inputs.projects, 'python') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Pull DocArchitect image
+        run: docker pull ghcr.io/emilholmegaard/doc-architect:latest
+
+      - name: Run Python test
+        run: bash examples/test-python-fastapi.sh
+        timeout-minutes: 10
+
+      - name: Upload Python results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: python-results
+          path: output/fastapi/
+          retention-days: 30
+
+      - name: Validate Python output
+        run: |
+          # Basic validation
+          if [ ! -f "output/fastapi/index.md" ]; then
+            echo "Error: Missing index.md"
+            exit 1
+          fi
+          echo "✓ Python validation passed"
+
+  validate-all:
+    name: Comprehensive Validation
+    runs-on: ubuntu-latest
+    needs: [test-spring, test-dotnet, test-python]
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: output/
+
+      - name: Reorganize artifacts
+        run: |
+          # Move artifacts to expected directories
+          if [ -d "output/spring-results" ]; then
+            mkdir -p output/piggymetrics
+            mv output/spring-results/* output/piggymetrics/ || true
+          fi
+          if [ -d "output/dotnet-results" ]; then
+            mkdir -p output/eshopweb
+            mv output/dotnet-results/* output/eshopweb/ || true
+          fi
+          if [ -d "output/python-results" ]; then
+            mkdir -p output/fastapi
+            mv output/python-results/* output/fastapi/ || true
+          fi
+
+      - name: Run comprehensive validation
+        run: bash examples/validate-outputs.sh
+        continue-on-error: true
+
+      - name: Generate summary report
+        if: always()
+        run: |
+          echo "# Real-World Testing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check each project
+          if [ -d "output/piggymetrics" ]; then
+            echo "✅ Spring Boot (PiggyMetrics) - Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Spring Boot (PiggyMetrics) - Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -d "output/eshopweb" ]; then
+            echo "✅ .NET (eShopOnWeb) - Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ .NET (eShopOnWeb) - Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -d "output/fastapi" ]; then
+            echo "✅ Python (FastAPI) - Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Python (FastAPI) - Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "Check the artifacts section for generated documentation from each project." >> $GITHUB_STEP_SUMMARY
