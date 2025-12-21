@@ -23,12 +23,11 @@ import com.docarchitect.core.util.Technologies;
  *
  * <p><b>Supported Patterns</b></p>
  * <ul>
- *   <li>{@code @app.get("/path")} - GET endpoint</li>
- *   <li>{@code @app.post("/path")} - POST endpoint</li>
- *   <li>{@code @app.put("/path")} - PUT endpoint</li>
- *   <li>{@code @app.delete("/path")} - DELETE endpoint</li>
- *   <li>{@code @app.patch("/path")} - PATCH endpoint</li>
+ *   <li>{@code @app.get("/path")} - FastAPI instance endpoints</li>
  *   <li>{@code @router.get("/path")} - APIRouter endpoints</li>
+ *   <li>{@code @api.get("/path")} - Custom variable names</li>
+ *   <li>Supports any valid Python variable name: {@code @my_router.post("/items")}</li>
+ *   <li>All HTTP methods: GET, POST, PUT, DELETE, PATCH</li>
  * </ul>
  *
  * <p><b>Parameter Extraction</b></p>
@@ -40,7 +39,7 @@ import com.docarchitect.core.util.Technologies;
  *
  * <p><b>Regex Patterns</b></p>
  * <ul>
- *   <li>{@code DECORATOR_PATTERN}: {@code @(app|router)\.(get|post|put|delete|patch)\s*\(\s*['"](.*?)['"]}</li>
+ *   <li>{@code DECORATOR_PATTERN}: {@code @[a-zA-Z_][a-zA-Z0-9_]*\.(get|post|put|delete|patch)\s*\(\s*['"](.*?)['"]}</li>
  *   <li>{@code FUNCTION_PATTERN}: {@code def\s+(\w+)\s*\((.*?)\):}</li>
  *   <li>{@code PATH_PARAM_PATTERN}: {@code \{(\w+)(?::\s*\w+)?\}}</li>
  *   <li>{@code QUERY_PARAM_PATTERN}: {@code (\w+):\s*.*?Query\(}</li>
@@ -79,11 +78,12 @@ public class FastAPIScanner extends AbstractRegexScanner {
     private static final int MAX_FUNCTION_SEARCH_LINES = 5;
 
     /**
-     * Regex to match FastAPI decorator: @app.get("/users") or @router.post("/items").
-     * Captures: (1) app|router, (2) HTTP method, (3) path.
+     * Regex to match FastAPI decorator: @app.get("/users") or @router.post("/items") or @api.get("/v1").
+     * Matches any valid Python identifier (variable name) before the HTTP method.
+     * Captures: (1) variable name, (2) HTTP method, (3) path.
      */
     private static final Pattern DECORATOR_PATTERN = Pattern.compile(
-        "@(app|router)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"](.+?)['\"]"
+        "@([a-zA-Z_][a-zA-Z0-9_]*)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"](.+?)['\"]"
     );
 
     /**
