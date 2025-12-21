@@ -96,7 +96,7 @@ class ScannersMetadataTest {
             .allMatch(pattern ->
                 pattern.contains("*") ||
                 pattern.contains("/") ||
-                pattern.matches("[a-z0-9._-]+\\.(mod|js|ts|json|xml|yml|yaml|toml|sql|graphql|avsc|avro|cs|py|go)")
+                pattern.matches("[a-z0-9._-]+\\.(mod|js|ts|json|xml|yml|yaml|toml|sql|graphql|avsc|avro|cs|py|go|props)")
             );
     }
 
