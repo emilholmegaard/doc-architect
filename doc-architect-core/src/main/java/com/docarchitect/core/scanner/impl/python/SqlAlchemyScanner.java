@@ -61,11 +61,15 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
     private static final String REGEX_PRIMARY_KEY = "primary_key\\s*=\\s*True";
     private static final String REGEX_NULLABLE = "nullable\\s*=\\s*(True|False)";
     private static final String REGEX_RELATIONSHIP_TARGET = "relationship\\s*\\(\\s*['\"](.+?)['\"]";
+    private static final String REGEX_TABLE_TRUE = "table\\s*=\\s*True";
+    private static final String REGEX_FOREIGN_KEY = "foreign_key\\s*=\\s*['\"](.+?)['\"]";
 
     private static final Pattern TABLENAME_PATTERN = Pattern.compile(REGEX_TABLENAME);
     private static final Pattern PRIMARY_KEY_PATTERN = Pattern.compile(REGEX_PRIMARY_KEY);
     private static final Pattern NULLABLE_PATTERN = Pattern.compile(REGEX_NULLABLE);
     private static final Pattern RELATIONSHIP_TARGET_PATTERN = Pattern.compile(REGEX_RELATIONSHIP_TARGET);
+    private static final Pattern TABLE_TRUE_PATTERN = Pattern.compile(REGEX_TABLE_TRUE);
+    private static final Pattern FOREIGN_KEY_PATTERN = Pattern.compile(REGEX_FOREIGN_KEY);
 
     // --- Magic Numbers ---
     private static final int CLASS_BODY_SEARCH_LIMIT = 500;
@@ -167,13 +171,8 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
         }
 
         for (PythonAst.PythonClass pythonClass : classes) {
-            // Skip non-SQLAlchemy models (must inherit from Base)
-            if (!pythonClass.inheritsFrom(BASE_CLASS_NAME)) {
-                continue;
-            }
-
-            // Skip the Base class itself (declarative base)
-            if (pythonClass.name().equals(BASE_CLASS_NAME)) {
+            // Determine if this class represents a database table
+            if (!isDatabaseTable(pythonClass, fileContent)) {
                 continue;
             }
 
@@ -184,25 +183,57 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             List<DataEntity.Field> fields = new ArrayList<>();
             String primaryKey = null;
 
-            for (PythonAst.Field field : pythonClass.fields()) {
-                if (field.name().equals(TABLENAME_FIELD_NAME) || field.name().startsWith("_")) {
-                    continue;
-                }
+            // Only process fields that are actually defined in THIS class, not inherited
+            List<PythonAst.Field> classFields = getFieldsDefinedInClass(pythonClass, fileContent);
+            log.debug("Class {} has {} fields defined", pythonClass.name(), classFields.size());
 
-                // Check if this is a relationship field
-                if (field.value() != null && field.value().contains(RELATIONSHIP_FUNCTION_NAME + "(")) {
+            for (PythonAst.Field field : classFields) {
+                try {
+                    log.debug("Processing field: {}.{}", pythonClass.name(), field.name());
+                    // Skip dunder fields and private fields
+                    if (field.name().equals(TABLENAME_FIELD_NAME) || field.name().startsWith("_")) {
+                        continue;
+                    }
+
+                // Check if this is a relationship field (Relationship() or relationship())
+                boolean isRelationship = field.value() != null &&
+                    (field.value().contains(RELATIONSHIP_FUNCTION_NAME + "(") ||
+                     field.value().contains("Relationship("));
+
+                if (isRelationship) {
                     // Extract relationship
                     Relationship rel = extractRelationship(pythonClass.name(), field);
                     if (rel != null) {
                         relationships.add(rel);
                         log.debug("Found SQLAlchemy relationship: {} -> {}", pythonClass.name(), rel.targetId());
                     }
-                } else if (field.value() != null &&
-                          (field.value().contains(COLUMN_FUNCTION_NAME + "(") || field.value().contains(MAPPED_COLUMN_FUNCTION_NAME + "("))) {
+                } else {
                     // Regular column field
+                    // Can be: Column(), mapped_column(), Field(), or simple type annotation
                     String sqlType = extractColumnType(field);
                     boolean nullable = isNullable(field.value());
                     boolean isPrimaryKey = isPrimaryKey(field.value());
+
+                    // Check for foreign key in Field(foreign_key="...")
+                    String foreignKeyRef = extractForeignKey(field.value());
+                    log.debug("Field {}.{}: value='{}', foreignKeyRef='{}'",
+                        pythonClass.name(), field.name(), field.value(), foreignKeyRef);
+                    if (foreignKeyRef != null) {
+                        // Create relationship for foreign key
+                        String targetEntity = extractTargetEntityFromForeignKey(foreignKeyRef);
+                        log.debug("Extracted target entity from FK '{}': '{}'", foreignKeyRef, targetEntity);
+                        if (targetEntity != null) {
+                            Relationship fkRel = new Relationship(
+                                pythonClass.name(),
+                                targetEntity,
+                                RelationshipType.DEPENDS_ON,
+                                "Foreign key reference",
+                                SQLALCHEMY_TECHNOLOGY
+                            );
+                            relationships.add(fkRel);
+                            log.debug("Found foreign key: {} -> {}", pythonClass.name(), targetEntity);
+                        }
+                    }
 
                     DataEntity.Field dataField = new DataEntity.Field(
                         field.name(),
@@ -218,6 +249,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
                     }
 
                     log.debug("Found SQLAlchemy field: {}.{} ({})", pythonClass.name(), field.name(), sqlType);
+                }
+                } catch (Exception e) {
+                    log.warn("Error processing field {}.{}: {}", pythonClass.name(), field.name(), e.getMessage());
                 }
             }
 
@@ -236,6 +270,159 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
                 log.debug("Found SQLAlchemy entity: {} -> table: {}", pythonClass.name(), tableName);
             }
         }
+    }
+
+    /**
+     * Extracts fields directly from the class body source code.
+     *
+     * <p>NOTE: The Python AST parser has issues with SQLModel - it often returns
+     * incomplete field lists, missing simple type annotations and Relationship fields,
+     * and sometimes mixes fields from different classes. To work around this, we
+     * parse fields directly from the source code using regex.</p>
+     *
+     * @param pythonClass the class to get fields for
+     * @param fileContent the source file content (may be null)
+     * @return list of fields defined in this class
+     */
+    private List<PythonAst.Field> getFieldsDefinedInClass(PythonAst.PythonClass pythonClass, String fileContent) {
+        if (fileContent == null) {
+            return pythonClass.fields();
+        }
+
+        // Find the class definition in the file
+        String classPattern = "class\\s+" + Pattern.quote(pythonClass.name()) + "\\s*\\([^)]*\\):";
+        Pattern pattern = Pattern.compile(classPattern);
+        Matcher classMatcher = pattern.matcher(fileContent);
+
+        if (!classMatcher.find()) {
+            // Can't find class definition, use regex parsing as fallback
+            log.debug("Could not find class definition for {}", pythonClass.name());
+            return List.of();
+        }
+
+        int classStart = classMatcher.end();
+
+        // Find the end of the class by looking for the next class definition or end of file
+        // or the next line with zero indentation (simple heuristic)
+        String remainingContent = fileContent.substring(classStart);
+        String[] lines = remainingContent.split("\n");
+
+        // Build the class body
+        StringBuilder classBody = new StringBuilder();
+        boolean foundFirstIndentedLine = false;
+
+        for (String line : lines) {
+            // Skip empty lines and comments at the start
+            if (!foundFirstIndentedLine && (line.trim().isEmpty() || line.trim().startsWith("#"))) {
+                continue;
+            }
+
+            // Check if this is an indented line (part of the class)
+            if (line.length() > 0 && (line.charAt(0) == ' ' || line.charAt(0) == '\t')) {
+                classBody.append(line).append("\n");
+                foundFirstIndentedLine = true;
+            } else if (foundFirstIndentedLine && !line.trim().isEmpty()) {
+                // Hit a non-indented, non-empty line - end of class
+                break;
+            }
+        }
+
+        String classBodyStr = classBody.toString();
+
+        // Parse fields directly from class body
+        // Pattern 1: field_name: type = value  OR  field_name: type  (modern syntax)
+        // Pattern 2: field_name = value  (legacy Column() syntax)
+        Pattern modernPattern = Pattern.compile("^\\s*([a-z_][a-z0-9_]*)\\s*:\\s*([^=\\n]+?)(?:\\s*=\\s*(.+?))?\\s*$", Pattern.MULTILINE);
+        Pattern legacyPattern = Pattern.compile("^\\s*([a-z_][a-z0-9_]*)\\s*=\\s*(.+?)\\s*$", Pattern.MULTILINE);
+
+        List<PythonAst.Field> result = new ArrayList<>();
+
+        // Try modern syntax first (with type annotations)
+        Matcher modernMatcher = modernPattern.matcher(classBodyStr);
+        while (modernMatcher.find()) {
+            String fieldName = modernMatcher.group(1);
+            String fieldType = modernMatcher.group(2).trim();
+            String fieldValue = modernMatcher.group(3) != null ? modernMatcher.group(3).trim() : null;
+
+            result.add(new PythonAst.Field(fieldName, fieldType, fieldValue, List.of()));
+        }
+
+        // If no modern fields found, try legacy syntax (without type annotations)
+        if (result.isEmpty()) {
+            Matcher legacyMatcher = legacyPattern.matcher(classBodyStr);
+            while (legacyMatcher.find()) {
+                String fieldName = legacyMatcher.group(1);
+                String fieldValue = legacyMatcher.group(2).trim();
+
+                // Legacy syntax doesn't have type annotations, type is in Column() call
+                result.add(new PythonAst.Field(fieldName, null, fieldValue, List.of()));
+            }
+        }
+
+        log.debug("Extracted {} fields from class body for {}", result.size(), pythonClass.name());
+        return result;
+    }
+
+    /**
+     * Determines if a Python class represents a database table.
+     *
+     * <p>A class is considered a database table if it meets one of these criteria:</p>
+     * <ul>
+     *   <li><b>Traditional SQLAlchemy:</b> Inherits from {@code Base} and is not the Base class itself</li>
+     *   <li><b>SQLModel:</b> Has {@code table=True} parameter in class definition</li>
+     * </ul>
+     *
+     * <p>This filtering is critical to distinguish actual database tables from Pydantic schemas
+     * in SQLModel projects, where both inherit from SQLModel but only tables have {@code table=True}.</p>
+     *
+     * @param pythonClass the class to check
+     * @param fileContent the file content for regex matching (may be null)
+     * @return true if this class represents a database table
+     */
+    private boolean isDatabaseTable(PythonAst.PythonClass pythonClass, String fileContent) {
+        String className = pythonClass.name();
+
+        // Skip the Base class itself (declarative base)
+        if (BASE_CLASS_NAME.equals(className)) {
+            log.debug("Skipping Base class: {}", className);
+            return false;
+        }
+
+        // Check for traditional SQLAlchemy: inherits from Base
+        // NOTE: Use exact match to avoid matching "UserBase" etc.
+        boolean inheritsFromBase = pythonClass.baseClasses().stream()
+            .anyMatch(base -> base.equals(BASE_CLASS_NAME));
+        if (inheritsFromBase) {
+            log.debug("Found traditional SQLAlchemy model: {}", className);
+            return true;
+        }
+
+        // Check for SQLModel: has table=True parameter
+        boolean hasSqlModelTable = isSqlModelTable(pythonClass, fileContent);
+        if (hasSqlModelTable) {
+            log.debug("Found SQLModel table: {}", className);
+            return true;
+        }
+
+        // Not a database table - likely a Pydantic schema or unrelated class
+        log.debug("Skipping non-table class: {} (no Base inheritance, no table=True)", className);
+        return false;
+    }
+
+    /**
+     * Checks if a class is a SQLModel table (has table=True parameter).
+     * SQLModel uses table=True in the class definition to mark database tables,
+     * distinguishing them from Pydantic schemas.
+     */
+    private boolean isSqlModelTable(PythonAst.PythonClass pythonClass, String fileContent) {
+        if (fileContent == null) {
+            return false;
+        }
+
+        // Find class definition: class ClassName(..., table=True)
+        String classPattern = "class\\s+" + Pattern.quote(pythonClass.name()) + "\\s*\\([^)]*\\btable\\s*=\\s*True\\b[^)]*\\)";
+        Pattern pattern = Pattern.compile(classPattern);
+        return pattern.matcher(fileContent).find();
     }
 
     /**
@@ -267,18 +454,33 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
     /**
      * Extracts relationship information from a field.
+     * Handles both relationship() and Relationship() syntax.
      */
     private Relationship extractRelationship(String sourceModel, PythonAst.Field field) {
         if (field.value() == null) {
             return null;
         }
 
+        // Try to extract target from relationship("Target", ...) or Relationship(...)
+        // For SQLModel Relationship, the target is in the type hint, not the function call
+        String targetModel = null;
+
+        // First, check for relationship("Target", ...) pattern
         Matcher matcher = RELATIONSHIP_TARGET_PATTERN.matcher(field.value());
-        if (!matcher.find()) {
-            return null;
+        if (matcher.find()) {
+            targetModel = matcher.group(1);
         }
 
-        String targetModel = matcher.group(1);
+        // For SQLModel: field_name: list["Target"] = Relationship(...)
+        // or: field_name: "Target" | None = Relationship(...)
+        // Extract from type hint if present
+        if (targetModel == null && field.type() != null) {
+            targetModel = extractTargetFromTypeHint(field.type());
+        }
+
+        if (targetModel == null) {
+            return null;
+        }
 
         return new Relationship(
             sourceModel,
@@ -287,6 +489,65 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             SQLALCHEMY_RELATIONSHIP_DESCRIPTION,
             SQLALCHEMY_TECHNOLOGY
         );
+    }
+
+    /**
+     * Extracts target entity name from type hint like list["Item"] or "User" | None.
+     */
+    private String extractTargetFromTypeHint(String typeHint) {
+        // Pattern for list["Target"] or List["Target"]
+        Pattern listPattern = Pattern.compile("[Ll]ist\\s*\\[\\s*['\"](.+?)['\"]\\s*\\]");
+        Matcher listMatcher = listPattern.matcher(typeHint);
+        if (listMatcher.find()) {
+            return listMatcher.group(1);
+        }
+
+        // Pattern for "Target" | None or Optional["Target"]
+        Pattern quotedPattern = Pattern.compile("['\"]([A-Z][A-Za-z0-9_]*)['\"]");
+        Matcher quotedMatcher = quotedPattern.matcher(typeHint);
+        if (quotedMatcher.find()) {
+            return quotedMatcher.group(1);
+        }
+
+        return null;
+    }
+
+    /**
+     * Extracts foreign key reference from Field(foreign_key="table.column").
+     */
+    private String extractForeignKey(String fieldDef) {
+        if (fieldDef == null) {
+            return null;
+        }
+        Matcher matcher = FOREIGN_KEY_PATTERN.matcher(fieldDef);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    /**
+     * Extracts target entity name from foreign key reference like "user.id".
+     * Converts table name to entity name (e.g., "user" -> "User").
+     */
+    private String extractTargetEntityFromForeignKey(String foreignKeyRef) {
+        if (foreignKeyRef == null || !foreignKeyRef.contains(".")) {
+            return null;
+        }
+
+        String tableName = foreignKeyRef.substring(0, foreignKeyRef.indexOf("."));
+
+        // Convert snake_case to PascalCase
+        String[] parts = tableName.split("_");
+        StringBuilder entityName = new StringBuilder();
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                entityName.append(Character.toUpperCase(part.charAt(0)))
+                          .append(part.substring(1));
+            }
+        }
+
+        return entityName.toString();
     }
 
     /**
@@ -353,6 +614,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
      * Checks if the column is nullable.
      */
     private boolean isNullable(String columnDef) {
+        if (columnDef == null) {
+            return true; // Default to nullable for simple type annotations
+        }
         Matcher matcher = NULLABLE_PATTERN.matcher(columnDef);
         if (matcher.find()) {
             return "True".equals(matcher.group(1));
@@ -364,6 +628,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
      * Checks if the column is a primary key.
      */
     private boolean isPrimaryKey(String columnDef) {
+        if (columnDef == null) {
+            return false; // Simple type annotations are not primary keys
+        }
         return PRIMARY_KEY_PATTERN.matcher(columnDef).find();
     }
 
