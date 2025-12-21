@@ -402,7 +402,10 @@ public class CSharpAstParser {
             }
 
             // Check if line contains a method declaration
-            Pattern methodPattern = Pattern.compile("public\\s+(\\w+(?:<[^>]+>)?)\\s+(\\w+)\\s*\\(([^)]*)\\)");
+            // Support: public [static] [async] [virtual|override] ReturnType MethodName(params)
+            Pattern methodPattern = Pattern.compile(
+                "public\\s+(?:static\\s+)?(?:async\\s+)?(?:virtual\\s+|override\\s+)?(\\w+(?:<[^>]+>)?)\\s+(\\w+)\\s*\\(([^)]*)\\)"
+            );
             Matcher matcher = methodPattern.matcher(line);
             if (matcher.find()) {
                 String returnType = matcher.group(1);
