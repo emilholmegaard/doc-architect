@@ -35,6 +35,7 @@ nav:
     - 'ADR-012: Local CI Testing with Act': 'adrs/012-local-ci-testing-with-act.md'
     - 'ADR-013: Renderer Output Destinations': 'adrs/013-renderer-output-destinations.md'
     - 'ADR-014: Integration Testing and Docker Packaging': 'adrs/014-integration-testing-docker-packaging.md'
+    - 'ADR-015: Real-World Scanner Validation': 'adrs/015-real-world-scanner-validation-findings.md'
 
 plugins:
   - search:
