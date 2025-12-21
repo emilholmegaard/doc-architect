@@ -167,7 +167,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN);
+        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN);
     }
 
     @Override
