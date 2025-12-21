@@ -118,6 +118,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
     private static final String PACKAGES_CONFIG_PATTERN = "**/packages.config";
     private static final String BUILD_PROPS_PATTERN = "**/Directory.Build.props";
     private static final String PACKAGES_PROPS_PATTERN = "**/Directory.Packages.props";
+    private static final String ROOT_PACKAGES_PROPS_PATTERN = "Directory.Packages.props";
 
     // Prefixes and Delimiters
     private static final String VERSION_PREFIX = "Version=";
@@ -157,7 +158,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of(CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN);
+        return Set.of(CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN, ROOT_PACKAGES_PROPS_PATTERN);
     }
 
     @Override
@@ -167,7 +168,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN);
+        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN, ROOT_PACKAGES_PROPS_PATTERN);
     }
 
     @Override
@@ -214,6 +215,14 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
         });
 
         context.findFiles(PACKAGES_PROPS_PATTERN).forEach(file -> {
+            try {
+                parseDirectoryPackagesProps(file, sourceComponentId, dependencies);
+            } catch (IOException e) {
+                log.warn("Failed to parse Directory.Packages.props: {} - {}", file, e.getMessage());
+            }
+        });
+
+        context.findFiles(ROOT_PACKAGES_PROPS_PATTERN).forEach(file -> {
             try {
                 parseDirectoryPackagesProps(file, sourceComponentId, dependencies);
             } catch (IOException e) {

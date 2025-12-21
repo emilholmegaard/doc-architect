@@ -272,7 +272,7 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
     @Test
     void scan_withDirectoryPackagesProps_extractsDependencies() throws IOException {
         // Given: Directory.Packages.props file (Central Package Management)
-        createFile("project/Directory.Packages.props", """
+        createFile("Directory.Packages.props", """
             <Project>
               <PropertyGroup>
                 <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
@@ -305,7 +305,7 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
     @Test
     void scan_withCentralPackageManagement_combinesBothSources() throws IOException {
         // Given: Both Directory.Packages.props and .csproj files
-        createFile("project/Directory.Packages.props", """
+        createFile("Directory.Packages.props", """
             <Project>
               <PropertyGroup>
                 <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
