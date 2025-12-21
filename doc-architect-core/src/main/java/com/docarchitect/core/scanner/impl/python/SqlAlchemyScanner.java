@@ -185,17 +185,22 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
             // Only process fields that are actually defined in THIS class, not inherited
             List<PythonAst.Field> classFields = getFieldsDefinedInClass(pythonClass, fileContent);
+            log.debug("Class {} has {} fields defined", pythonClass.name(), classFields.size());
 
             for (PythonAst.Field field : classFields) {
-                // Skip dunder fields and private fields
-                if (field.name().equals(TABLENAME_FIELD_NAME) || field.name().startsWith("_")) {
-                    continue;
-                }
+                try {
+                    log.debug("Processing field: {}.{}", pythonClass.name(), field.name());
+                    // Skip dunder fields and private fields
+                    if (field.name().equals(TABLENAME_FIELD_NAME) || field.name().startsWith("_")) {
+                        continue;
+                    }
 
                 // Check if this is a relationship field (Relationship() or relationship())
-                if (field.value() != null &&
+                boolean isRelationship = field.value() != null &&
                     (field.value().contains(RELATIONSHIP_FUNCTION_NAME + "(") ||
-                     field.value().contains("Relationship("))) {
+                     field.value().contains("Relationship("));
+
+                if (isRelationship) {
                     // Extract relationship
                     Relationship rel = extractRelationship(pythonClass.name(), field);
                     if (rel != null) {
@@ -211,9 +216,12 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
                     // Check for foreign key in Field(foreign_key="...")
                     String foreignKeyRef = extractForeignKey(field.value());
+                    log.debug("Field {}.{}: value='{}', foreignKeyRef='{}'",
+                        pythonClass.name(), field.name(), field.value(), foreignKeyRef);
                     if (foreignKeyRef != null) {
                         // Create relationship for foreign key
                         String targetEntity = extractTargetEntityFromForeignKey(foreignKeyRef);
+                        log.debug("Extracted target entity from FK '{}': '{}'", foreignKeyRef, targetEntity);
                         if (targetEntity != null) {
                             Relationship fkRel = new Relationship(
                                 pythonClass.name(),
@@ -242,6 +250,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
                     log.debug("Found SQLAlchemy field: {}.{} ({})", pythonClass.name(), field.name(), sqlType);
                 }
+                } catch (Exception e) {
+                    log.warn("Error processing field {}.{}: {}", pythonClass.name(), field.name(), e.getMessage());
+                }
             }
 
             // Create DataEntity
@@ -262,19 +273,19 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
     }
 
     /**
-     * Filters fields to only include those actually defined in the class body,
-     * excluding inherited fields from parent classes.
+     * Extracts fields directly from the class body source code.
      *
-     * <p>The AST parser returns all fields including inherited ones. This method
-     * uses the source file content to determine which fields are actually defined
-     * in this specific class.</p>
+     * <p>NOTE: The Python AST parser has issues with SQLModel - it often returns
+     * incomplete field lists, missing simple type annotations and Relationship fields,
+     * and sometimes mixes fields from different classes. To work around this, we
+     * parse fields directly from the source code using regex.</p>
      *
      * @param pythonClass the class to get fields for
      * @param fileContent the source file content (may be null)
-     * @return list of fields defined in this class (not inherited)
+     * @return list of fields defined in this class
      */
     private List<PythonAst.Field> getFieldsDefinedInClass(PythonAst.PythonClass pythonClass, String fileContent) {
-        if (fileContent == null || pythonClass.fields().isEmpty()) {
+        if (fileContent == null) {
             return pythonClass.fields();
         }
 
@@ -284,9 +295,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
         Matcher classMatcher = pattern.matcher(fileContent);
 
         if (!classMatcher.find()) {
-            // Can't find class definition, return all fields (fallback)
-            log.debug("Could not find class definition for {}, using all fields", pythonClass.name());
-            return pythonClass.fields();
+            // Can't find class definition, use regex parsing as fallback
+            log.debug("Could not find class definition for {}", pythonClass.name());
+            return List.of();
         }
 
         int classStart = classMatcher.end();
@@ -318,24 +329,37 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
         String classBodyStr = classBody.toString();
 
-        // Filter fields: only keep fields whose names appear in the class body
-        List<PythonAst.Field> result = pythonClass.fields().stream()
-            .filter(field -> {
-                // Check if this field name appears in the class body with an assignment
-                String fieldPattern = "^\\s*" + Pattern.quote(field.name()) + "\\s*[:=]";
-                Pattern p = Pattern.compile(fieldPattern, Pattern.MULTILINE);
-                boolean found = p.matcher(classBodyStr).find();
-                if (!found) {
-                    log.debug("Excluding inherited field: {}.{}", pythonClass.name(), field.name());
-                } else {
-                    log.debug("Including field: {}.{} (value={})", pythonClass.name(), field.name(), field.value());
-                }
-                return found;
-            })
-            .toList();
+        // Parse fields directly from class body
+        // Pattern 1: field_name: type = value  OR  field_name: type  (modern syntax)
+        // Pattern 2: field_name = value  (legacy Column() syntax)
+        Pattern modernPattern = Pattern.compile("^\\s*([a-z_][a-z0-9_]*)\\s*:\\s*([^=\\n]+?)(?:\\s*=\\s*(.+?))?\\s*$", Pattern.MULTILINE);
+        Pattern legacyPattern = Pattern.compile("^\\s*([a-z_][a-z0-9_]*)\\s*=\\s*(.+?)\\s*$", Pattern.MULTILINE);
 
-        log.debug("Class {} has {} total fields, {} defined in class",
-            pythonClass.name(), pythonClass.fields().size(), result.size());
+        List<PythonAst.Field> result = new ArrayList<>();
+
+        // Try modern syntax first (with type annotations)
+        Matcher modernMatcher = modernPattern.matcher(classBodyStr);
+        while (modernMatcher.find()) {
+            String fieldName = modernMatcher.group(1);
+            String fieldType = modernMatcher.group(2).trim();
+            String fieldValue = modernMatcher.group(3) != null ? modernMatcher.group(3).trim() : null;
+
+            result.add(new PythonAst.Field(fieldName, fieldType, fieldValue, List.of()));
+        }
+
+        // If no modern fields found, try legacy syntax (without type annotations)
+        if (result.isEmpty()) {
+            Matcher legacyMatcher = legacyPattern.matcher(classBodyStr);
+            while (legacyMatcher.find()) {
+                String fieldName = legacyMatcher.group(1);
+                String fieldValue = legacyMatcher.group(2).trim();
+
+                // Legacy syntax doesn't have type annotations, type is in Column() call
+                result.add(new PythonAst.Field(fieldName, null, fieldValue, List.of()));
+            }
+        }
+
+        log.debug("Extracted {} fields from class body for {}", result.size(), pythonClass.name());
         return result;
     }
 
@@ -492,6 +516,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
      * Extracts foreign key reference from Field(foreign_key="table.column").
      */
     private String extractForeignKey(String fieldDef) {
+        if (fieldDef == null) {
+            return null;
+        }
         Matcher matcher = FOREIGN_KEY_PATTERN.matcher(fieldDef);
         if (matcher.find()) {
             return matcher.group(1);
@@ -587,6 +614,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
      * Checks if the column is nullable.
      */
     private boolean isNullable(String columnDef) {
+        if (columnDef == null) {
+            return true; // Default to nullable for simple type annotations
+        }
         Matcher matcher = NULLABLE_PATTERN.matcher(columnDef);
         if (matcher.find()) {
             return "True".equals(matcher.group(1));
@@ -598,6 +628,9 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
      * Checks if the column is a primary key.
      */
     private boolean isPrimaryKey(String columnDef) {
+        if (columnDef == null) {
+            return false; // Simple type annotations are not primary keys
+        }
         return PRIMARY_KEY_PATTERN.matcher(columnDef).find();
     }
 
