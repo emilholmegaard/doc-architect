@@ -15,7 +15,7 @@
   - AbstractRegexScanner, AbstractJacksonScanner, AbstractJavaParserScanner (all extend AbstractScanner).
 - Align with ADRs in docs/adrs (C4 model, TechDocs, logging, testing, packaging).
 
-## Project Structure (updated)
+## Project Structure 
 
 ```
 doc-architect/
