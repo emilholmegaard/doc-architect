@@ -94,7 +94,6 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
     private static final String MANY_TO_ONE_DESCRIPTION = "Many-to-One relationship";
     private static final String RELATIONSHIP_SOURCE = "Entity Framework";
     private static final String ENTITY_TYPE = "table";
-    private static final String DEFAULT_PRIMARY_KEY = "Id";
     
     // Type name constants
     private static final String ICOLLECTION_TYPE = "ICollection<";
@@ -248,14 +247,14 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
                 continue;
             }
 
-            // Extract properties
+            // Extract properties and detect primary key
             List<DataEntity.Field> fields = extractEntityFieldsFromAst(csharpClass, entityNames);
+            String primaryKey = findPrimaryKeyFromProperties(csharpClass);
 
             // Extract relationships
             extractNavigationRelationshipsFromAst(csharpClass, entityNames, relationships);
 
             // Create DataEntity
-            String primaryKey = findPrimaryKey(fields);
             if (!fields.isEmpty()) {
                 String tableName = toPlural(className);
 
@@ -269,7 +268,8 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
                 );
 
                 dataEntities.add(entity);
-                log.debug("Found Entity Framework entity: {} -> table: {}", className, tableName);
+                log.debug("Found Entity Framework entity: {} -> table: {} with PK: {}",
+                    className, tableName, primaryKey != null ? primaryKey : "none");
             }
         }
     }
@@ -302,6 +302,50 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
     }
 
     /**
+     * Determines if a property has the [Key] attribute.
+     */
+    private boolean hasKeyAttribute(DotNetAst.Property property) {
+        return property.attributes().stream()
+            .anyMatch(attr -> "Key".equals(attr.name()));
+    }
+
+    /**
+     * Determines if a field is a primary key by EF convention or [Key] attribute.
+     *
+     * <p>EF Core conventions:
+     * <ul>
+     *   <li>Field named "Id" (case-insensitive)</li>
+     *   <li>Field named "{ClassName}Id" (case-insensitive)</li>
+     *   <li>Field decorated with [Key] attribute</li>
+     * </ul>
+     *
+     * @param property the property to check
+     * @param className the entity class name
+     * @return true if this property is a primary key
+     */
+    private boolean isPrimaryKeyByConvention(DotNetAst.Property property, String className) {
+        String propertyName = property.name();
+
+        // Check for [Key] attribute
+        if (hasKeyAttribute(property)) {
+            return true;
+        }
+
+        // EF convention: "Id"
+        if ("Id".equalsIgnoreCase(propertyName)) {
+            return true;
+        }
+
+        // EF convention: "{ClassName}Id"
+        String conventionName = className + "Id";
+        if (conventionName.equalsIgnoreCase(propertyName)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Determines if a type is a navigation property.
      */
     private boolean isNavigationProperty(String type, Set<String> entityNames) {
@@ -311,14 +355,30 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
     }
 
     /**
-     * Finds the primary key field from the field list.
+     * Finds the primary key field from the class properties using EF conventions and [Key] attribute.
+     *
+     * @param csharpClass the entity class
+     * @return the primary key field name, or null if not found
      */
-    private String findPrimaryKey(List<DataEntity.Field> fields) {
-        return fields.stream()
-            .map(DataEntity.Field::name)
-            .filter(name -> name.equals(DEFAULT_PRIMARY_KEY))
-            .findFirst()
-            .orElse(DEFAULT_PRIMARY_KEY);
+    private String findPrimaryKeyFromProperties(DotNetAst.CSharpClass csharpClass) {
+        String className = csharpClass.name();
+
+        // Check all properties for primary key
+        for (DotNetAst.Property property : csharpClass.properties()) {
+            // Skip navigation properties
+            String type = property.type();
+            if (type.startsWith(ICOLLECTION_TYPE) || type.startsWith(LIST_TYPE)) {
+                continue;
+            }
+
+            if (isPrimaryKeyByConvention(property, className)) {
+                log.debug("Detected primary key: {}.{}", className, property.name());
+                return property.name();
+            }
+        }
+
+        log.debug("No primary key detected for entity: {}", className);
+        return null;
     }
 
     /**
