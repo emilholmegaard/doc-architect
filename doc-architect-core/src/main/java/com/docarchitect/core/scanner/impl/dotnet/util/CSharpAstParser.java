@@ -362,16 +362,46 @@ public class CSharpAstParser {
 
     private static List<DotNetAst.Property> extractPropertiesRegex(String classBody) {
         List<DotNetAst.Property> properties = new ArrayList<>();
+
+        // Split by lines to better handle attributes
+        String[] lines = classBody.split("\n");
+        List<DotNetAst.Attribute> currentAttributes = new ArrayList<>();
+
         Pattern propPattern = Pattern.compile(
             "public\\s+(\\w+(?:<[^>]+>)?)\\s+(\\w+)\\s*\\{[^}]*get;[^}]*set;[^}]*\\}",
             Pattern.DOTALL
         );
 
-        Matcher matcher = propPattern.matcher(classBody);
-        while (matcher.find()) {
-            String type = matcher.group(1);
-            String name = matcher.group(2);
-            properties.add(new DotNetAst.Property(name, type, true, true, List.of()));
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+
+            // Check if line contains an attribute
+            if (line.startsWith("[") && line.contains("]")) {
+                Pattern attrPattern = Pattern.compile("\\[(\\w+)(?:\\(([^)]*)\\))?\\]");
+                Matcher attrMatcher = attrPattern.matcher(line);
+                while (attrMatcher.find()) {
+                    String attrName = attrMatcher.group(1);
+                    String args = attrMatcher.group(2);
+                    List<String> argList = args != null && !args.trim().isEmpty() ?
+                        List.of(args) : List.of();
+                    currentAttributes.add(new DotNetAst.Attribute(attrName, argList));
+                }
+                continue;
+            }
+
+            // Check if line contains a property declaration
+            Matcher propMatcher = propPattern.matcher(line);
+            if (propMatcher.find()) {
+                String type = propMatcher.group(1);
+                String name = propMatcher.group(2);
+                properties.add(new DotNetAst.Property(name, type, true, true, new ArrayList<>(currentAttributes)));
+                currentAttributes.clear();
+            } else if (!line.isEmpty() && !line.startsWith("//") && !line.startsWith("/*")) {
+                // Non-empty, non-comment line that's not an attribute or property - clear attributes
+                if (!line.startsWith("[")) {
+                    currentAttributes.clear();
+                }
+            }
         }
 
         return properties;

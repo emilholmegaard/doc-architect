@@ -252,6 +252,75 @@ class MermaidGeneratorTest {
     }
 
     @Test
+    void generate_erDiagram_onlyPrimaryKeyFieldMarkedAsPK() {
+        // Create entity fields - only Id should be marked as PK
+        DataEntity.Field idField = new DataEntity.Field("Id", "INTEGER", false, null);
+        DataEntity.Field nameField = new DataEntity.Field("Name", "NVARCHAR", false, null);
+        DataEntity.Field descField = new DataEntity.Field("Description", "NVARCHAR", true, null);
+        DataEntity.Field priceField = new DataEntity.Field("Price", "DECIMAL", false, null);
+
+        DataEntity entity = new DataEntity(
+            "CatalogItem",
+            "CatalogItems",
+            "table",
+            List.of(idField, nameField, descField, priceField),
+            "Id",  // Primary key
+            "Catalog item entity"
+        );
+
+        ArchitectureModel model = new ArchitectureModel(
+            "TestProject", "1.0", List.of(), List.of(), List.of(),
+            List.of(), List.of(), List.of(), List.of(entity)
+        );
+
+        GeneratedDiagram diagram = generator.generate(model, DiagramType.ER_DIAGRAM, config);
+
+        String content = diagram.content();
+
+        // Verify only Id field is marked with PK
+        assertThat(content)
+            .contains("erDiagram")
+            .contains("CATALOGITEMS")
+            .contains("INTEGER Id PK")
+            .doesNotContain("NVARCHAR Name PK")
+            .doesNotContain("NVARCHAR Description PK")
+            .doesNotContain("DECIMAL Price PK");
+
+        // Verify regular fields are present without PK marker
+        assertThat(content)
+            .contains("NVARCHAR Name")
+            .contains("NVARCHAR Description")
+            .contains("DECIMAL Price");
+    }
+
+    @Test
+    void generate_erDiagram_noPrimaryKeyDefined_noFieldsMarkedAsPK() {
+        DataEntity.Field field1 = new DataEntity.Field("name", "varchar", false, null);
+        DataEntity.Field field2 = new DataEntity.Field("email", "varchar", false, null);
+
+        DataEntity entity = new DataEntity(
+            "svc1", "contacts", "table", List.of(field1, field2), null, "Contact table"
+        );
+
+        ArchitectureModel model = new ArchitectureModel(
+            "TestProject", "1.0", List.of(), List.of(), List.of(),
+            List.of(), List.of(), List.of(), List.of(entity)
+        );
+
+        GeneratedDiagram diagram = generator.generate(model, DiagramType.ER_DIAGRAM, config);
+
+        String content = diagram.content();
+
+        // Verify no fields are marked as PK
+        assertThat(content)
+            .contains("erDiagram")
+            .contains("CONTACTS")
+            .contains("varchar name")
+            .contains("varchar email")
+            .doesNotContain(" PK");
+    }
+
+    @Test
     void generate_messageFlow_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),

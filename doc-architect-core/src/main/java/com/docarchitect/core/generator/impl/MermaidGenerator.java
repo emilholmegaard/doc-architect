@@ -533,7 +533,7 @@ public class MermaidGenerator implements DiagramGenerator {
             if (entity.fields().isEmpty()) {
                 sb.append("    string placeholder \"No fields defined\"\n");
             } else {
-                appendEntityFields(sb, entity.fields());
+                appendEntityFields(sb, entity.fields(), entity.primaryKey());
             }
 
             sb.append("  }\n");
@@ -545,15 +545,27 @@ public class MermaidGenerator implements DiagramGenerator {
      *
      * @param sb the string builder
      * @param fields list of fields to render
+     * @param primaryKey the primary key field name (may be null)
      */
-    private void appendEntityFields(StringBuilder sb, List<DataEntity.Field> fields) {
+    private void appendEntityFields(StringBuilder sb, List<DataEntity.Field> fields, String primaryKey) {
         for (DataEntity.Field field : fields) {
             String dataType = field.dataType() != null ? field.dataType() : "string";
-            String nullable = field.nullable() ? "" : " PK";
+            String pkMarker = isPrimaryKeyField(field.name(), primaryKey) ? " PK" : "";
             String comment = field.description() != null ? " \"" + escape(field.description()) + "\"" : "";
             sb.append("    ").append(dataType).append(" ")
-                .append(field.name()).append(nullable).append(comment).append("\n");
+                .append(field.name()).append(pkMarker).append(comment).append("\n");
         }
+    }
+
+    /**
+     * Determines if a field is the primary key.
+     *
+     * @param fieldName the field name
+     * @param primaryKey the primary key from the entity (may be null)
+     * @return true if this field is the primary key
+     */
+    private boolean isPrimaryKeyField(String fieldName, String primaryKey) {
+        return primaryKey != null && fieldName.equals(primaryKey);
     }
 
     /**
