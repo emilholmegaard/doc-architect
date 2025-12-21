@@ -165,4 +165,163 @@ def format_price(price):
         // Then: Should return false
         assertThat(applies).isFalse();
     }
+
+    @Test
+    void scan_withSqlModelTableTrue_extractsOnlyTables() throws IOException {
+        // Given: SQLModel file with table=True entities and Pydantic schemas
+        createFile("app/models.py", """
+from sqlmodel import Field, Relationship, SQLModel
+
+# Pydantic schema (NOT a database table)
+class UserBase(SQLModel):
+    email: str = Field(unique=True, index=True)
+    is_active: bool = True
+
+# Pydantic schema (NOT a database table)
+class UserCreate(UserBase):
+    password: str = Field(min_length=8)
+
+# Database table (has table=True)
+class User(UserBase, table=True):
+    id: int = Field(primary_key=True)
+    hashed_password: str = Field()
+
+# Pydantic schema (NOT a database table)
+class UserPublic(UserBase):
+    id: int
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract only User entity (not UserBase, UserCreate, or UserPublic)
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+
+        DataEntity user = result.dataEntities().get(0);
+        assertThat(user.componentId()).isEqualTo("User");
+        assertThat(user.name()).isEqualTo("user"); // table name inferred from class name
+        assertThat(user.fields()).hasSize(2); // id and hashed_password with Field()
+    }
+
+    @Test
+    void scan_withSqlModelForeignKey_createsRelationships() throws IOException {
+        // Given: SQLModel entities with foreign key
+        createFile("app/models.py", """
+import uuid
+from sqlmodel import Field, Relationship, SQLModel
+
+class User(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    email: str
+    items: list["Item"] = Relationship(back_populates="owner")
+
+class Item(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    title: str
+    owner_id: uuid.UUID = Field(foreign_key="user.id", nullable=False)
+    owner: "User" | None = Relationship(back_populates="items")
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract 2 entities and relationships
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(2);
+        assertThat(result.relationships()).isNotEmpty();
+
+        // Verify foreign key relationship was detected
+        assertThat(result.relationships())
+            .anyMatch(rel -> rel.sourceId().equals("Item") && rel.targetId().equals("User"));
+
+        // Verify Relationship() navigation property was detected
+        assertThat(result.relationships())
+            .anyMatch(rel -> rel.sourceId().equals("User") && rel.targetId().equals("Item"));
+    }
+
+    @Test
+    void scan_withComplexSqlModelFile_detectsOnlyTablesNotSchemas() throws IOException {
+        // Given: Complex SQLModel file with many schemas (like FastAPI example)
+        createFile("app/models.py", """
+from sqlmodel import Field, Relationship, SQLModel
+
+class UserBase(SQLModel):
+    email: str
+
+class UserCreate(UserBase):
+    password: str
+
+class UserUpdate(UserBase):
+    email: str | None = None
+    password: str | None = None
+
+class User(UserBase, table=True):
+    id: int = Field(primary_key=True)
+    hashed_password: str
+    items: list["Item"] = Relationship(back_populates="owner")
+
+class UserPublic(UserBase):
+    id: int
+
+class ItemBase(SQLModel):
+    title: str
+    description: str | None = None
+
+class ItemCreate(ItemBase):
+    pass
+
+class ItemUpdate(ItemBase):
+    title: str | None = None
+
+class Item(ItemBase, table=True):
+    id: int = Field(primary_key=True)
+    owner_id: int = Field(foreign_key="user.id")
+    owner: User | None = Relationship(back_populates="items")
+
+class ItemPublic(ItemBase):
+    id: int
+    owner_id: int
+
+class Message(SQLModel):
+    message: str
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should find exactly 2 entities (User and Item), not 11 schemas
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities())
+            .hasSize(2)
+            .extracting(DataEntity::componentId)
+            .containsExactlyInAnyOrder("User", "Item");
+    }
+
+    @Test
+    void scan_withTraditionalSqlAlchemy_stillWorks() throws IOException {
+        // Given: Traditional SQLAlchemy models (should still work)
+        createFile("app/models.py", """
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    email = Column(String(100), nullable=False)
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should still extract traditional SQLAlchemy models
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+
+        DataEntity user = result.dataEntities().get(0);
+        assertThat(user.componentId()).isEqualTo("User");
+        assertThat(user.name()).isEqualTo("users");
+    }
 }
