@@ -217,6 +217,18 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
     }
 
     @Test
+    void appliesTo_withDirectoryPackagesProps_returnsTrue() throws IOException {
+        // Given: Project with Directory.Packages.props
+        createFile("Directory.Packages.props", "<Project />");
+
+        // When: appliesTo is checked
+        boolean applies = scanner.appliesTo(context);
+
+        // Then: Should return true
+        assertThat(applies).isTrue();
+    }
+
+    @Test
     void appliesTo_withoutDotNetFiles_returnsFalse() throws IOException {
         // Given: Project without .NET files
         createDirectory("src/main/java");
@@ -260,7 +272,7 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
     @Test
     void scan_withDirectoryPackagesProps_extractsDependencies() throws IOException {
         // Given: Directory.Packages.props file (Central Package Management)
-        createFile("Directory.Packages.props", """
+        createFile("project/Directory.Packages.props", """
             <Project>
               <PropertyGroup>
                 <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
@@ -293,7 +305,7 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
     @Test
     void scan_withCentralPackageManagement_combinesBothSources() throws IOException {
         // Given: Both Directory.Packages.props and .csproj files
-        createFile("Directory.Packages.props", """
+        createFile("project/Directory.Packages.props", """
             <Project>
               <PropertyGroup>
                 <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
