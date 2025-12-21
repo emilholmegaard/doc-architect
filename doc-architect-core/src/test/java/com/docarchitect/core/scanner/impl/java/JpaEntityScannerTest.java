@@ -18,11 +18,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <p>These tests validate the scanner's ability to:
  * <ul>
  *   <li>Parse JPA @Entity classes using JavaParser AST</li>
+ *   <li>Parse Spring Data MongoDB @Document classes</li>
  *   <li>Extract entity fields with correct data types</li>
  *   <li>Detect @Id primary key annotations</li>
  *   <li>Extract table names from @Table annotation</li>
+ *   <li>Extract collection names from @Document annotation</li>
  *   <li>Detect JPA relationships (@OneToMany, @ManyToOne, etc.)</li>
- *   <li>Convert class names to snake_case table names</li>
+ *   <li>Convert class names to snake_case table/collection names</li>
  * </ul>
  *
  * @see JpaEntityScanner
@@ -319,5 +321,222 @@ class JpaEntityScannerTest extends ScannerTestBase {
 
         // Then: Should return false
         assertThat(applies).isFalse();
+    }
+
+    // MongoDB @Document Support Tests
+
+    @Test
+    void scan_withMongoDocumentEntity_extractsFieldsAndPrimaryKey() throws IOException {
+        // Given: A Spring Data MongoDB @Document entity
+        createFile("src/main/java/com/example/User.java", """
+            package com.example;
+
+            import org.springframework.data.mongodb.core.mapping.Document;
+            import org.springframework.data.annotation.Id;
+
+            @Document(collection = "users")
+            public class User {
+                @Id
+                private String id;
+
+                private String email;
+
+                private String name;
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract MongoDB document with collection type
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+
+        DataEntity entity = result.dataEntities().get(0);
+        assertThat(entity.componentId()).isEqualTo("com.example.User");
+        assertThat(entity.name()).isEqualTo("users"); // From @Document(collection = "users")
+        assertThat(entity.type()).isEqualTo("collection");
+        assertThat(entity.primaryKey()).isEqualTo("id");
+        assertThat(entity.description()).isEqualTo("MongoDB Document: User");
+        assertThat(entity.fields()).hasSize(3);
+
+        DataEntity.Field idField = entity.fields().stream()
+            .filter(f -> "id".equals(f.name()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(idField.dataType()).isEqualTo("String");
+    }
+
+    @Test
+    void scan_withMongoDocumentWithoutCollection_usesDefaultName() throws IOException {
+        // Given: MongoDB @Document without collection attribute
+        createFile("src/main/java/com/example/DataPoint.java", """
+            package com.example;
+
+            import org.springframework.data.mongodb.core.mapping.Document;
+            import org.springframework.data.annotation.Id;
+
+            @Document
+            public class DataPoint {
+                @Id
+                private String id;
+
+                private Double value;
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should use snake_case conversion of class name
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+
+        DataEntity entity = result.dataEntities().get(0);
+        assertThat(entity.name()).isEqualTo("data_point"); // snake_case conversion
+        assertThat(entity.type()).isEqualTo("collection");
+    }
+
+    @Test
+    void scan_withMongoDocumentComplexFields_extractsAllFields() throws IOException {
+        // Given: MongoDB document with complex field types
+        createFile("src/main/java/com/example/Transaction.java", """
+            package com.example;
+
+            import org.springframework.data.mongodb.core.mapping.Document;
+            import org.springframework.data.annotation.Id;
+            import java.time.Instant;
+            import java.util.Set;
+
+            @Document(collection = "transactions")
+            public class Transaction {
+                @Id
+                private String id;
+
+                private String accountId;
+
+                private Double amount;
+
+                private Instant timestamp;
+
+                private Set<String> tags;
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract all fields with correct types
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+
+        DataEntity entity = result.dataEntities().get(0);
+        assertThat(entity.fields()).hasSize(5);
+
+        assertThat(entity.fields())
+            .extracting(DataEntity.Field::name, DataEntity.Field::dataType)
+            .containsExactlyInAnyOrder(
+                org.assertj.core.groups.Tuple.tuple("id", "String"),
+                org.assertj.core.groups.Tuple.tuple("accountId", "String"),
+                org.assertj.core.groups.Tuple.tuple("amount", "Double"),
+                org.assertj.core.groups.Tuple.tuple("timestamp", "Instant"),
+                org.assertj.core.groups.Tuple.tuple("tags", "Set<String>")
+            );
+    }
+
+    @Test
+    void scan_withBothJpaAndMongo_extractsBothTypes() throws IOException {
+        // Given: Project with both JPA @Entity and MongoDB @Document
+        createFile("src/main/java/com/example/JpaUser.java", """
+            package com.example;
+
+            import javax.persistence.*;
+
+            @Entity
+            @Table(name = "users")
+            public class JpaUser {
+                @Id
+                private Long id;
+
+                private String username;
+            }
+            """);
+
+        createFile("src/main/java/com/example/MongoEvent.java", """
+            package com.example;
+
+            import org.springframework.data.mongodb.core.mapping.Document;
+            import org.springframework.data.annotation.Id;
+
+            @Document(collection = "events")
+            public class MongoEvent {
+                @Id
+                private String id;
+
+                private String type;
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract both entities with correct types
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(2);
+
+        DataEntity jpaEntity = result.dataEntities().stream()
+            .filter(e -> "com.example.JpaUser".equals(e.componentId()))
+            .findFirst()
+            .orElseThrow();
+
+        DataEntity mongoEntity = result.dataEntities().stream()
+            .filter(e -> "com.example.MongoEvent".equals(e.componentId()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(jpaEntity.type()).isEqualTo("table");
+        assertThat(jpaEntity.name()).isEqualTo("users");
+        assertThat(jpaEntity.description()).isEqualTo("JPA Entity: JpaUser");
+
+        assertThat(mongoEntity.type()).isEqualTo("collection");
+        assertThat(mongoEntity.name()).isEqualTo("events");
+        assertThat(mongoEntity.description()).isEqualTo("MongoDB Document: MongoEvent");
+    }
+
+    @Test
+    void scan_withMongoDocumentEmbeddedObject_extractsField() throws IOException {
+        // Given: MongoDB document with embedded object
+        createFile("src/main/java/com/example/Order.java", """
+            package com.example;
+
+            import org.springframework.data.mongodb.core.mapping.Document;
+            import org.springframework.data.annotation.Id;
+
+            @Document(collection = "orders")
+            public class Order {
+                @Id
+                private String id;
+
+                private Address shippingAddress;
+
+                private String status;
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract embedded object field
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+
+        DataEntity entity = result.dataEntities().get(0);
+        DataEntity.Field addressField = entity.fields().stream()
+            .filter(f -> "shippingAddress".equals(f.name()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(addressField.dataType()).isEqualTo("Address");
     }
 }

@@ -21,9 +21,10 @@ import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 
 /**
- * Scanner for JPA entity declarations in Java source files.
+ * Scanner for JPA entity and Spring Data MongoDB document declarations in Java source files.
  *
- * <p>Uses JavaParser to extract JPA entities, fields, and relationships from @Entity classes.
+ * <p>Uses JavaParser to extract entities, fields, and relationships from @Entity and @Document classes.
+ * Supports both JPA (relational) and MongoDB (document) data models.
  *
  * @see com.docarchitect.core.scanner.Scanner
  * @see com.docarchitect.core.model.DataEntity
@@ -36,16 +37,21 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
     private static final String JAVA_FILE_GLOB = "**/*.java";
     private static final int SCANNER_PRIORITY = 60;
 
+    private static final Set<String> ENTITY_ANNOTATIONS = Set.of("Entity", "Document");
     private static final String ENTITY_ANNOTATION = "Entity";
+    private static final String DOCUMENT_ANNOTATION = "Document";
     private static final String TABLE_ANNOTATION = "Table";
     private static final String TABLE_NAME_ATTRIBUTE = "name";
+    private static final String COLLECTION_ATTRIBUTE = "collection";
     private static final String COLUMN_ANNOTATION = "Column";
     private static final String NULLABLE_ATTRIBUTE = "nullable";
     private static final String FALSE_LITERAL = "false";
     private static final String ID_ANNOTATION = "Id";
 
     private static final String DATA_ENTITY_TYPE_TABLE = "table";
+    private static final String DATA_ENTITY_TYPE_COLLECTION = "collection";
     private static final String ENTITY_DESCRIPTION_PREFIX = "JPA Entity: ";
+    private static final String DOCUMENT_DESCRIPTION_PREFIX = "MongoDB Document: ";
     private static final String RELATIONSHIP_DESCRIPTION_SUFFIX = " relationship";
     private static final String RELATIONSHIP_TECHNOLOGY = "JPA";
 
@@ -89,7 +95,7 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScanResult scan(ScanContext context) {
-        log.info("Scanning JPA entities in: {}", context.rootPath());
+        log.info("Scanning JPA entities and MongoDB documents in: {}", context.rootPath());
 
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
@@ -108,7 +114,7 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
             }
         }
 
-        log.info("Found {} JPA entities and {} relationships", dataEntities.size(), relationships.size());
+        log.info("Found {} data entities and {} relationships", dataEntities.size(), relationships.size());
 
         return buildSuccessResult(
             List.of(),
@@ -129,12 +135,16 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
         CompilationUnit cu = cuOpt.get();
         cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
-            boolean isEntity = classDecl.getAnnotations().stream()
-                .anyMatch(ann -> ENTITY_ANNOTATION.equals(ann.getNameAsString()));
+            Optional<AnnotationExpr> entityAnnotation = classDecl.getAnnotations().stream()
+                .filter(ann -> ENTITY_ANNOTATIONS.contains(ann.getNameAsString()))
+                .findFirst();
 
-            if (!isEntity) {
+            if (entityAnnotation.isEmpty()) {
                 return;
             }
+
+            String annotationType = entityAnnotation.get().getNameAsString();
+            boolean isMongoDocument = DOCUMENT_ANNOTATION.equals(annotationType);
 
             String className = classDecl.getNameAsString();
             String packageName = cu.getPackageDeclaration()
@@ -142,7 +152,11 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
                 .orElse("");
 
             String fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
-            String tableName = extractTableName(classDecl, className);
+            String tableName = isMongoDocument
+                ? extractCollectionName(classDecl, className)
+                : extractTableName(classDecl, className);
+            String entityType = isMongoDocument ? DATA_ENTITY_TYPE_COLLECTION : DATA_ENTITY_TYPE_TABLE;
+            String description = (isMongoDocument ? DOCUMENT_DESCRIPTION_PREFIX : ENTITY_DESCRIPTION_PREFIX) + className;
 
             List<DataEntity.Field> fields = new ArrayList<>();
             String primaryKey = null;
@@ -168,14 +182,18 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
             DataEntity entity = new DataEntity(
                 fullyQualifiedName,
                 tableName,
-                DATA_ENTITY_TYPE_TABLE,
+                entityType,
                 fields,
                 primaryKey,
-                ENTITY_DESCRIPTION_PREFIX + className
+                description
             );
 
             dataEntities.add(entity);
-            log.debug("Found JPA entity: {} -> table: {}", fullyQualifiedName, tableName);
+            log.debug("Found {} entity: {} -> {}: {}",
+                isMongoDocument ? "MongoDB" : "JPA",
+                fullyQualifiedName,
+                entityType,
+                tableName);
         });
     }
 
@@ -186,6 +204,18 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
             .findFirst()
             .flatMap(ann -> ((NormalAnnotationExpr) ann).getPairs().stream()
                 .filter(pair -> TABLE_NAME_ATTRIBUTE.equals(pair.getNameAsString()))
+                .findFirst()
+                .map(pair -> pair.getValue().toString().replaceAll("\"", "")))
+            .orElse(toSnakeCase(className));
+    }
+
+    private String extractCollectionName(ClassOrInterfaceDeclaration classDecl, String className) {
+        return classDecl.getAnnotations().stream()
+            .filter(ann -> DOCUMENT_ANNOTATION.equals(ann.getNameAsString()))
+            .filter(ann -> ann instanceof NormalAnnotationExpr)
+            .findFirst()
+            .flatMap(ann -> ((NormalAnnotationExpr) ann).getPairs().stream()
+                .filter(pair -> COLLECTION_ATTRIBUTE.equals(pair.getNameAsString()))
                 .findFirst()
                 .map(pair -> pair.getValue().toString().replaceAll("\"", "")))
             .orElse(toSnakeCase(className));
