@@ -217,6 +217,18 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
     }
 
     @Test
+    void appliesTo_withDirectoryPackagesProps_returnsTrue() throws IOException {
+        // Given: Project with Directory.Packages.props
+        createFile("Directory.Packages.props", "<Project />");
+
+        // When: appliesTo is checked
+        boolean applies = scanner.appliesTo(context);
+
+        // Then: Should return true
+        assertThat(applies).isTrue();
+    }
+
+    @Test
     void appliesTo_withoutDotNetFiles_returnsFalse() throws IOException {
         // Given: Project without .NET files
         createDirectory("src/main/java");
@@ -226,5 +238,102 @@ class NuGetDependencyScannerTest extends ScannerTestBase {
 
         // Then: Should return false
         assertThat(applies).isFalse();
+    }
+
+    @Test
+    void scan_withPackagesWithoutVersion_usesFallbackVersion() throws IOException {
+        // Given: SDK-style .csproj with packages without explicit versions (Central Package Management)
+        createFile("project/MyApp.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <PackageReference Include="MediatR" />
+                <PackageReference Include="FluentValidation" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract dependencies with fallback version
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies()).hasSize(2);
+
+        Dependency mediatr = result.dependencies().stream()
+            .filter(d -> "MediatR".equals(d.artifactId()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(mediatr.groupId()).isEqualTo("nuget");
+        assertThat(mediatr.version()).isEqualTo("*");
+        assertThat(mediatr.direct()).isTrue();
+    }
+
+    @Test
+    void scan_withDirectoryPackagesProps_extractsDependencies() throws IOException {
+        // Given: Directory.Packages.props file (Central Package Management)
+        createFile("Directory.Packages.props", """
+            <Project>
+              <PropertyGroup>
+                <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageVersion Include="MediatR" Version="12.0.1" />
+                <PackageVersion Include="FluentValidation" Version="11.9.0" />
+                <PackageVersion Include="Serilog" Version="3.1.0" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract dependencies
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies()).hasSize(3);
+
+        Dependency mediatr = result.dependencies().stream()
+            .filter(d -> "MediatR".equals(d.artifactId()))
+            .findFirst()
+            .orElseThrow();
+
+        assertThat(mediatr.groupId()).isEqualTo("nuget");
+        assertThat(mediatr.version()).isEqualTo("12.0.1");
+        assertThat(mediatr.direct()).isTrue();
+    }
+
+    @Test
+    void scan_withCentralPackageManagement_combinesBothSources() throws IOException {
+        // Given: Both Directory.Packages.props and .csproj files
+        createFile("Directory.Packages.props", """
+            <Project>
+              <PropertyGroup>
+                <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageVersion Include="MediatR" Version="12.0.1" />
+                <PackageVersion Include="FluentValidation" Version="11.9.0" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        createFile("project/MyApp.csproj", """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <PackageReference Include="Serilog" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract from both sources
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies()).hasSize(3);
+
+        assertThat(result.dependencies())
+            .extracting(Dependency::artifactId)
+            .containsExactlyInAnyOrder("MediatR", "FluentValidation", "Serilog");
     }
 }

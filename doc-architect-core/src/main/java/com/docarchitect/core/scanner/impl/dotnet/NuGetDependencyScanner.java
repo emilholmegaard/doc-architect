@@ -64,6 +64,30 @@ import com.fasterxml.jackson.databind.JsonNode;
  * </Project>
  * }</pre>
  *
+ * <p><b>Directory.Packages.props (Central Package Management - CPM):</b></p>
+ * <pre>{@code
+ * <Project>
+ *   <PropertyGroup>
+ *     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+ *   </PropertyGroup>
+ *   <ItemGroup>
+ *     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+ *     <PackageVersion Include="MediatR" Version="12.0.1" />
+ *   </ItemGroup>
+ * </Project>
+ * }</pre>
+ *
+ * <p><b>Central Package Management (CPM) - .csproj without versions:</b></p>
+ * <pre>{@code
+ * <Project Sdk="Microsoft.NET.Sdk">
+ *   <ItemGroup>
+ *     <PackageReference Include="Newtonsoft.Json" />
+ *     <PackageReference Include="MediatR" />
+ *   </ItemGroup>
+ * </Project>
+ * }</pre>
+ * <p>When versions are omitted (as in CPM), the scanner assigns version "*" as a placeholder.</p>
+ *
  * @see Dependency
  * @since 1.0.0
  */
@@ -72,6 +96,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
     // XML Element Names
     private static final String ITEM_GROUP = "ItemGroup";
     private static final String PACKAGE_REFERENCE = "PackageReference";
+    private static final String PACKAGE_VERSION = "PackageVersion";
     private static final String REFERENCE = "Reference";
     private static final String PACKAGE = "package";
     private static final String HINT_PATH = "HintPath";
@@ -92,6 +117,8 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
     private static final String CSPROJ_PATTERN = "**/*.csproj";
     private static final String PACKAGES_CONFIG_PATTERN = "**/packages.config";
     private static final String BUILD_PROPS_PATTERN = "**/Directory.Build.props";
+    private static final String PACKAGES_PROPS_PATTERN = "**/Directory.Packages.props";
+    private static final String ROOT_PACKAGES_PROPS_PATTERN = "Directory.Packages.props";
 
     // Prefixes and Delimiters
     private static final String VERSION_PREFIX = "Version=";
@@ -131,7 +158,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of(CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN);
+        return Set.of(CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN, ROOT_PACKAGES_PROPS_PATTERN);
     }
 
     @Override
@@ -141,7 +168,7 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN);
+        return hasAnyFiles(context, CSPROJ_PATTERN, PACKAGES_CONFIG_PATTERN, BUILD_PROPS_PATTERN, PACKAGES_PROPS_PATTERN, ROOT_PACKAGES_PROPS_PATTERN);
     }
 
     @Override
@@ -187,6 +214,22 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
             }
         });
 
+        context.findFiles(PACKAGES_PROPS_PATTERN).forEach(file -> {
+            try {
+                parseDirectoryPackagesProps(file, sourceComponentId, dependencies);
+            } catch (IOException e) {
+                log.warn("Failed to parse Directory.Packages.props: {} - {}", file, e.getMessage());
+            }
+        });
+
+        context.findFiles(ROOT_PACKAGES_PROPS_PATTERN).forEach(file -> {
+            try {
+                parseDirectoryPackagesProps(file, sourceComponentId, dependencies);
+            } catch (IOException e) {
+                log.warn("Failed to parse Directory.Packages.props: {} - {}", file, e.getMessage());
+            }
+        });
+
         log.info("Found {} NuGet dependencies", dependencies.size());
 
         return buildSuccessResult(
@@ -223,7 +266,9 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
                 String packageId = extractAttribute(pkgRef, INCLUDE);
                 String version = extractAttribute(pkgRef, VERSION);
 
-                if (packageId != null && version != null) {
+                if (packageId != null) {
+                    // Use "*" for version if not specified (Central Package Management)
+                    version = version != null ? version : UNKNOWN_VERSION;
                     addDependency(sourceComponentId, packageId, version, dependencies);
                     log.debug("Found NuGet package from {}: {} {}", file.getFileName(), packageId, version);
                 }
@@ -320,6 +365,36 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
         }
     }
 
+    private void parseDirectoryPackagesProps(Path file, String sourceComponentId, List<Dependency> dependencies) throws IOException {
+        JsonNode root = parseXml(file);
+
+        JsonNode itemGroups = ensureArray(root.get(ITEM_GROUP));
+        if (itemGroups == null) {
+            return;
+        }
+
+        for (JsonNode itemGroup : itemGroups) {
+            JsonNode packageVersions = ensureArray(itemGroup.get(PACKAGE_VERSION));
+            if (packageVersions == null) {
+                continue;
+            }
+
+            for (JsonNode pkgVer : packageVersions) {
+                String packageId = extractAttribute(pkgVer, INCLUDE);
+                if (packageId == null) {
+                    packageId = extractAttribute(pkgVer, UPDATE);
+                }
+
+                String version = extractAttribute(pkgVer, VERSION);
+
+                if (packageId != null && version != null) {
+                    addDependency(sourceComponentId, packageId, version, dependencies);
+                    log.debug("Found package version from Directory.Packages.props: {} {}", packageId, version);
+                }
+            }
+        }
+    }
+
     private JsonNode ensureArray(JsonNode node) {
         if (node == null) {
             return null;
@@ -349,15 +424,6 @@ public class NuGetDependencyScanner extends AbstractJacksonScanner {
     private String extractPackageNameFromInclude(String include) {
         String[] parts = include.split(COMMA_DELIMITER);
         return parts.length > 0 ? parts[0].trim() : include;
-    }
-
-    @Override
-    protected String extractAttribute(JsonNode node, String attributeName) {
-        JsonNode attr = node.get(attributeName);
-        if (attr != null && attr.isTextual()) {
-            return attr.asText();
-        }
-        return null;
     }
 
     private String extractVersionFromInclude(String include) {
