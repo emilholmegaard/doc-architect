@@ -34,7 +34,7 @@
         <logback.version>1.5.22</logback.version>
         <snakeyaml.version>2.3</snakeyaml.version>
         <javaparser.version>3.25.8</javaparser.version>
-        <jackson.version>2.18.2</jackson.version>
+        <jackson.version>2.20</jackson.version>
         <graphql-java.version>21.3</graphql-java.version>
         <avro.version>1.11.3</avro.version>
 
