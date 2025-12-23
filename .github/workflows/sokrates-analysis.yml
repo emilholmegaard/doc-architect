@@ -32,8 +32,8 @@ jobs:
       - name: Download Sokrates CLI
         run: |
           echo "Downloading Sokrates CLI..."
-          wget -O sokrates.jar https://github.com/zeljkoobrenovic/sokrates/releases/latest/download/sokrates.jar
-          echo "Sokrates CLI downloaded successfully"
+          curl -L -o sokrates.jar https://d2bb1mtyn3kglb.cloudfront.net/builds/sokrates-LATEST.jar
+          echo "Sokrates CLI downloaded successfully ($(du -h sokrates.jar | cut -f1))"
 
       - name: Generate git history
         run: |
