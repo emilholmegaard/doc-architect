@@ -32,7 +32,7 @@
         <archunit.version>1.4.1</archunit.version>
         <slf4j.version>2.0.17</slf4j.version>
         <logback.version>1.5.22</logback.version>
-        <snakeyaml.version>2.3</snakeyaml.version>
+        <snakeyaml.version>2.5</snakeyaml.version>
         <javaparser.version>3.25.8</javaparser.version>
         <jackson.version>2.18.2</jackson.version>
         <graphql-java.version>25.0</graphql-java.version>
