@@ -59,22 +59,22 @@ public class FastAPIScanner extends AbstractRegexScanner {
     private static final String PYTHON_FILE_EXTENSION = "\\.py$";
     
     private static final String FUNCTION_PREFIX = "def ";
-    
+
     private static final String PARAM_REQUEST = "request:";
     private static final String PARAM_RESPONSE = "response:";
     private static final String PARAM_QUERY = "Query(";
     private static final String PARAM_PATH = "Path(";
     private static final String PARAM_HEADER = "Header(";
-    
+
     private static final String PRIMITIVE_TYPES_REGEX = "int|str|float|bool";
-    
+
     private static final String SCHEMA_PATH_PREFIX = "Path: ";
     private static final String SCHEMA_QUERY_PREFIX = "Query: ";
     private static final String SCHEMA_BODY_PREFIX = "Body: ";
     private static final String SCHEMA_SEPARATOR = "; ";
     private static final String PARAM_SEPARATOR = ", ";
     private static final String TYPE_SEPARATOR = ": ";
-    
+
     private static final int MAX_FUNCTION_SEARCH_LINES = 5;
 
     /**
@@ -87,11 +87,12 @@ public class FastAPIScanner extends AbstractRegexScanner {
     );
 
     /**
-     * Regex to match function definition: def get_user(user_id: int):.
+     * Regex to match function definition: def get_user(user_id: int): or def get_user() -> Any:.
      * Captures: (1) function name, (2) parameters.
+     * Handles return type annotations like ) -> Any:
      */
     private static final Pattern FUNCTION_PATTERN = Pattern.compile(
-        "def\\s+(\\w+)\\s*\\((.*)\\):"
+        "def\\s+(\\w+)\\s*\\((.*)\\)\\s*(?:->\\s*[^:]+)?:"
     );
 
     /**
@@ -185,57 +186,198 @@ public class FastAPIScanner extends AbstractRegexScanner {
         String componentId = extractModuleName(file);
 
         for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i).trim();
+            String decoratorText = extractDecoratorText(lines, i);
+            if (decoratorText == null) {
+                continue;
+            }
 
-            // Look for FastAPI decorators
-            Matcher decoratorMatcher = DECORATOR_PATTERN.matcher(line);
+            Matcher decoratorMatcher = DECORATOR_PATTERN.matcher(decoratorText);
             if (decoratorMatcher.find()) {
-                String httpMethod = decoratorMatcher.group(2).toUpperCase();
-                String path = decoratorMatcher.group(3);
+                int functionStartIndex = findFunctionStartIndex(lines, i);
+                ApiEndpoint endpoint = createEndpointFromDecorator(
+                    decoratorMatcher,
+                    lines,
+                    functionStartIndex,
+                    componentId
+                );
 
-                // Find the function definition on the next non-empty line
-                String functionLine = findNextFunctionDefinition(lines, i + 1);
-                if (functionLine != null) {
-                    Matcher funcMatcher = FUNCTION_PATTERN.matcher(functionLine);
-                    if (funcMatcher.find()) {
-                        String functionName = funcMatcher.group(1);
-                        String parameters = funcMatcher.group(2);
-
-                        // Extract parameters
-                        List<String> pathParams = extractPathParameters(path);
-                        List<String> queryParams = extractQueryParameters(parameters);
-                        List<String> bodyParams = extractBodyParameters(parameters);
-
-                        String requestSchema = buildRequestSchema(pathParams, queryParams, bodyParams);
-                        String responseSchema = DEFAULT_RESPONSE_SCHEMA;
-
-                        ApiEndpoint endpoint = new ApiEndpoint(
-                            componentId,
-                            ApiType.REST,
-                            path,
-                            httpMethod,
-                            componentId + "." + functionName,
-                            requestSchema,
-                            responseSchema,
-                            null
-                        );
-
-                        apiEndpoints.add(endpoint);
-                        log.debug("Found FastAPI endpoint: {} {} -> {}", httpMethod, path, functionName);
-                    }
+                if (endpoint != null) {
+                    apiEndpoints.add(endpoint);
+                    log.debug("Found FastAPI endpoint: {} {}", endpoint.method(), endpoint.path());
                 }
             }
         }
     }
 
     /**
+     * Extracts decorator text, handling both single-line and multi-line decorators.
+     * Returns null if the line is not a FastAPI decorator.
+     */
+    private String extractDecoratorText(List<String> lines, int lineIndex) {
+        String line = lines.get(lineIndex).trim();
+
+        if (!line.startsWith("@")) {
+            return null;
+        }
+
+        // Check if this looks like a FastAPI decorator
+        if (!containsHttpMethod(line)) {
+            return null;
+        }
+
+        // Single-line decorator
+        if (line.contains("\"") && !line.endsWith("(")) {
+            return line;
+        }
+
+        // Multi-line decorator - collect until closing parenthesis
+        return collectMultiLineDecorator(lines, lineIndex);
+    }
+
+    /**
+     * Checks if line contains an HTTP method decorator.
+     */
+    private boolean containsHttpMethod(String line) {
+        return line.contains(".get(") || line.contains(".post(") ||
+               line.contains(".put(") || line.contains(".delete(") ||
+               line.contains(".patch(");
+    }
+
+    /**
+     * Collects a multi-line decorator into a single string.
+     */
+    private String collectMultiLineDecorator(List<String> lines, int startIndex) {
+        StringBuilder decorator = new StringBuilder();
+        int openParens = 0;
+        boolean started = false;
+
+        for (int i = startIndex; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            decorator.append(line).append(" ");
+
+            // Count parentheses to find the end
+            for (char c : line.toCharArray()) {
+                if (c == '(') {
+                    openParens++;
+                    started = true;
+                } else if (c == ')') {
+                    openParens--;
+                }
+            }
+
+            if (started && openParens == 0) {
+                break;
+            }
+        }
+
+        return decorator.toString();
+    }
+
+    /**
+     * Finds the index where the function definition starts after a decorator.
+     */
+    private int findFunctionStartIndex(List<String> lines, int decoratorIndex) {
+        // Skip past any additional decorator lines
+        int index = decoratorIndex;
+        while (index < lines.size()) {
+            String line = lines.get(index).trim();
+            if (line.startsWith("def ")) {
+                return index;
+            }
+            index++;
+            if (index - decoratorIndex > MAX_FUNCTION_SEARCH_LINES) {
+                break;
+            }
+        }
+        return decoratorIndex + 1;
+    }
+
+    /**
+     * Creates an ApiEndpoint from a matched decorator and function definition.
+     */
+    private ApiEndpoint createEndpointFromDecorator(
+            Matcher decoratorMatcher,
+            List<String> lines,
+            int functionStartIndex,
+            String componentId) {
+
+        String httpMethod = decoratorMatcher.group(2).toUpperCase();
+        String path = decoratorMatcher.group(3);
+
+        String functionLine = findNextFunctionDefinition(lines, functionStartIndex);
+        if (functionLine == null) {
+            return null;
+        }
+
+        Matcher funcMatcher = FUNCTION_PATTERN.matcher(functionLine);
+        if (!funcMatcher.find()) {
+            return null;
+        }
+
+        String functionName = funcMatcher.group(1);
+        String parameters = funcMatcher.group(2);
+
+        List<String> pathParams = extractPathParameters(path);
+        List<String> queryParams = extractQueryParameters(parameters);
+        List<String> bodyParams = extractBodyParameters(parameters);
+
+        String requestSchema = buildRequestSchema(pathParams, queryParams, bodyParams);
+
+        return new ApiEndpoint(
+            componentId,
+            ApiType.REST,
+            path,
+            httpMethod,
+            componentId + "." + functionName,
+            requestSchema,
+            DEFAULT_RESPONSE_SCHEMA,
+            null
+        );
+    }
+
+    /**
      * Finds the next function definition starting from the given line index.
+     * Handles multi-line function definitions by collecting lines until the closing : after ).
      */
     private String findNextFunctionDefinition(List<String> lines, int startIndex) {
         for (int i = startIndex; i < Math.min(startIndex + MAX_FUNCTION_SEARCH_LINES, lines.size()); i++) {
             String line = lines.get(i).trim();
             if (line.startsWith(FUNCTION_PREFIX)) {
-                return line;
+                // Check if this is a complete single-line function definition
+                // Handle both ): and ) -> Type: patterns
+                if (line.contains(")") && line.contains(":")) {
+                    // Find the colon that ends the function signature
+                    int closingParenIndex = line.indexOf(")");
+                    int colonIndex = line.indexOf(":", closingParenIndex);
+                    if (colonIndex > 0) {
+                        return line.substring(0, colonIndex + 1);
+                    }
+                }
+
+                // Multi-line function definition - collect until we find : after )
+                StringBuilder functionDef = new StringBuilder(line);
+                boolean foundClosingParen = line.contains(")");
+
+                for (int j = i + 1; j < Math.min(i + MAX_FUNCTION_SEARCH_LINES, lines.size()); j++) {
+                    String nextLine = lines.get(j).trim();
+                    functionDef.append(" ").append(nextLine);
+
+                    if (!foundClosingParen && nextLine.contains(")")) {
+                        foundClosingParen = true;
+                    }
+
+                    if (foundClosingParen && nextLine.contains(":")) {
+                        // Found the end of the function signature
+                        String fullDef = functionDef.toString();
+                        int closingParenIndex = fullDef.indexOf(")");
+                        int colonIndex = fullDef.indexOf(":", closingParenIndex);
+                        if (colonIndex > 0) {
+                            return fullDef.substring(0, colonIndex + 1);
+                        }
+                    }
+                }
+                // If we didn't find closing, return null
+                return null;
             }
         }
         return null;

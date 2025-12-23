@@ -263,4 +263,78 @@ class FastAPIScannerTest extends ScannerTestBase {
         // Then: Should return false
         assertThat(applies).isFalse();
     }
+
+    @Test
+    void scan_withMultiLineDecorator_extractsEndpoint() throws IOException {
+        // Given: FastAPI endpoint with multi-line decorator
+        createFile("app/routes/login.py", """
+            from fastapi import APIRouter, Depends
+            from fastapi.responses import HTMLResponse
+
+            router = APIRouter(tags=["login"])
+
+            @router.post(
+                "/password-recovery-html-content/{email}",
+                dependencies=[Depends(get_current_active_superuser)],
+                response_class=HTMLResponse,
+            )
+            def recover_password_html_content(email: str, session: SessionDep):
+                return HTMLResponse(content="test")
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract endpoint from multi-line decorator
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+
+        ApiEndpoint endpoint = result.apiEndpoints().get(0);
+        assertThat(endpoint.type()).isEqualTo(ApiType.REST);
+        assertThat(endpoint.path()).isEqualTo("/password-recovery-html-content/{email}");
+        assertThat(endpoint.method()).isEqualTo("POST");
+        assertThat(endpoint.requestSchema()).contains("email");
+    }
+
+    @Test
+    void scan_withMultipleMultiLineDecorators_extractsAll() throws IOException {
+        // Given: Multiple endpoints with multi-line decorators
+        createFile("app/api/routes.py", """
+            from fastapi import APIRouter
+
+            router = APIRouter()
+
+            @router.get(
+                "/items",
+                response_model=list,
+            )
+            def get_items():
+                return []
+
+            @router.post(
+                "/items",
+                status_code=201,
+            )
+            def create_item(item: dict):
+                return item
+
+            @router.put(
+                "/items/{item_id}",
+                response_model=dict,
+            )
+            def update_item(item_id: int, item: dict):
+                return item
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract all 3 endpoints
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(3);
+
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method)
+            .containsExactlyInAnyOrder("GET", "POST", "PUT");
+    }
 }
