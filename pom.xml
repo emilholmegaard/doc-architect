@@ -36,7 +36,7 @@
         <javaparser.version>3.25.8</javaparser.version>
         <jackson.version>2.18.2</jackson.version>
         <graphql-java.version>25.0</graphql-java.version>
-        <avro.version>1.11.3</avro.version>
+        <avro.version>1.12.1</avro.version>
 
         <!-- Plugin Versions -->
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
