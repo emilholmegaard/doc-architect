@@ -337,4 +337,38 @@ class FastAPIScannerTest extends ScannerTestBase {
             .extracting(ApiEndpoint::method)
             .containsExactlyInAnyOrder("GET", "POST", "PUT");
     }
+
+    @Test
+    void scan_withKeywordOnlyParameters_extractsEndpoint() throws IOException {
+        // Given: FastAPI endpoint with *args keyword-only parameter separator
+        createFile("app/items.py", """
+            from fastapi import APIRouter
+            from typing import Any
+            import uuid
+
+            router = APIRouter()
+
+            @router.put("/{id}", response_model=dict)
+            def update_item(
+                *,
+                session: str,
+                current_user: str,
+                id: uuid.UUID,
+                item_in: dict,
+            ) -> Any:
+                return {"id": id}
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract PUT endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+
+        ApiEndpoint endpoint = result.apiEndpoints().get(0);
+        assertThat(endpoint.method()).isEqualTo("PUT");
+        assertThat(endpoint.path()).isEqualTo("/{id}");
+        assertThat(endpoint.requestSchema()).contains("id");
+    }
 }

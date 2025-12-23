@@ -59,6 +59,7 @@ public class FastAPIScanner extends AbstractRegexScanner {
     private static final String PYTHON_FILE_EXTENSION = "\\.py$";
     
     private static final String FUNCTION_PREFIX = "def ";
+    private static final String ASYNC_FUNCTION_PREFIX = "async def ";
 
     private static final String PARAM_REQUEST = "request:";
     private static final String PARAM_RESPONSE = "response:";
@@ -75,7 +76,7 @@ public class FastAPIScanner extends AbstractRegexScanner {
     private static final String PARAM_SEPARATOR = ", ";
     private static final String TYPE_SEPARATOR = ": ";
 
-    private static final int MAX_FUNCTION_SEARCH_LINES = 5;
+    private static final int MAX_FUNCTION_SEARCH_LINES = 10;
 
     /**
      * Regex to match FastAPI decorator: @app.get("/users") or @router.post("/items") or @api.get("/v1").
@@ -87,12 +88,12 @@ public class FastAPIScanner extends AbstractRegexScanner {
     );
 
     /**
-     * Regex to match function definition: def get_user(user_id: int): or def get_user() -> Any:.
+     * Regex to match function definition: def get_user(user_id: int): or async def get_user() -> Any:.
      * Captures: (1) function name, (2) parameters.
-     * Handles return type annotations like ) -> Any:
+     * Handles both sync and async functions, and optional return type annotations.
      */
     private static final Pattern FUNCTION_PATTERN = Pattern.compile(
-        "def\\s+(\\w+)\\s*\\((.*)\\)\\s*(?:->\\s*[^:]+)?:"
+        "(?:async\\s+)?def\\s+(\\w+)\\s*\\((.*)\\)\\s*(?:->\\s*[^:]+)?:"
     );
 
     /**
@@ -281,7 +282,8 @@ public class FastAPIScanner extends AbstractRegexScanner {
         int index = decoratorIndex;
         while (index < lines.size()) {
             String line = lines.get(index).trim();
-            if (line.startsWith("def ")) {
+            // Check for both "def" and "async def"
+            if (line.startsWith(FUNCTION_PREFIX) || line.startsWith(ASYNC_FUNCTION_PREFIX)) {
                 return index;
             }
             index++;
@@ -342,13 +344,13 @@ public class FastAPIScanner extends AbstractRegexScanner {
     private String findNextFunctionDefinition(List<String> lines, int startIndex) {
         for (int i = startIndex; i < Math.min(startIndex + MAX_FUNCTION_SEARCH_LINES, lines.size()); i++) {
             String line = lines.get(i).trim();
-            if (line.startsWith(FUNCTION_PREFIX)) {
+            // Check for both "def" and "async def"
+            if (line.startsWith(FUNCTION_PREFIX) || line.startsWith(ASYNC_FUNCTION_PREFIX)) {
                 // Check if this is a complete single-line function definition
                 // Handle both ): and ) -> Type: patterns
                 if (line.contains(")") && line.contains(":")) {
-                    // Find the colon that ends the function signature
-                    int closingParenIndex = line.indexOf(")");
-                    int colonIndex = line.indexOf(":", closingParenIndex);
+                    // Find the colon that ends the function signature (after the closing paren)
+                    int colonIndex = findFunctionEndingColon(line);
                     if (colonIndex > 0) {
                         return line.substring(0, colonIndex + 1);
                     }
@@ -369,8 +371,7 @@ public class FastAPIScanner extends AbstractRegexScanner {
                     if (foundClosingParen && nextLine.contains(":")) {
                         // Found the end of the function signature
                         String fullDef = functionDef.toString();
-                        int closingParenIndex = fullDef.indexOf(")");
-                        int colonIndex = fullDef.indexOf(":", closingParenIndex);
+                        int colonIndex = findFunctionEndingColon(fullDef);
                         if (colonIndex > 0) {
                             return fullDef.substring(0, colonIndex + 1);
                         }
@@ -381,6 +382,28 @@ public class FastAPIScanner extends AbstractRegexScanner {
             }
         }
         return null;
+    }
+
+    /**
+     * Finds the colon that ends a Python function signature.
+     * This must be the LAST colon after the closing parenthesis of the parameter list.
+     * We need to skip colons inside brackets (like Annotated[Type, ...]).
+     */
+    private int findFunctionEndingColon(String line) {
+        // Find the last closing paren (end of parameter list)
+        int lastClosingParen = line.lastIndexOf(")");
+        if (lastClosingParen < 0) {
+            return -1;
+        }
+
+        // Find the last colon after that closing paren
+        // This handles ): and ) -> Type: patterns
+        int colonIndex = line.lastIndexOf(":");
+        if (colonIndex > lastClosingParen) {
+            return colonIndex;
+        }
+
+        return -1;
     }
 
     /**
