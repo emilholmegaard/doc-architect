@@ -155,6 +155,26 @@ DocArchitect supports lightweight CI/CD mode for detecting significant changes:
 
 For full CI/CD setup with security scanning, see [docs/ci-cd-setup.md](docs/ci-cd-setup.md).
 
+## Code Quality Reports
+
+[![Sokrates Analysis](https://img.shields.io/badge/Sokrates-View%20Report-blue)](https://emilholmegaard.github.io/doc-architect/sokrates/latest/)
+
+Weekly automated code analysis is performed using [Sokrates](https://github.com/zeljkoobrenovic/sokrates), a polyglot source code examination tool.
+
+- **[Latest Report](https://emilholmegaard.github.io/doc-architect/sokrates/latest/)** - Current week's comprehensive analysis
+- **[Report Archive](https://emilholmegaard.github.io/doc-architect/sokrates/archive/)** - Historical reports (last 4 weeks)
+
+Reports include metrics on:
+
+- Code volume and language breakdown
+- Duplication analysis
+- File/unit size distributions and conditional complexity
+- Component decomposition and dependencies
+- File age, change frequency, and contributor statistics
+- Temporal trends and patterns
+
+The analysis runs automatically every Monday at 2 AM UTC via GitHub Actions and publishes results to GitHub Pages.
+
 ## Extending DocArchitect
 
 ### Adding a Custom Scanner

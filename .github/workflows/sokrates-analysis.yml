@@ -1,0 +1,138 @@
+name: Sokrates Code Analysis
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+  workflow_dispatch:      # Allow manual trigger
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for git analysis
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Download Sokrates CLI
+        run: |
+          echo "Downloading Sokrates CLI..."
+          wget -O sokrates.jar https://github.com/zeljkoobrenovic/sokrates/releases/latest/download/sokrates.jar
+          echo "Sokrates CLI downloaded successfully"
+
+      - name: Generate git history
+        run: |
+          echo "Generating git history for Sokrates analysis..."
+          git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' --no-renames --after="2020-01-01" > git-history.txt
+          echo "Git history generated ($(wc -l < git-history.txt) lines)"
+
+      - name: Initialize Sokrates (if needed)
+        run: |
+          cd _sokrates
+          if [ ! -f config.json ]; then
+            echo "No config.json found, initializing Sokrates..."
+            java -jar ../sokrates.jar init
+          else
+            echo "Using existing Sokrates configuration"
+          fi
+
+      - name: Generate Sokrates Reports
+        run: |
+          cd _sokrates
+          echo "Running Sokrates analysis..."
+          java -jar ../sokrates.jar generateReports
+          echo "Sokrates reports generated successfully"
+
+      - name: Prepare GitHub Pages content
+        run: |
+          WEEK=$(date +%Y-W%U)
+          echo "Preparing reports for week: $WEEK"
+
+          # Create directory structure
+          mkdir -p gh-pages/sokrates/latest
+          mkdir -p "gh-pages/sokrates/archive/$WEEK"
+
+          # Copy reports to latest
+          cp -r _sokrates/reports/* gh-pages/sokrates/latest/
+
+          # Archive this week's report
+          cp -r _sokrates/reports/* "gh-pages/sokrates/archive/$WEEK/"
+
+          # Keep only last 4 weeks of archives
+          cd gh-pages/sokrates/archive
+          ls -t | tail -n +5 | xargs -r rm -rf
+
+          echo "Reports prepared for deployment"
+
+      - name: Create index page
+        run: |
+          cat > gh-pages/sokrates/index.html <<'HTML'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Doc-Architect Code Analysis</title>
+            <meta http-equiv="refresh" content="0; url=latest/index.html">
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              }
+              .container {
+                text-align: center;
+                background: white;
+                padding: 2rem;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+              }
+              a {
+                color: #667eea;
+                text-decoration: none;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>📊 Doc-Architect Code Analysis</h1>
+              <p>Redirecting to <a href="latest/index.html">latest report</a>...</p>
+            </div>
+          </body>
+          </html>
+          HTML
+          echo "Index page created"
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gh-pages/sokrates
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Output deployment URL
+        run: |
+          echo "✅ Sokrates reports deployed successfully!"
+          echo "📊 View latest report at: ${{ steps.deployment.outputs.page_url }}"
