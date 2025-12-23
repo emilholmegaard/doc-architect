@@ -20,7 +20,7 @@ COPY doc-architect-cli/src ./doc-architect-cli/src
 RUN mvn clean package -DskipTests -B
 
 # Stage 2: Runtime image
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="DocArchitect Team"
 LABEL org.opencontainers.image.source="https://github.com/emilholmegaard/doc-architect"
