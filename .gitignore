@@ -55,5 +55,10 @@ CLAUDE.local.md
 secrets/
 .secrets
 
+#Sokrates
+_sokrates/findings/
+_sokrates/reports/
+_sokrates/history/
+
 # Act (local GitHub Actions testing)
 .act/
