@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * Functional tests for {@link FastAPIScanner}.
@@ -262,5 +263,153 @@ class FastAPIScannerTest extends ScannerTestBase {
 
         // Then: Should return false
         assertThat(applies).isFalse();
+    }
+
+    @Test
+    void scan_withMultiLineDecorator_extractsEndpoint() throws IOException {
+        // Given: FastAPI endpoint with multi-line decorator
+        createFile("app/routes/login.py", """
+            from fastapi import APIRouter, Depends
+            from fastapi.responses import HTMLResponse
+
+            router = APIRouter(tags=["login"])
+
+            @router.post(
+                "/password-recovery-html-content/{email}",
+                dependencies=[Depends(get_current_active_superuser)],
+                response_class=HTMLResponse,
+            )
+            def recover_password_html_content(email: str, session: SessionDep):
+                return HTMLResponse(content="test")
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract endpoint from multi-line decorator
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+
+        ApiEndpoint endpoint = result.apiEndpoints().get(0);
+        assertThat(endpoint.type()).isEqualTo(ApiType.REST);
+        assertThat(endpoint.path()).isEqualTo("/password-recovery-html-content/{email}");
+        assertThat(endpoint.method()).isEqualTo("POST");
+        assertThat(endpoint.requestSchema()).contains("email");
+    }
+
+    @Test
+    void scan_withMultipleMultiLineDecorators_extractsAll() throws IOException {
+        // Given: Multiple endpoints with multi-line decorators
+        createFile("app/api/routes.py", """
+            from fastapi import APIRouter
+
+            router = APIRouter()
+
+            @router.get(
+                "/items",
+                response_model=list,
+            )
+            def get_items():
+                return []
+
+            @router.post(
+                "/items",
+                status_code=201,
+            )
+            def create_item(item: dict):
+                return item
+
+            @router.put(
+                "/items/{item_id}",
+                response_model=dict,
+            )
+            def update_item(item_id: int, item: dict):
+                return item
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract all 3 endpoints
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(3);
+
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method)
+            .containsExactlyInAnyOrder("GET", "POST", "PUT");
+    }
+
+    @Test
+    void scan_withKeywordOnlyParameters_extractsEndpoint() throws IOException {
+        // Given: FastAPI endpoint with *args keyword-only parameter separator
+        createFile("app/items.py", """
+            from fastapi import APIRouter
+            from typing import Any
+            import uuid
+
+            router = APIRouter()
+
+            @router.put("/{id}", response_model=dict)
+            def update_item(
+                *,
+                session: str,
+                current_user: str,
+                id: uuid.UUID,
+                item_in: dict,
+            ) -> Any:
+                return {"id": id}
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract PUT endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+
+        ApiEndpoint endpoint = result.apiEndpoints().get(0);
+        assertThat(endpoint.method()).isEqualTo("PUT");
+        assertThat(endpoint.path()).isEqualTo("/{id}");
+        assertThat(endpoint.requestSchema()).contains("id");
+    }
+
+    @Test
+    void scan_withMultipleFunctionsCloselySpaced_extractsCorrectEndpoints() throws IOException {
+        // Given: Multiple short FastAPI endpoints with functions close together
+        // This tests that increasing MAX_FUNCTION_SEARCH_LINES doesn't cause
+        // a decorator to match the wrong function
+        createFile("app/api.py", """
+            from fastapi import APIRouter
+
+            router = APIRouter()
+
+            @router.get("/users")
+            def get_users():
+                return []
+
+            @router.post("/users")
+            def create_user(name: str):
+                return {"name": name}
+
+            @router.delete("/users/{id}")
+            def delete_user(id: int):
+                return {"deleted": id}
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract all 3 endpoints with correct paths/methods
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(3);
+
+        // Verify each endpoint matches its correct function
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method, ApiEndpoint::path, ApiEndpoint::description)
+            .containsExactlyInAnyOrder(
+                tuple("GET", "/users", "api.get_users"),
+                tuple("POST", "/users", "api.create_user"),
+                tuple("DELETE", "/users/{id}", "api.delete_user")
+            );
     }
 }
