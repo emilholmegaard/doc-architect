@@ -43,19 +43,17 @@ jobs:
 
       - name: Initialize Sokrates (if needed)
         run: |
-          cd _sokrates
-          if [ ! -f config.json ]; then
+          if [ ! -f _sokrates/config.json ]; then
             echo "No config.json found, initializing Sokrates..."
-            java -jar ../sokrates.jar init
+            java -jar sokrates.jar init -confFile _sokrates/config.json
           else
             echo "Using existing Sokrates configuration"
           fi
 
       - name: Generate Sokrates Reports
         run: |
-          cd _sokrates
           echo "Running Sokrates analysis..."
-          java -jar ../sokrates.jar generateReports
+          java -jar sokrates.jar generateReports -confFile _sokrates/config.json
           echo "Sokrates reports generated successfully"
 
       - name: Prepare GitHub Pages content
