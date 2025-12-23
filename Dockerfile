@@ -2,6 +2,11 @@
 # Stage 1: Build the application
 FROM maven:3-eclipse-temurin-25-alpine AS build
 
+# Update all Alpine packages to latest versions (security hardening)
+RUN apk update && \
+    apk upgrade --no-cache && \
+    rm -rf /var/cache/apk/*
+
 WORKDIR /app
 
 # Copy parent POM and module POMs for better layer caching
@@ -26,6 +31,12 @@ LABEL maintainer="DocArchitect Team"
 LABEL org.opencontainers.image.source="https://github.com/emilholmegaard/doc-architect"
 LABEL org.opencontainers.image.description="Automated Architecture Documentation Generator"
 LABEL org.opencontainers.image.licenses="MIT"
+
+# Update all Alpine packages to latest versions (fixes CVE-2025-30258, CVE-2025-64505, CVE-2025-64506)
+# See: https://github.com/emilholmegaard/doc-architect/issues/95
+RUN apk update && \
+    apk upgrade --no-cache && \
+    rm -rf /var/cache/apk/*
 
 # Install runtime dependencies
 RUN apk add --no-cache \
