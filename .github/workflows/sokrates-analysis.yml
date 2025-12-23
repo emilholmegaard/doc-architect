@@ -69,16 +69,25 @@ jobs:
           mkdir -p "gh-pages/sokrates/archive/$WEEK"
 
           # Copy reports to latest
-          cp -r _sokrates/reports/* gh-pages/sokrates/latest/
+          if [ -d "_sokrates/reports" ]; then
+            cp -r _sokrates/reports/* gh-pages/sokrates/latest/ || echo "Warning: No reports to copy to latest"
+            ls -la gh-pages/sokrates/latest/
+          else
+            echo "Error: _sokrates/reports directory not found"
+            exit 1
+          fi
 
           # Archive this week's report
-          cp -r _sokrates/reports/* "gh-pages/sokrates/archive/$WEEK/"
+          cp -r _sokrates/reports/* "gh-pages/sokrates/archive/$WEEK/" || echo "Warning: No reports to copy to archive"
 
           # Keep only last 4 weeks of archives
           cd gh-pages/sokrates/archive
           ls -t | tail -n +5 | xargs -r rm -rf
+          cd ../../..
 
           echo "Reports prepared for deployment"
+          echo "Contents of gh-pages/sokrates:"
+          ls -la gh-pages/sokrates/
 
       - name: Create index page
         run: |
