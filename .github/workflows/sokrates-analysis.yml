@@ -17,6 +17,9 @@ concurrency:
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,8 +35,8 @@ jobs:
       - name: Download Sokrates CLI
         run: |
           echo "Downloading Sokrates CLI..."
-          wget -O sokrates.jar https://github.com/zeljkoobrenovic/sokrates/releases/latest/download/sokrates.jar
-          echo "Sokrates CLI downloaded successfully"
+          curl -L -o sokrates.jar https://d2bb1mtyn3kglb.cloudfront.net/builds/sokrates-LATEST.jar
+          echo "Sokrates CLI downloaded successfully ($(du -h sokrates.jar | cut -f1))"
 
       - name: Generate git history
         run: |
@@ -43,19 +46,17 @@ jobs:
 
       - name: Initialize Sokrates (if needed)
         run: |
-          cd _sokrates
-          if [ ! -f config.json ]; then
+          if [ ! -f _sokrates/config.json ]; then
             echo "No config.json found, initializing Sokrates..."
-            java -jar ../sokrates.jar init
+            java -jar sokrates.jar init -confFile _sokrates/config.json
           else
             echo "Using existing Sokrates configuration"
           fi
 
       - name: Generate Sokrates Reports
         run: |
-          cd _sokrates
           echo "Running Sokrates analysis..."
-          java -jar ../sokrates.jar generateReports
+          java -jar sokrates.jar generateReports -confFile _sokrates/config.json
           echo "Sokrates reports generated successfully"
 
       - name: Prepare GitHub Pages content
