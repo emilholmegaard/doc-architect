@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * Functional tests for {@link FastAPIScanner}.
@@ -370,5 +371,45 @@ class FastAPIScannerTest extends ScannerTestBase {
         assertThat(endpoint.method()).isEqualTo("PUT");
         assertThat(endpoint.path()).isEqualTo("/{id}");
         assertThat(endpoint.requestSchema()).contains("id");
+    }
+
+    @Test
+    void scan_withMultipleFunctionsCloselySpaced_extractsCorrectEndpoints() throws IOException {
+        // Given: Multiple short FastAPI endpoints with functions close together
+        // This tests that increasing MAX_FUNCTION_SEARCH_LINES doesn't cause
+        // a decorator to match the wrong function
+        createFile("app/api.py", """
+            from fastapi import APIRouter
+
+            router = APIRouter()
+
+            @router.get("/users")
+            def get_users():
+                return []
+
+            @router.post("/users")
+            def create_user(name: str):
+                return {"name": name}
+
+            @router.delete("/users/{id}")
+            def delete_user(id: int):
+                return {"deleted": id}
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract all 3 endpoints with correct paths/methods
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(3);
+
+        // Verify each endpoint matches its correct function
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method, ApiEndpoint::path, ApiEndpoint::description)
+            .containsExactlyInAnyOrder(
+                tuple("GET", "/users", "api.get_users"),
+                tuple("POST", "/users", "api.create_user"),
+                tuple("DELETE", "/users/{id}", "api.delete_user")
+            );
     }
 }
