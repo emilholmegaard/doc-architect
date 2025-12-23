@@ -157,11 +157,11 @@ For full CI/CD setup with security scanning, see [docs/ci-cd-setup.md](docs/ci-c
 
 ## Code Quality Reports
 
-[![Sokrates Analysis](https://img.shields.io/badge/Sokrates-View%20Report-blue)](https://emilholmegaard.github.io/doc-architect/latest/)
+[![Sokrates Analysis](https://img.shields.io/badge/Sokrates-View%20Report-blue)](https://emilholmegaard.github.io/doc-architect/latest/html/index.html)
 
 Weekly automated code analysis is performed using [Sokrates](https://github.com/zeljkoobrenovic/sokrates), a polyglot source code examination tool.
 
-- **[Latest Report](https://emilholmegaard.github.io/doc-architect/latest/)** - Current week's comprehensive analysis
+- **[Latest Report](https://emilholmegaard.github.io/doc-architect/latest/html/index.html)** - Current week's comprehensive analysis
 - **[Report Archive](https://emilholmegaard.github.io/doc-architect/archive/)** - Historical reports (last 4 weeks)
 
 Reports include metrics on:
