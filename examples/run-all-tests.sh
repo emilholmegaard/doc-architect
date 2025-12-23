@@ -37,9 +37,9 @@ run_test() {
 }
 
 # Run all tests
-run_test "Spring Boot Microservices" "./test-spring-microservices.sh"
-run_test ".NET Solution" "./test-dotnet-solution.sh"
-run_test "Python FastAPI" "./test-python-fastapi.sh"
+run_test "Spring Boot Microservices" "./examples/test-spring-microservices.sh"
+run_test ".NET Solution" "./examples/test-dotnet-solution.sh"
+run_test "Python FastAPI" "./examples/test-python-fastapi.sh"
 
 # Summary
 echo ""
