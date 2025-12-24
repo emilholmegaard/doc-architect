@@ -220,7 +220,21 @@ gh run list --workflow=real-world-tests.yml
 
 ## Known Issues
 
-The comprehensive test suite has identified several scanner robustness issues that are being tracked and will be fixed:
+The comprehensive test suite has identified several issues that are being tracked and will be fixed:
+
+### Critical Issues
+
+**Scanner Execution Failure (#104):**
+```
+✓ Discovered 19 scanners
+✓ Executed 0 scanners
+
+Architecture Model Summary:
+  Components:     0
+  Dependencies:   0
+```
+
+**CRITICAL**: CLI discovers scanners but executes 0, resulting in no data extraction. Likely scanner ID mismatch or file discovery issue. See #104 for investigation.
 
 ### Scanner Parsing Errors
 
