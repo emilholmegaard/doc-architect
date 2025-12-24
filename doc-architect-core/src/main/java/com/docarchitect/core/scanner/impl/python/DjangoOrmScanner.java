@@ -1,5 +1,6 @@
 package com.docarchitect.core.scanner.impl.python;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -143,6 +144,56 @@ public class DjangoOrmScanner extends AbstractAstScanner<PythonAst.PythonClass> 
     @Override
     public boolean appliesTo(ScanContext context) {
         return hasAnyFiles(context, PATTERN_MODELS_PY, PATTERN_MODELS_SUFFIX);
+    }
+
+    /**
+     * Pre-filters files to avoid parsing SQLAlchemy or other non-Django Python files.
+     *
+     * <p>This method checks file content for framework-specific imports before
+     * attempting AST parsing, preventing {@link ArrayIndexOutOfBoundsException}
+     * and other parser errors when encountering incompatible patterns.
+     *
+     * <p><b>Detection Logic:</b></p>
+     * <ul>
+     *   <li><b>Skip:</b> SQLAlchemy files ({@code from sqlalchemy import})</li>
+     *   <li><b>Accept:</b> Django imports ({@code from django.db import models})</li>
+     *   <li><b>Accept:</b> Django model inheritance ({@code models.Model})</li>
+     *   <li><b>Skip:</b> Everything else (no matching imports)</li>
+     * </ul>
+     *
+     * @param file Python file to check
+     * @return true if file likely contains Django models, false otherwise
+     */
+    @Override
+    protected boolean shouldScanFile(Path file) {
+        try {
+            String content = readFileContent(file);
+
+            // Skip SQLAlchemy files
+            if (content.contains("from sqlalchemy import") ||
+                content.contains("from sqlalchemy.") ||
+                content.contains("declarative_base()") ||
+                content.contains("from sqlmodel import")) {
+                log.debug("Skipping SQLAlchemy file: {}", file.getFileName());
+                return false;
+            }
+
+            // Accept Django files
+            if (content.contains("from django.db import models") ||
+                content.contains("from django.db import") ||
+                content.contains("django.db.models") ||
+                content.contains("models.Model")) {
+                return true;
+            }
+
+            // Skip files without Django imports
+            log.debug("Skipping non-Django file: {}", file.getFileName());
+            return false;
+
+        } catch (IOException e) {
+            log.debug("Failed to read file for pre-filtering: {} - {}", file, e.getMessage());
+            return false;
+        }
     }
 
     @Override

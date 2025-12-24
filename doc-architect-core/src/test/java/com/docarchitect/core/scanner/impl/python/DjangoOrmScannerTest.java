@@ -132,4 +132,130 @@ class DjangoOrmScannerTest extends ScannerTestBase {
         // Then: Should return false
         assertThat(applies).isFalse();
     }
+
+    // ========== Pre-filtering Tests (Issue #101) ==========
+
+    @Test
+    void scan_withSqlAlchemyModels_skipsThemGracefully() throws IOException {
+        // Given: SQLAlchemy models that would cause ArrayIndexOutOfBoundsException
+        createFile("app/models.py", """
+            from sqlalchemy import Column, Integer, String
+            from sqlalchemy.ext.declarative import declarative_base
+
+            Base = declarative_base()
+
+            class User(Base):
+                __tablename__ = 'users'
+                id = Column(Integer, primary_key=True)
+                username = Column(String(100))
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip SQLAlchemy files without errors
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+        // No ArrayIndexOutOfBoundsException should be thrown
+    }
+
+    @Test
+    void scan_withMixedSqlAlchemyAndDjango_extractsOnlyDjango() throws IOException {
+        // Given: Project with both SQLAlchemy and Django models
+        createFile("app/sqlalchemy_models.py", """
+            from sqlalchemy import Column, Integer, String
+            from sqlalchemy.ext.declarative import declarative_base
+
+            Base = declarative_base()
+
+            class SqlAlchemyUser(Base):
+                __tablename__ = 'users'
+                id = Column(Integer, primary_key=True)
+            """);
+
+        createFile("app/django_models.py", """
+            from django.db import models
+
+            class DjangoUser(models.Model):
+                username = models.CharField(max_length=100)
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract only Django entities
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+        assertThat(result.dataEntities().get(0).componentId()).isEqualTo("DjangoUser");
+    }
+
+    @Test
+    void scan_withSqlModelFiles_skipsThemGracefully() throws IOException {
+        // Given: SQLModel file (should be skipped by Django scanner)
+        createFile("app/models.py", """
+            from sqlmodel import Field, SQLModel
+
+            class User(SQLModel, table=True):
+                id: int = Field(primary_key=True)
+                email: str
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip SQLModel files without errors
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+    }
+
+    @Test
+    void scan_withPlainPythonFiles_skipsThemGracefully() throws IOException {
+        // Given: Plain Python files without ORM code
+        createFile("app/models.py", """
+            class DataProcessor:
+                def process(self, data):
+                    return data.upper()
+
+            def helper_function():
+                pass
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip plain Python files without errors
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+    }
+
+    @Test
+    void scan_withRealDjangoProject_processesCorrectly() throws IOException {
+        // Given: Real Django project structure
+        createFile("products/models.py", """
+            from django.db import models
+
+            class Product(models.Model):
+                name = models.CharField(max_length=255)
+                price = models.DecimalField(max_digits=10, decimal_places=2)
+                created_at = models.DateTimeField(auto_now_add=True)
+            """);
+
+        createFile("users/models.py", """
+            from django.db import models
+
+            class User(models.Model):
+                username = models.CharField(max_length=100, unique=True)
+                email = models.EmailField()
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should process Django models correctly
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(2);
+        assertThat(result.dataEntities())
+            .extracting(DataEntity::componentId)
+            .containsExactlyInAnyOrder("Product", "User");
+    }
 }

@@ -110,24 +110,83 @@ public abstract class AbstractAstScanner<T> extends AbstractScanner {
     }
 
     /**
+     * Determines if a file should be scanned by this scanner.
+     *
+     * <p>This pre-filtering hook allows scanners to check file content before
+     * attempting expensive AST parsing. Override this method to implement
+     * framework-specific detection (e.g., checking for specific imports).
+     *
+     * <p><b>Default Implementation:</b> Returns {@code true} for all files.
+     *
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * @Override
+     * protected boolean shouldScanFile(Path file) {
+     *     try {
+     *         String content = readFileContent(file);
+     *         // Skip Django files when scanning for SQLAlchemy
+     *         if (content.contains("from django.db import models")) {
+     *             return false;
+     *         }
+     *         // Only scan files with SQLAlchemy imports
+     *         return content.contains("from sqlalchemy import") ||
+     *                content.contains("Base = declarative_base()");
+     *     } catch (IOException e) {
+     *         return false;
+     *     }
+     * }
+     * }</pre>
+     *
+     * @param file path to the file to check
+     * @return true if this file should be parsed, false to skip
+     */
+    protected boolean shouldScanFile(Path file) {
+        return true; // Default: scan all files
+    }
+
+    /**
      * Parses a source file and returns AST nodes.
      *
      * <p>This method wraps {@link AstParser#parseFile(Path)} and handles
      * exceptions gracefully by logging warnings and returning an empty list.
      *
+     * <p><b>Pre-filtering:</b> Calls {@link #shouldScanFile(Path)} before parsing.
+     * If the file should not be scanned, returns an empty list without attempting to parse.
+     *
+     * <p><b>Error Handling:</b> Different exception types are logged at appropriate levels:
+     * <ul>
+     *   <li>IOException: WARN - File read errors</li>
+     *   <li>AstParseException: DEBUG - Parser couldn't handle the file (may not match scanner's patterns)</li>
+     *   <li>ArrayIndexOutOfBoundsException: DEBUG - Parser error on unsupported patterns</li>
+     *   <li>Other exceptions: ERROR - Unexpected failures</li>
+     * </ul>
+     *
      * @param filePath path to the source file
-     * @return list of AST nodes (empty if parsing fails)
+     * @return list of AST nodes (empty if parsing fails or file should be skipped)
      */
     protected List<T> parseAstFile(Path filePath) {
+        // Layer 1: Pre-filtering
+        if (!shouldScanFile(filePath)) {
+            log.debug("Skipping file (pre-filter): {}", filePath);
+            return new ArrayList<>();
+        }
+
+        // Layer 2: Parse with graceful error handling
         try {
             return astParser.parseFile(filePath);
         } catch (IOException e) {
             log.warn("Failed to read file for AST parsing: {} - {}", filePath, e.getMessage());
             return new ArrayList<>();
         } catch (AstParser.AstParseException e) {
-            log.warn("AST parsing failed for file: {} - {}", filePath, e.getMessage());
+            // Parser couldn't handle this file - likely doesn't match our patterns
+            log.debug("AST parsing skipped (unsupported pattern): {} - {}", filePath, e.getMessage());
+            return new ArrayList<>();
+        } catch (ArrayIndexOutOfBoundsException e) {
+            // Common parser error when file doesn't match expected structure
+            log.debug("AST parsing skipped (parser error): {} - {}", filePath, e.getClass().getSimpleName());
             return new ArrayList<>();
         } catch (Exception e) {
+            // Truly unexpected errors
             log.error("Unexpected error during AST parsing: {}", filePath, e);
             return new ArrayList<>();
         }

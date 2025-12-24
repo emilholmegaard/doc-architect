@@ -5,12 +5,23 @@ This directory contains test scripts that validate DocArchitect against producti
 ## Scripts
 
 | Script | Purpose | Runtime |
-|--------|---------|---------|
+| ------ | ------- | ------- |
 | `test-spring-microservices.sh` | Tests Spring Boot microservices (PiggyMetrics) | ~60s |
 | `test-dotnet-solution.sh` | Tests .NET Clean Architecture (eShopOnWeb) | ~55s |
 | `test-python-fastapi.sh` | Tests Python FastAPI (Full-Stack) | ~40s |
-| `run-all-tests.sh` | Executes all tests sequentially | ~3m |
-| `validate-outputs.sh` | Validates generated documentation quality | ~10s |
+| `test-python-saleor.sh` | Tests Python GraphQL e-commerce (Saleor) | ~90s |
+| `test-java-keycloak.sh` | Tests Java identity management (Keycloak) | ~120s |
+| `test-dotnet-eshoponcontainers.sh` | Tests .NET microservices reference (eShopOnContainers) | ~100s |
+| `test-go-gitea.sh` | Tests Go Git service (Gitea) | ~80s |
+| `test-go-linkerd2.sh` | Tests Go service mesh (Linkerd2) | ~90s |
+| `test-dotnet-umbraco.sh` | Tests .NET CMS (Umbraco) | ~110s |
+| `test-java-druid.sh` | Tests Java distributed database (Apache Druid) | ~130s |
+| `test-dotnet-orchardcore.sh` | Tests .NET modular CMS (OrchardCore) | ~115s |
+| `test-java-openhab.sh` | Tests Java OSGi home automation (openHAB) | ~125s |
+| `test-ruby-gitlab.sh` | Tests Ruby Rails DevOps platform (GitLab) | ~140s |
+| `test-go-mattermost.sh` | Tests Go collaboration platform (Mattermost) | ~95s |
+| `run-all-tests.sh` | Executes all tests sequentially | ~20m |
+| `validate-outputs.sh` | Validates generated documentation quality | ~40s |
 
 ## Quick Start
 
@@ -22,6 +33,17 @@ This directory contains test scripts that validate DocArchitect against producti
 ./examples/test-spring-microservices.sh
 ./examples/test-dotnet-solution.sh
 ./examples/test-python-fastapi.sh
+./examples/test-python-saleor.sh
+./examples/test-java-keycloak.sh
+./examples/test-dotnet-eshoponcontainers.sh
+./examples/test-go-gitea.sh
+./examples/test-go-linkerd2.sh
+./examples/test-dotnet-umbraco.sh
+./examples/test-java-druid.sh
+./examples/test-dotnet-orchardcore.sh
+./examples/test-java-openhab.sh
+./examples/test-ruby-gitlab.sh
+./examples/test-go-mattermost.sh
 
 # Validate outputs
 ./examples/validate-outputs.sh
@@ -36,6 +58,7 @@ This directory contains test scripts that validate DocArchitect against producti
 ## What Gets Tested
 
 ### Spring Boot (PiggyMetrics)
+
 - 7 microservices with REST APIs
 - Maven multi-module project
 - MongoDB entities
@@ -43,6 +66,7 @@ This directory contains test scripts that validate DocArchitect against producti
 - Service discovery and configuration
 
 ### .NET (eShopOnWeb)
+
 - ASP.NET Core Web API
 - Entity Framework Core
 - Clean Architecture pattern
@@ -50,38 +74,132 @@ This directory contains test scripts that validate DocArchitect against producti
 - NuGet package management
 
 ### Python (Full-Stack FastAPI)
+
 - FastAPI async endpoints
 - SQLAlchemy ORM
 - Poetry dependency management
 - Pydantic schemas
 - Celery background tasks
 
+### Python GraphQL (Saleor)
+
+- GraphQL schema and operations
+- Django ORM models (100+ entities)
+- Poetry dependency management
+- E-commerce domain (products, orders, users)
+- Tests GraphQLScanner and DjangoORMScanner
+
+### Java Identity Management (Keycloak)
+
+- Large Maven multi-module project (50+ modules)
+- Extensive JPA entities (150+)
+- Complex REST API (100+ endpoints)
+- Quarkus framework
+- Identity and access management domain
+
+### .NET Microservices (eShopOnContainers)
+
+- Reference microservices architecture (10+ services)
+- gRPC and REST APIs (50+ endpoints)
+- Entity Framework Core (30+ entities)
+- Inter-service communication patterns
+- Clean Architecture in microservices context
+
+### Go Git Service (Gitea)
+
+- Go module dependencies (100+)
+- Monolithic Go application
+- Git repository management
+- REST API endpoints
+- Tests Go dependency scanner
+
+### Go Service Mesh (Linkerd2)
+
+- Microservices architecture in Go
+- gRPC service definitions
+- Protobuf schemas
+- Kubernetes integration
+- Tests Go and Protobuf scanners
+
+### .NET CMS (Umbraco)
+
+- Large .NET CMS platform (20+ modules)
+- Extensive ASP.NET Core APIs (100+)
+- Complex EF Core schema (50+ entities)
+- Content management domain
+- Tests mature .NET codebase patterns
+
+### Java Distributed Database (Apache Druid)
+
+- Massive Maven multi-module project (100+ modules)
+- Extensive Maven dependencies (200+)
+- Distributed systems architecture
+- REST APIs for query and ingestion
+- Tests scalability of scanners on large projects
+
+### .NET Modular CMS (OrchardCore)
+
+- Multi-tenant modular architecture (30+ modules)
+- Extensive ASP.NET Core APIs (150+)
+- Complex EF Core schema (40+ entities)
+- Modular plugin system
+- Tests .NET modularity patterns
+
+### Java OSGi Home Automation (openHAB)
+
+- OSGi-based modular architecture (40+ bundles)
+- Extensive Maven dependencies (150+)
+- REST APIs for home automation (50+)
+- Tests OSGi patterns and Maven complexity
+
+### Ruby Rails DevOps (GitLab)
+
+- Complete DevOps platform (50+ modules)
+- Ruby on Rails backend (200+ gems)
+- REST and GraphQL APIs (500+ endpoints)
+- Complex Active Record models (200+ entities)
+- Tests Ruby/Rails scanners (requires implementation)
+
+### Go Collaboration Platform (Mattermost)
+
+- Team collaboration with Go backend (10+ services)
+- Go module dependencies (100+)
+- REST and WebSocket APIs (100+ endpoints)
+- Real-time communication patterns
+- Tests Go architecture patterns
+
 ## Output Structure
 
 After running tests, outputs are in `output/` directory:
 
-```
+```text
 output/
-├── piggymetrics/
-│   ├── index.md
-│   ├── dependencies/
-│   ├── api/
-│   └── data/
-├── eshopweb/
-│   ├── index.md
-│   ├── dependencies/
-│   ├── api/
-│   └── data/
-└── fastapi/
-    ├── index.md
-    ├── dependencies/
-    ├── api/
-    └── data/
+├── piggymetrics/       # Spring Boot Microservices
+├── eshopweb/          # .NET Clean Architecture
+├── fastapi/           # Python FastAPI
+├── saleor/            # Python GraphQL
+├── keycloak/          # Java Identity Management
+├── eshoponcontainers/ # .NET Microservices
+├── gitea/             # Go Git Service
+├── linkerd2/          # Go Service Mesh
+├── umbraco/           # .NET CMS
+├── druid/             # Java Distributed Database
+├── orchardcore/       # .NET Modular CMS
+├── openhab/           # Java OSGi Home Automation
+├── gitlab/            # Ruby Rails DevOps
+└── mattermost/        # Go Collaboration Platform
+
+Each project output contains:
+├── index.md           # Navigation and summary
+├── dependencies/      # Dependency graphs
+├── api/               # API documentation
+└── data/              # Entity diagrams
 ```
 
 ## Success Criteria
 
 All tests pass when:
+
 - ✅ All scripts complete without errors
 - ✅ Output directories contain expected files
 - ✅ Minimum component/endpoint/entity counts met
@@ -100,15 +218,67 @@ gh workflow run real-world-tests.yml
 gh run list --workflow=real-world-tests.yml
 ```
 
+## Known Issues
+
+The comprehensive test suite has identified several issues that are being tracked and will be fixed:
+
+### Critical Issues
+
+**Scanner Execution Failure (#104):**
+```
+✓ Discovered 19 scanners
+✓ Executed 0 scanners
+
+Architecture Model Summary:
+  Components:     0
+  Dependencies:   0
+```
+
+**CRITICAL**: CLI discovers scanners but executes 0, resulting in no data extraction. Likely scanner ID mismatch or file discovery issue. See #104 for investigation.
+
+### Scanner Parsing Errors
+
+**Python Scanners (#101):**
+```
+ERROR c.d.c.s.i.python.SqlAlchemyScanner - Unexpected error during AST parsing
+java.lang.ArrayIndexOutOfBoundsException
+```
+
+Python scanners throw exceptions when encountering unsupported patterns. Scanners continue processing and extract valid entities from compatible files. See issue #101 for planned improvements.
+
+**Java KafkaScanner (#102):**
+```
+WARN c.d.c.scanner.impl.java.KafkaScanner - Failed to parse Java file: UpdateTest.java
+```
+
+KafkaScanner attempts to parse non-Kafka files. Pre-filtering improvements planned in #102.
+
+**Java SpringRestApiScanner (#103):**
+```
+WARN c.d.c.s.i.java.SpringRestApiScanner - Failed to parse Java file: UserStorageSyncTask.java
+```
+
+SpringRestApiScanner attempts to parse non-controller files. Pre-filtering and performance improvements planned in #103.
+
+### Impact
+
+- **Severity**: Low - Scanners continue and extract valid data
+- **User Experience**: Poor - Error logs are alarming
+- **Performance**: Moderate - Wasted parsing time on irrelevant files
+
+All issues are non-blocking. The test suite successfully validates scanner functionality while identifying areas for improvement.
+
 ## Troubleshooting
 
 **Docker image not found:**
+
 ```bash
 docker build -t doc-architect:local .
 # Update scripts to use local tag
 ```
 
 **Git clone fails:**
+
 ```bash
 # Clear and retry
 rm -rf test-projects/
@@ -116,6 +286,7 @@ rm -rf test-projects/
 ```
 
 **Validation fails:**
+
 ```bash
 # Check generated files
 ls -la output/*/

@@ -327,6 +327,414 @@ validate_fastapi() {
     fi
 }
 
+# Validate Saleor (Python GraphQL)
+validate_saleor() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Saleor (Python GraphQL)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "saleor" "components" 15
+    validate_min_count "saleor" "dependencies" 50  # Poetry dependencies
+    validate_min_count "saleor" "api_endpoints" 200  # GraphQL operations
+    validate_min_count "saleor" "data_entities" 100  # Django ORM models
+
+    # Content validation - Check for GraphQL schema
+    echo ""
+    echo -e "${BLUE}Validating GraphQL Content${NC}"
+    if [ -f "output/saleor/api-catalog.md" ]; then
+        check_contains "output/saleor/api-catalog.md" "Query\|Mutation\|Product\|Order" "GraphQL types"
+        check_contains "output/saleor/api-catalog.md" "GraphQL\|graphql" "GraphQL schema documentation"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Content validation - Check for Django models
+    echo ""
+    echo -e "${BLUE}Validating Django ORM Entities${NC}"
+    if [ -f "output/saleor/er-diagram.md" ]; then
+        check_contains "output/saleor/er-diagram.md" "PRODUCT\|Product" "Product entity"
+        check_contains "output/saleor/er-diagram.md" "ORDER\|Order" "Order entity"
+        check_contains "output/saleor/er-diagram.md" "USER\|User" "User entity"
+    else
+        echo -e "${RED}✗ FAIL: ER diagram not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for key Python packages
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/saleor/dependency-graph.md" ]; then
+        check_contains "output/saleor/dependency-graph.md" "graphene\|django\|celery" "Key Python dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Keycloak (Java)
+validate_keycloak() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Keycloak (Java)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "keycloak" "components" 50
+    validate_min_count "keycloak" "dependencies" 100  # Maven dependencies
+    validate_min_count "keycloak" "api_endpoints" 100
+    validate_min_count "keycloak" "data_entities" 150  # JPA entities
+
+    # Content validation - Check for known REST endpoints
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/keycloak/api-catalog.md" ]; then
+        check_contains "output/keycloak/api-catalog.md" "realms\|users\|clients\|roles" "Keycloak API paths"
+        check_contains "output/keycloak/api-catalog.md" "GET\|POST\|PUT\|DELETE" "HTTP methods"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Content validation - Check for known entities
+    echo ""
+    echo -e "${BLUE}Validating Data Entities${NC}"
+    if [ -f "output/keycloak/er-diagram.md" ]; then
+        check_contains "output/keycloak/er-diagram.md" "REALM\|Realm\|CLIENT\|Client\|USER\|User" "Core entities"
+    else
+        echo -e "${RED}✗ FAIL: ER diagram not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for Maven modules
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/keycloak/dependency-graph.md" ]; then
+        check_contains "output/keycloak/dependency-graph.md" "quarkus\|hibernate\|jackson" "Key Java dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Quality validation - Check ER diagram PK markers
+    validate_er_diagram_quality "keycloak"
+}
+
+# Validate eShopOnContainers (.NET Microservices)
+validate_eshoponcontainers() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: eShopOnContainers (.NET)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "eshoponcontainers" "components" 10
+    validate_min_count "eshoponcontainers" "dependencies" 30  # NuGet packages
+    validate_min_count "eshoponcontainers" "api_endpoints" 50
+    validate_min_count "eshoponcontainers" "data_entities" 30
+
+    # Content validation - Check for microservice APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/eshoponcontainers/api-catalog.md" ]; then
+        check_contains "output/eshoponcontainers/api-catalog.md" "catalog\|basket\|ordering\|identity" "Microservice APIs"
+        check_contains "output/eshoponcontainers/api-catalog.md" "GET\|POST\|PUT\|DELETE" "HTTP methods"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Content validation - Check for known entities
+    echo ""
+    echo -e "${BLUE}Validating Data Entities${NC}"
+    if [ -f "output/eshoponcontainers/er-diagram.md" ]; then
+        check_contains "output/eshoponcontainers/er-diagram.md" "ORDER\|Order\|CATALOG\|Catalog\|BASKET\|Basket" "Core entities"
+        check_contains "output/eshoponcontainers/er-diagram.md" "BUYER\|Buyer\|PRODUCT\|Product" "Commerce entities"
+    else
+        echo -e "${RED}✗ FAIL: ER diagram not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for .NET packages
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/eshoponcontainers/dependency-graph.md" ]; then
+        check_contains "output/eshoponcontainers/dependency-graph.md" "EntityFrameworkCore\|MediatR\|AutoMapper" "Common .NET packages"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Quality validation - Check ER diagram PK markers
+    validate_er_diagram_quality "eshoponcontainers"
+}
+
+# Validate Gitea (Go)
+validate_gitea() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Gitea (Go)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "gitea" "components" 1
+    validate_min_count "gitea" "dependencies" 100  # Go module dependencies
+
+    # Dependency validation - Check for Go modules
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/gitea/dependency-graph.md" ]; then
+        check_contains "output/gitea/dependency-graph.md" "github.com\|golang.org" "Go module dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Linkerd2 (Go gRPC)
+validate_linkerd2() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Linkerd2 (Go gRPC)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "linkerd2" "components" 10
+    validate_min_count "linkerd2" "dependencies" 50  # Go module dependencies
+
+    # Dependency validation - Check for Go modules
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/linkerd2/dependency-graph.md" ]; then
+        check_contains "output/linkerd2/dependency-graph.md" "github.com\|golang.org\|k8s.io" "Go/K8s dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Umbraco CMS (.NET)
+validate_umbraco() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Umbraco CMS (.NET)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "umbraco" "components" 20
+    validate_min_count "umbraco" "dependencies" 80  # NuGet packages
+    validate_min_count "umbraco" "api_endpoints" 100
+    validate_min_count "umbraco" "data_entities" 50
+
+    # Content validation - Check for CMS APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/umbraco/api-catalog.md" ]; then
+        check_contains "output/umbraco/api-catalog.md" "content\|media\|member\|backoffice" "CMS API endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Content validation - Check for CMS entities
+    echo ""
+    echo -e "${BLUE}Validating Data Entities${NC}"
+    if [ -f "output/umbraco/er-diagram.md" ]; then
+        check_contains "output/umbraco/er-diagram.md" "CONTENT\|Content\|NODE\|Node\|DOCUMENT\|Document" "CMS entities"
+    else
+        echo -e "${RED}✗ FAIL: ER diagram not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Quality validation - Check ER diagram PK markers
+    validate_er_diagram_quality "umbraco"
+}
+
+# Validate Apache Druid (Java)
+validate_druid() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Apache Druid (Java)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "druid" "components" 100
+    validate_min_count "druid" "dependencies" 200  # Maven dependencies
+    validate_min_count "druid" "api_endpoints" 50
+
+    # Content validation - Check for Druid APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/druid/api-catalog.md" ]; then
+        check_contains "output/druid/api-catalog.md" "query\|ingest\|coordinator\|broker" "Druid API endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for Maven modules
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/druid/dependency-graph.md" ]; then
+        check_contains "output/druid/dependency-graph.md" "jackson\|guava\|jetty" "Common Java dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate OrchardCore (.NET Modular CMS)
+validate_orchardcore() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: OrchardCore (.NET)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "orchardcore" "components" 30
+    validate_min_count "orchardcore" "dependencies" 100  # NuGet packages
+    validate_min_count "orchardcore" "api_endpoints" 150
+    validate_min_count "orchardcore" "data_entities" 40
+
+    # Content validation - Check for modular CMS APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/orchardcore/api-catalog.md" ]; then
+        check_contains "output/orchardcore/api-catalog.md" "content\|module\|tenant\|admin" "Modular CMS endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Quality validation - Check ER diagram PK markers
+    validate_er_diagram_quality "orchardcore"
+}
+
+# Validate openHAB Core (Java OSGi)
+validate_openhab() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: openHAB Core (Java)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "openhab" "components" 40
+    validate_min_count "openhab" "dependencies" 150  # Maven dependencies
+    validate_min_count "openhab" "api_endpoints" 50
+
+    # Content validation - Check for home automation APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/openhab/api-catalog.md" ]; then
+        check_contains "output/openhab/api-catalog.md" "thing\|item\|binding\|channel" "Home automation endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for OSGi/Maven
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/openhab/dependency-graph.md" ]; then
+        check_contains "output/openhab/dependency-graph.md" "osgi\|eclipse\|jetty" "OSGi dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate GitLab (Ruby Rails)
+validate_gitlab() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: GitLab (Ruby)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "gitlab" "components" 50
+    validate_min_count "gitlab" "dependencies" 200  # Ruby gems
+    validate_min_count "gitlab" "api_endpoints" 500
+    validate_min_count "gitlab" "data_entities" 200
+
+    # Content validation - Check for DevOps APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/gitlab/api-catalog.md" ]; then
+        check_contains "output/gitlab/api-catalog.md" "project\|pipeline\|merge_request\|issue" "GitLab API endpoints"
+        check_contains "output/gitlab/api-catalog.md" "GraphQL\|REST" "API types"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for Ruby gems
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/gitlab/dependency-graph.md" ]; then
+        check_contains "output/gitlab/dependency-graph.md" "rails\|grape\|graphql" "Key Ruby gems"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Mattermost (Go)
+validate_mattermost() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Mattermost (Go)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "mattermost" "components" 10
+    validate_min_count "mattermost" "dependencies" 100  # Go module dependencies
+    validate_min_count "mattermost" "api_endpoints" 100
+
+    # Content validation - Check for collaboration APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/mattermost/api-catalog.md" ]; then
+        check_contains "output/mattermost/api-catalog.md" "channel\|user\|team\|post\|websocket" "Collaboration endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for Go modules
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/mattermost/dependency-graph.md" ]; then
+        check_contains "output/mattermost/dependency-graph.md" "github.com\|golang.org" "Go module dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
 # Main execution
 echo "=========================================="
 echo "DocArchitect Output Validation"
@@ -338,6 +746,17 @@ echo ""
 validate_piggymetrics
 validate_eshopweb
 validate_fastapi
+validate_saleor
+validate_keycloak
+validate_eshoponcontainers
+validate_gitea
+validate_linkerd2
+validate_umbraco
+validate_druid
+validate_orchardcore
+validate_openhab
+validate_gitlab
+validate_mattermost
 
 # Summary
 echo ""
