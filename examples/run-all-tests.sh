@@ -37,9 +37,16 @@ run_test() {
 }
 
 # Run all tests
-run_test "Spring Boot Microservices" "./examples/test-spring-microservices.sh"
-run_test ".NET Solution" "./examples/test-dotnet-solution.sh"
+run_test "Spring Boot Microservices (PiggyMetrics)" "./examples/test-spring-microservices.sh"
+run_test ".NET Clean Architecture (eShopOnWeb)" "./examples/test-dotnet-solution.sh"
 run_test "Python FastAPI" "./examples/test-python-fastapi.sh"
+run_test "Python GraphQL (Saleor)" "./examples/test-python-saleor.sh"
+run_test "Java Identity Management (Keycloak)" "./examples/test-java-keycloak.sh"
+run_test ".NET Microservices (eShopOnContainers)" "./examples/test-dotnet-eshoponcontainers.sh"
+run_test "Go Git Service (Gitea)" "./examples/test-go-gitea.sh"
+run_test "Go Service Mesh (Linkerd2)" "./examples/test-go-linkerd2.sh"
+run_test ".NET CMS (Umbraco)" "./examples/test-dotnet-umbraco.sh"
+run_test "Java Distributed Database (Apache Druid)" "./examples/test-java-druid.sh"
 
 # Summary
 echo ""
@@ -56,9 +63,16 @@ fi
 
 echo ""
 echo "Results available in:"
-echo "  - output/piggymetrics/  (Spring Boot)"
-echo "  - output/eshopweb/      (.NET)"
-echo "  - output/fastapi/       (Python)"
+echo "  - output/piggymetrics/        (Spring Boot Microservices)"
+echo "  - output/eshopweb/            (.NET Clean Architecture)"
+echo "  - output/fastapi/             (Python FastAPI)"
+echo "  - output/saleor/              (Python GraphQL)"
+echo "  - output/keycloak/            (Java Identity Management)"
+echo "  - output/eshoponcontainers/   (.NET Microservices)"
+echo "  - output/gitea/               (Go Git Service)"
+echo "  - output/linkerd2/            (Go Service Mesh)"
+echo "  - output/umbraco/             (.NET CMS)"
+echo "  - output/druid/               (Java Distributed Database)"
 echo ""
 echo "Verify each output contains:"
 echo "  - index.md with navigation"
