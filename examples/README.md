@@ -218,6 +218,20 @@ gh workflow run real-world-tests.yml
 gh run list --workflow=real-world-tests.yml
 ```
 
+## Known Issues
+
+**Scanner ArrayIndexOutOfBoundsException on Python projects:**
+
+Some Python projects may show `ArrayIndexOutOfBoundsException` errors when SQLAlchemyScanner processes Django migration files or vice versa. This is expected behavior when scanners encounter code patterns they don't fully support. The scanners log errors but continue processing, and valid entities are still extracted from properly formatted files.
+
+Example:
+```
+ERROR c.d.c.s.i.python.SqlAlchemyScanner - Unexpected error during AST parsing: /workspace/saleor/schedulers/models.py
+java.lang.ArrayIndexOutOfBoundsException
+```
+
+This will be addressed in future scanner improvements to better differentiate Django vs SQLAlchemy patterns and handle edge cases more gracefully.
+
 ## Troubleshooting
 
 **Docker image not found:**
