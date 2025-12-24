@@ -124,6 +124,57 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
         return hasAnyFiles(context, PYTHON_FILE_PATTERN);
     }
 
+    /**
+     * Pre-filters files to avoid parsing Django or other non-SQLAlchemy Python files.
+     *
+     * <p>This method checks file content for framework-specific imports before
+     * attempting AST parsing, preventing {@link ArrayIndexOutOfBoundsException}
+     * and other parser errors when encountering incompatible patterns.
+     *
+     * <p><b>Detection Logic:</b></p>
+     * <ul>
+     *   <li><b>Skip:</b> Django files ({@code from django.db import models})</li>
+     *   <li><b>Accept:</b> SQLAlchemy imports ({@code from sqlalchemy import})</li>
+     *   <li><b>Accept:</b> SQLModel imports ({@code from sqlmodel import})</li>
+     *   <li><b>Accept:</b> Declarative base ({@code declarative_base()})</li>
+     *   <li><b>Skip:</b> Everything else (no matching imports)</li>
+     * </ul>
+     *
+     * @param file Python file to check
+     * @return true if file likely contains SQLAlchemy models, false otherwise
+     */
+    @Override
+    protected boolean shouldScanFile(Path file) {
+        try {
+            String content = readFileContent(file);
+
+            // Skip Django ORM files
+            if (content.contains("from django.db import models") ||
+                content.contains("from django.db import") ||
+                content.contains("django.db.models")) {
+                log.debug("Skipping Django file: {}", file.getFileName());
+                return false;
+            }
+
+            // Accept SQLAlchemy files
+            if (content.contains("from sqlalchemy import") ||
+                content.contains("from sqlalchemy.") ||
+                content.contains("declarative_base()") ||
+                content.contains("from sqlmodel import") ||
+                content.contains("SQLModel")) {
+                return true;
+            }
+
+            // Skip files without SQLAlchemy imports
+            log.debug("Skipping non-SQLAlchemy file: {}", file.getFileName());
+            return false;
+
+        } catch (IOException e) {
+            log.debug("Failed to read file for pre-filtering: {} - {}", file, e.getMessage());
+            return false;
+        }
+    }
+
     @Override
     public ScanResult scan(ScanContext context) {
         log.info("Scanning SQLAlchemy entities in: {}", context.rootPath());

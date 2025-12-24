@@ -324,4 +324,161 @@ class User(Base):
         assertThat(user.componentId()).isEqualTo("User");
         assertThat(user.name()).isEqualTo("users");
     }
+
+    // ========== Pre-filtering Tests (Issue #101) ==========
+
+    @Test
+    void scan_withDjangoModels_skipsThemGracefully() throws IOException {
+        // Given: Django models that would cause ArrayIndexOutOfBoundsException
+        createFile("app/models.py", """
+from django.db import models
+
+class User(models.Model):
+    username = models.CharField(max_length=100)
+    email = models.EmailField()
+    is_active = models.BooleanField(default=True)
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip Django files without errors
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+        // No ArrayIndexOutOfBoundsException should be thrown
+    }
+
+    @Test
+    void scan_withMixedDjangoAndSqlAlchemy_extractsOnlySqlAlchemy() throws IOException {
+        // Given: Project with both Django and SQLAlchemy models
+        createFile("app/django_models.py", """
+from django.db import models
+
+class DjangoUser(models.Model):
+    username = models.CharField(max_length=100)
+""");
+
+        createFile("app/sqlalchemy_models.py", """
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+class SqlAlchemyUser(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    username = Column(String(100))
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract only SQLAlchemy entities
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+        assertThat(result.dataEntities().get(0).componentId()).isEqualTo("SqlAlchemyUser");
+    }
+
+    @Test
+    void scan_withDjangoMigrations_skipsThemGracefully() throws IOException {
+        // Given: Django migration files (common cause of parser errors)
+        createFile("app/migrations/0001_initial.py", """
+from django.db import migrations, models
+
+class Migration(migrations.Migration):
+    initial = True
+    dependencies = []
+    operations = [
+        migrations.CreateModel(
+            name='User',
+            fields=[
+                ('id', models.AutoField(primary_key=True)),
+                ('username', models.CharField(max_length=100)),
+            ],
+        ),
+    ]
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip migration files without errors
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+    }
+
+    @Test
+    void scan_withPlainPythonFiles_skipsThemGracefully() throws IOException {
+        // Given: Plain Python files without ORM code
+        createFile("app/utils.py", """
+def calculate_total(items):
+    return sum(item.price for item in items)
+
+class Calculator:
+    def add(self, a, b):
+        return a + b
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip plain Python files without errors
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+    }
+
+    @Test
+    void scan_withSqlModelImports_processesCorrectly() throws IOException {
+        // Given: SQLModel file (should be accepted by pre-filter)
+        createFile("app/models.py", """
+from sqlmodel import Field, SQLModel
+
+class User(SQLModel, table=True):
+    id: int = Field(primary_key=True)
+    email: str
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should process SQLModel files
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(1);
+    }
+
+    @Test
+    void scan_withComplexDjangoProject_skipsAllDjangoFiles() throws IOException {
+        // Given: Complex Django project structure (like Saleor)
+        createFile("schedulers/models.py", """
+from django.db import models
+
+class Schedule(models.Model):
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+""");
+
+        createFile("shipping/models.py", """
+from django.db import models
+
+class ShippingMethod(models.Model):
+    name = models.CharField(max_length=255)
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+""");
+
+        createFile("schedulers/migrations/0001_initial.py", """
+from django.db import migrations, models
+
+class Migration(migrations.Migration):
+    initial = True
+    dependencies = []
+    operations = []
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip all Django files gracefully (no ERROR logs)
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+    }
 }
