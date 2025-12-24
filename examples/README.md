@@ -220,17 +220,39 @@ gh run list --workflow=real-world-tests.yml
 
 ## Known Issues
 
-**Scanner ArrayIndexOutOfBoundsException on Python projects:**
+The comprehensive test suite has identified several scanner robustness issues that are being tracked and will be fixed:
 
-Some Python projects may show `ArrayIndexOutOfBoundsException` errors when SQLAlchemyScanner processes Django migration files or vice versa. This is expected behavior when scanners encounter code patterns they don't fully support. The scanners log errors but continue processing, and valid entities are still extracted from properly formatted files.
+### Scanner Parsing Errors
 
-Example:
+**Python Scanners (#101):**
 ```
-ERROR c.d.c.s.i.python.SqlAlchemyScanner - Unexpected error during AST parsing: /workspace/saleor/schedulers/models.py
+ERROR c.d.c.s.i.python.SqlAlchemyScanner - Unexpected error during AST parsing
 java.lang.ArrayIndexOutOfBoundsException
 ```
 
-This will be addressed in future scanner improvements to better differentiate Django vs SQLAlchemy patterns and handle edge cases more gracefully.
+Python scanners throw exceptions when encountering unsupported patterns. Scanners continue processing and extract valid entities from compatible files. See issue #101 for planned improvements.
+
+**Java KafkaScanner (#102):**
+```
+WARN c.d.c.scanner.impl.java.KafkaScanner - Failed to parse Java file: UpdateTest.java
+```
+
+KafkaScanner attempts to parse non-Kafka files. Pre-filtering improvements planned in #102.
+
+**Java SpringRestApiScanner (#103):**
+```
+WARN c.d.c.s.i.java.SpringRestApiScanner - Failed to parse Java file: UserStorageSyncTask.java
+```
+
+SpringRestApiScanner attempts to parse non-controller files. Pre-filtering and performance improvements planned in #103.
+
+### Impact
+
+- **Severity**: Low - Scanners continue and extract valid data
+- **User Experience**: Poor - Error logs are alarming
+- **Performance**: Moderate - Wasted parsing time on irrelevant files
+
+All issues are non-blocking. The test suite successfully validates scanner functionality while identifying areas for improvement.
 
 ## Troubleshooting
 
