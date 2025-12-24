@@ -600,6 +600,141 @@ validate_druid() {
     fi
 }
 
+# Validate OrchardCore (.NET Modular CMS)
+validate_orchardcore() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: OrchardCore (.NET)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "orchardcore" "components" 30
+    validate_min_count "orchardcore" "dependencies" 100  # NuGet packages
+    validate_min_count "orchardcore" "api_endpoints" 150
+    validate_min_count "orchardcore" "data_entities" 40
+
+    # Content validation - Check for modular CMS APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/orchardcore/api-catalog.md" ]; then
+        check_contains "output/orchardcore/api-catalog.md" "content\|module\|tenant\|admin" "Modular CMS endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Quality validation - Check ER diagram PK markers
+    validate_er_diagram_quality "orchardcore"
+}
+
+# Validate openHAB Core (Java OSGi)
+validate_openhab() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: openHAB Core (Java)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "openhab" "components" 40
+    validate_min_count "openhab" "dependencies" 150  # Maven dependencies
+    validate_min_count "openhab" "api_endpoints" 50
+
+    # Content validation - Check for home automation APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/openhab/api-catalog.md" ]; then
+        check_contains "output/openhab/api-catalog.md" "thing\|item\|binding\|channel" "Home automation endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for OSGi/Maven
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/openhab/dependency-graph.md" ]; then
+        check_contains "output/openhab/dependency-graph.md" "osgi\|eclipse\|jetty" "OSGi dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate GitLab (Ruby Rails)
+validate_gitlab() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: GitLab (Ruby)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "gitlab" "components" 50
+    validate_min_count "gitlab" "dependencies" 200  # Ruby gems
+    validate_min_count "gitlab" "api_endpoints" 500
+    validate_min_count "gitlab" "data_entities" 200
+
+    # Content validation - Check for DevOps APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/gitlab/api-catalog.md" ]; then
+        check_contains "output/gitlab/api-catalog.md" "project\|pipeline\|merge_request\|issue" "GitLab API endpoints"
+        check_contains "output/gitlab/api-catalog.md" "GraphQL\|REST" "API types"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for Ruby gems
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/gitlab/dependency-graph.md" ]; then
+        check_contains "output/gitlab/dependency-graph.md" "rails\|grape\|graphql" "Key Ruby gems"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Mattermost (Go)
+validate_mattermost() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Mattermost (Go)"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "mattermost" "components" 10
+    validate_min_count "mattermost" "dependencies" 100  # Go module dependencies
+    validate_min_count "mattermost" "api_endpoints" 100
+
+    # Content validation - Check for collaboration APIs
+    echo ""
+    echo -e "${BLUE}Validating API Content${NC}"
+    if [ -f "output/mattermost/api-catalog.md" ]; then
+        check_contains "output/mattermost/api-catalog.md" "channel\|user\|team\|post\|websocket" "Collaboration endpoints"
+    else
+        echo -e "${RED}✗ FAIL: API catalog not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+
+    # Dependency validation - Check for Go modules
+    echo ""
+    echo -e "${BLUE}Validating Dependencies${NC}"
+    if [ -f "output/mattermost/dependency-graph.md" ]; then
+        check_contains "output/mattermost/dependency-graph.md" "github.com\|golang.org" "Go module dependencies"
+    else
+        echo -e "${RED}✗ FAIL: Dependency graph not generated${NC}"
+        ((TOTAL_CHECKS++))
+        ((FAILED_CHECKS++))
+    fi
+}
+
 # Main execution
 echo "=========================================="
 echo "DocArchitect Output Validation"
@@ -618,6 +753,10 @@ validate_gitea
 validate_linkerd2
 validate_umbraco
 validate_druid
+validate_orchardcore
+validate_openhab
+validate_gitlab
+validate_mattermost
 
 # Summary
 echo ""

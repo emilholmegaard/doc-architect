@@ -16,8 +16,12 @@ This directory contains test scripts that validate DocArchitect against producti
 | `test-go-linkerd2.sh` | Tests Go service mesh (Linkerd2) | ~90s |
 | `test-dotnet-umbraco.sh` | Tests .NET CMS (Umbraco) | ~110s |
 | `test-java-druid.sh` | Tests Java distributed database (Apache Druid) | ~130s |
-| `run-all-tests.sh` | Executes all tests sequentially | ~15m |
-| `validate-outputs.sh` | Validates generated documentation quality | ~30s |
+| `test-dotnet-orchardcore.sh` | Tests .NET modular CMS (OrchardCore) | ~115s |
+| `test-java-openhab.sh` | Tests Java OSGi home automation (openHAB) | ~125s |
+| `test-ruby-gitlab.sh` | Tests Ruby Rails DevOps platform (GitLab) | ~140s |
+| `test-go-mattermost.sh` | Tests Go collaboration platform (Mattermost) | ~95s |
+| `run-all-tests.sh` | Executes all tests sequentially | ~20m |
+| `validate-outputs.sh` | Validates generated documentation quality | ~40s |
 
 ## Quick Start
 
@@ -36,6 +40,10 @@ This directory contains test scripts that validate DocArchitect against producti
 ./examples/test-go-linkerd2.sh
 ./examples/test-dotnet-umbraco.sh
 ./examples/test-java-druid.sh
+./examples/test-dotnet-orchardcore.sh
+./examples/test-java-openhab.sh
+./examples/test-ruby-gitlab.sh
+./examples/test-go-mattermost.sh
 
 # Validate outputs
 ./examples/validate-outputs.sh
@@ -129,6 +137,37 @@ This directory contains test scripts that validate DocArchitect against producti
 - REST APIs for query and ingestion
 - Tests scalability of scanners on large projects
 
+### .NET Modular CMS (OrchardCore)
+
+- Multi-tenant modular architecture (30+ modules)
+- Extensive ASP.NET Core APIs (150+)
+- Complex EF Core schema (40+ entities)
+- Modular plugin system
+- Tests .NET modularity patterns
+
+### Java OSGi Home Automation (openHAB)
+
+- OSGi-based modular architecture (40+ bundles)
+- Extensive Maven dependencies (150+)
+- REST APIs for home automation (50+)
+- Tests OSGi patterns and Maven complexity
+
+### Ruby Rails DevOps (GitLab)
+
+- Complete DevOps platform (50+ modules)
+- Ruby on Rails backend (200+ gems)
+- REST and GraphQL APIs (500+ endpoints)
+- Complex Active Record models (200+ entities)
+- Tests Ruby/Rails scanners (requires implementation)
+
+### Go Collaboration Platform (Mattermost)
+
+- Team collaboration with Go backend (10+ services)
+- Go module dependencies (100+)
+- REST and WebSocket APIs (100+ endpoints)
+- Real-time communication patterns
+- Tests Go architecture patterns
+
 ## Output Structure
 
 After running tests, outputs are in `output/` directory:
@@ -144,7 +183,11 @@ output/
 ├── gitea/             # Go Git Service
 ├── linkerd2/          # Go Service Mesh
 ├── umbraco/           # .NET CMS
-└── druid/             # Java Distributed Database
+├── druid/             # Java Distributed Database
+├── orchardcore/       # .NET Modular CMS
+├── openhab/           # Java OSGi Home Automation
+├── gitlab/            # Ruby Rails DevOps
+└── mattermost/        # Go Collaboration Platform
 
 Each project output contains:
 ├── index.md           # Navigation and summary
