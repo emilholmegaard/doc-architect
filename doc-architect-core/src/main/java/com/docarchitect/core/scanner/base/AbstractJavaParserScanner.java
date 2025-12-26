@@ -63,20 +63,62 @@ public abstract class AbstractJavaParserScanner extends AbstractScanner {
     // ==================== Java File Parsing ====================
 
     /**
+     * Determines if a file should be scanned by this scanner.
+     *
+     * <p>This pre-filtering hook allows scanners to check file content before
+     * attempting expensive AST parsing. Override this method to implement
+     * framework-specific detection (e.g., checking for specific imports or annotations).
+     *
+     * <p><b>Default Implementation:</b> Returns {@code true} for all files.
+     *
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * @Override
+     * protected boolean shouldScanFile(Path file) {
+     *     try {
+     *         String content = readFileContent(file);
+     *         // Only scan files with Kafka imports
+     *         return content.contains("org.apache.kafka") ||
+     *                content.contains("org.springframework.kafka") ||
+     *                content.contains("@KafkaListener");
+     *     } catch (IOException e) {
+     *         return false;
+     *     }
+     * }
+     * }</pre>
+     *
+     * @param file path to the file to check
+     * @return true if this file should be parsed, false to skip
+     */
+    protected boolean shouldScanFile(Path file) {
+        return true; // Default: scan all files
+    }
+
+    /**
      * Parses a Java source file into a CompilationUnit AST.
      *
+     * <p><b>Pre-filtering:</b> Calls {@link #shouldScanFile(Path)} before parsing.
+     * If the file should not be scanned, returns empty without attempting to parse.
+     *
      * @param file path to Java source file
-     * @return CompilationUnit if parsing succeeded, empty if failed
+     * @return CompilationUnit if parsing succeeded, empty if failed or file should be skipped
      * @throws IOException if file cannot be read
      */
     protected Optional<CompilationUnit> parseJavaFile(Path file) throws IOException {
+        // Layer 1: Pre-filtering
+        if (!shouldScanFile(file)) {
+            log.debug("Skipping file (pre-filter): {}", file);
+            return Optional.empty();
+        }
+
+        // Layer 2: Parse with error handling
         String content = readFileContent(file);
         ParseResult<CompilationUnit> result = javaParser.parse(content);
 
         if (result.isSuccessful() && result.getResult().isPresent()) {
             return result.getResult();
         } else {
-            log.warn("Failed to parse Java file: {}", file);
+            log.debug("Failed to parse Java file: {}", file);
             result.getProblems().forEach(problem -> log.debug("  - {}", problem));
             return Optional.empty();
         }

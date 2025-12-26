@@ -168,4 +168,96 @@ public class MultiConsumer {
         ScanResult result = scanner.scan(context);
         assertThat(result.messageFlows()).isEmpty();
     }
+
+    @Test
+    void shouldSkipFilesWithoutKafkaImports() throws IOException {
+        // Create a regular Java file without Kafka imports
+        createFile("src/main/java/com/example/RegularService.java", """
+package com.example;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class RegularService {
+    public void doSomething() {
+        System.out.println("No Kafka here");
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        // Should not find any message flows since file has no Kafka patterns
+        assertThat(result.messageFlows()).isEmpty();
+    }
+
+    @Test
+    void shouldSkipTestFilesWithoutKafkaPatterns() throws IOException {
+        // Create a test file without Kafka imports
+        createFile("src/test/java/com/example/UpdateTest.java", """
+package com.example;
+
+import org.junit.jupiter.api.Test;
+
+public class UpdateTest {
+    @Test
+    void shouldUpdateUser() {
+        // Regular unit test, no Kafka
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        // Should not find any message flows since test file has no Kafka patterns
+        assertThat(result.messageFlows()).isEmpty();
+    }
+
+    @Test
+    void shouldScanTestFilesWithKafkaPatterns() throws IOException {
+        // Create a test file WITH Kafka imports
+        createFile("src/test/java/com/example/KafkaIntegrationTest.java", """
+package com.example;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.kafka.annotation.KafkaListener;
+
+public class KafkaIntegrationTest {
+
+    @KafkaListener(topics = "test-topic")
+    public void consumeTestMessage(String message) {
+        // Kafka integration test
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        // Should find message flows in test files that contain Kafka patterns
+        assertThat(result.messageFlows()).hasSize(1);
+        assertThat(result.messageFlows().get(0).topic()).isEqualTo("test-topic");
+    }
+
+    @Test
+    void shouldDetectKafkaTemplateImport() throws IOException {
+        // Test that KafkaTemplate import is sufficient to trigger scanning
+        createFile("src/main/java/com/example/ProducerService.java", """
+package com.example;
+
+import org.springframework.kafka.core.KafkaTemplate;
+
+public class ProducerService {
+    private KafkaTemplate<String, String> kafkaTemplate;
+
+    public void send(String message) {
+        kafkaTemplate.send("my-topic", message);
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.messageFlows()).hasSize(1);
+        assertThat(result.messageFlows().get(0).topic()).isEqualTo("my-topic");
+    }
 }

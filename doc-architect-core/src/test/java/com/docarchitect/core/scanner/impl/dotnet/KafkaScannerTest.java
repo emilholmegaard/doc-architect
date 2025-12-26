@@ -286,14 +286,110 @@ class KafkaScannerTest extends ScannerTestBase {
     @Test
     void shouldHandleInvalidCsFile() throws IOException {
         createFile("Invalid.cs", "this is not valid C# code {{{");
-        
+
         ScanResult result = scanner.scan(context);
 
-        // Should not throw, just log warning
+        // Should not throw, just log debug message
         assertThat(result.messageFlows()).isNotNull();
     }
 
-   
+    @Test
+    void shouldSkipFilesWithoutKafkaImports() throws IOException {
+        // Create a regular C# file without Kafka imports
+        String content = """
+            namespace MyApp.Services;
 
+            public class RegularService
+            {
+                public void DoSomething()
+                {
+                    Console.WriteLine("No Kafka here");
+                }
+            }
+            """;
 
+        createFile("RegularService.cs", content);
+        ScanResult result = scanner.scan(context);
+
+        // Should not find any message flows since file has no Kafka patterns
+        assertThat(result.messageFlows()).isEmpty();
+    }
+
+    @Test
+    void shouldSkipTestFilesWithoutKafkaPatterns() throws IOException {
+        // Create a test file without Kafka imports
+        String content = """
+            namespace MyApp.Tests;
+
+            using Xunit;
+
+            public class UpdateTest
+            {
+                [Fact]
+                public void ShouldUpdateUser()
+                {
+                    // Regular unit test, no Kafka
+                }
+            }
+            """;
+
+        createFile("MyApp.Tests/UpdateTest.cs", content);
+        ScanResult result = scanner.scan(context);
+
+        // Should not find any message flows since test file has no Kafka patterns
+        assertThat(result.messageFlows()).isEmpty();
+    }
+
+    @Test
+    void shouldScanTestFilesWithKafkaPatterns() throws IOException {
+        // Create a test file WITH Kafka imports
+        String content = """
+            using Confluent.Kafka;
+            using Xunit;
+
+            namespace MyApp.Tests;
+
+            public class KafkaIntegrationTest
+            {
+                private IConsumer<string, TestEvent> _consumer;
+
+                [Fact]
+                public void ShouldConsumeMessage()
+                {
+                    _consumer.Consume("test-topic");
+                }
+            }
+            """;
+
+        createFile("MyApp.Tests/KafkaIntegrationTest.cs", content);
+        ScanResult result = scanner.scan(context);
+
+        // Should find message flows in test files that contain Kafka patterns
+        assertThat(result.messageFlows()).hasSizeGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void shouldDetectConfluentKafkaImport() throws IOException {
+        // Test that Confluent.Kafka import is sufficient to trigger scanning
+        String content = """
+            using Confluent.Kafka;
+
+            namespace MyApp.Producers;
+
+            public class ProducerService
+            {
+                private IProducer<string, string> _producer;
+
+                public void Send(string message)
+                {
+                    _producer.ProduceAsync("my-topic", new Message<string, string> { Value = message });
+                }
+            }
+            """;
+
+        createFile("ProducerService.cs", content);
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.messageFlows()).hasSizeGreaterThanOrEqualTo(1);
+    }
 }

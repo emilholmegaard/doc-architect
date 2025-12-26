@@ -85,6 +85,45 @@ public class KafkaScanner extends AbstractJavaParserScanner {
         return hasAnyFiles(context, FILE_PATTERN);
     }
 
+    /**
+     * Pre-filter files to only scan those containing Kafka-related imports or annotations.
+     *
+     * <p>This avoids attempting to parse files that don't contain Kafka code,
+     * reducing unnecessary WARN logs and improving performance.
+     *
+     * @param file path to Java source file
+     * @return true if file contains Kafka patterns, false otherwise
+     */
+    @Override
+    protected boolean shouldScanFile(Path file) {
+        // Skip test files unless they contain Kafka patterns
+        String filePath = file.toString();
+        boolean isTestFile = filePath.contains("/test/") || filePath.contains("\\test\\");
+
+        try {
+            String content = readFileContent(file);
+
+            // Check for Kafka imports and annotations
+            boolean hasKafkaPatterns = content.contains("org.apache.kafka") ||
+                                      content.contains("org.springframework.kafka") ||
+                                      content.contains("@KafkaListener") ||
+                                      content.contains("@EnableKafka") ||
+                                      content.contains("@SendTo") ||
+                                      content.contains("KafkaTemplate");
+
+            // For test files, require Kafka patterns
+            // For non-test files, allow if they have Kafka patterns
+            if (isTestFile) {
+                return hasKafkaPatterns;
+            }
+
+            return hasKafkaPatterns;
+        } catch (IOException e) {
+            log.debug("Failed to read file for pre-filtering: {}", file);
+            return false;
+        }
+    }
+
     @Override
     public ScanResult scan(ScanContext context) {
         log.info("Scanning Kafka message flows in: {}", context.rootPath());
@@ -100,7 +139,9 @@ public class KafkaScanner extends AbstractJavaParserScanner {
             try {
                 parseKafkaFlows(javaFile, messageFlows);
             } catch (Exception e) {
-                log.warn("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+                // Files without Kafka patterns are already filtered by shouldScanFile()
+                // Any remaining parse failures are logged at DEBUG level
+                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
             }
         }
 
