@@ -1,4 +1,5 @@
 title: Architecture Decision Records
+collapse_single_pages: true
 arrange:
   - TEMPLATE.md
   - ...
