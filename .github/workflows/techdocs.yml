@@ -37,6 +37,29 @@ jobs:
         run: |
           mkdocs build
 
+      - name: Download latest Sokrates reports
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: sokrates-analysis.yml
+          name: sokrates-reports
+          path: ./site/sokrates
+          if_no_artifact_found: warn
+          search_artifacts: true
+        continue-on-error: true
+
+      - name: Verify Sokrates integration
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        run: |
+          if [ -d "./site/sokrates" ]; then
+            echo "✅ Sokrates reports successfully integrated into TechDocs"
+            echo "Contents of sokrates directory:"
+            ls -la ./site/sokrates/
+          else
+            echo "⚠️  No Sokrates reports found - site will deploy without them"
+            echo "This is normal if Sokrates analysis hasn't run yet"
+          fi
+
       - name: Upload artifact
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v4
