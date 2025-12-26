@@ -18,6 +18,8 @@ import com.docarchitect.core.renderer.OutputRenderer;
 import com.docarchitect.core.renderer.GeneratedOutput;
 import com.docarchitect.core.renderer.GeneratedFile;
 import com.docarchitect.core.renderer.RenderContext;
+import com.docarchitect.core.config.ProjectConfig;
+import com.docarchitect.core.config.ConfigLoader;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -94,12 +96,15 @@ public class ScanCommand implements Callable<Integer> {
                 System.out.println();
             }
 
+            // Step 0: Load configuration
+            ProjectConfig config = loadConfiguration();
+
             // Step 1: Discover and load scanners
             List<Scanner> scanners = discoverScanners();
             System.out.println("✓ Discovered " + scanners.size() + " scanners");
 
-            // Step 2: Execute scanners
-            Map<String, ScanResult> scanResults = executeScanners(scanners);
+            // Step 2: Filter and execute scanners based on config
+            Map<String, ScanResult> scanResults = executeScanners(scanners, config);
             System.out.println("✓ Executed " + scanResults.size() + " scanners");
 
             // Step 3: Aggregate results into ArchitectureModel
@@ -140,6 +145,26 @@ public class ScanCommand implements Callable<Integer> {
     }
 
     /**
+     * Loads project configuration from YAML file.
+     */
+    private ProjectConfig loadConfiguration() {
+        Path absoluteConfigPath = configPath.isAbsolute()
+            ? configPath
+            : projectPath.resolve(configPath);
+
+        log.debug("Loading configuration from: {}", absoluteConfigPath);
+        ProjectConfig config = ConfigLoader.load(absoluteConfigPath);
+
+        if (config.scanners() != null && config.scanners().enabled() != null) {
+            log.debug("Configured enabled scanners: {}", config.scanners().enabled());
+        } else {
+            log.debug("No scanner filtering configured - all scanners enabled");
+        }
+
+        return config;
+    }
+
+    /**
      * Discovers all available scanners via SPI.
      */
     private List<Scanner> discoverScanners() {
@@ -152,20 +177,40 @@ public class ScanCommand implements Callable<Integer> {
         scanners.sort((a, b) -> Integer.compare(b.getPriority(), a.getPriority()));
 
         log.info("Discovered {} scanners", scanners.size());
+        if (log.isDebugEnabled()) {
+            scanners.forEach(s -> log.debug("  - {} ({})", s.getId(), s.getDisplayName()));
+        }
         return scanners;
     }
 
     /**
-     * Executes all scanners that apply to the project.
+     * Executes scanners that are enabled and apply to the project.
+     *
+     * @param scanners discovered scanners
+     * @param config project configuration
+     * @return scan results by scanner ID
      */
-    private Map<String, ScanResult> executeScanners(List<Scanner> scanners) {
+    private Map<String, ScanResult> executeScanners(List<Scanner> scanners, ProjectConfig config) {
         log.debug("Executing scanners on project: {}", projectPath);
+
+        // Validate config and warn about unknown scanner IDs
+        validateScannerConfig(scanners, config);
 
         Map<String, ScanResult> results = new LinkedHashMap<>();
         ScanContext context = createScanContext(results);
 
+        int skippedCount = 0;
+        int notApplicableCount = 0;
+
         for (Scanner scanner : scanners) {
             try {
+                // Check if scanner is enabled in config
+                if (config.scanners() != null && !config.scanners().isEnabled(scanner.getId())) {
+                    log.debug("Scanner {} is disabled in configuration", scanner.getId());
+                    skippedCount++;
+                    continue;
+                }
+
                 if (scanner.appliesTo(context)) {
                     log.info("Running scanner: {} ({})", scanner.getDisplayName(), scanner.getId());
                     System.out.println("  → " + scanner.getDisplayName());
@@ -183,6 +228,7 @@ public class ScanCommand implements Callable<Integer> {
                     }
                 } else {
                     log.debug("Scanner {} does not apply to this project", scanner.getId());
+                    notApplicableCount++;
                 }
             } catch (Exception e) {
                 log.error("Scanner {} failed: {}", scanner.getId(), e.getMessage(), e);
@@ -190,7 +236,54 @@ public class ScanCommand implements Callable<Integer> {
             }
         }
 
+        log.debug("Scanner execution summary: {} executed, {} disabled, {} not applicable",
+            results.size(), skippedCount, notApplicableCount);
+
+        // Warn if no scanners executed
+        if (results.isEmpty()) {
+            System.err.println();
+            System.err.println("⚠ WARNING: 0 scanners executed!");
+            System.err.println("  Possible causes:");
+            System.err.println("  - Scanner IDs in config don't match available scanners");
+            System.err.println("  - No files match scanner patterns");
+            System.err.println("  - All scanners failed");
+            System.err.println();
+            System.err.println("  Available scanner IDs:");
+            scanners.forEach(s -> System.err.println("    - " + s.getId()));
+            System.err.println();
+        }
+
         return results;
+    }
+
+    /**
+     * Validates scanner configuration and warns about unknown IDs.
+     *
+     * @param scanners discovered scanners
+     * @param config project configuration
+     */
+    private void validateScannerConfig(List<Scanner> scanners, ProjectConfig config) {
+        if (config.scanners() == null || config.scanners().enabled() == null || config.scanners().enabled().isEmpty()) {
+            return; // No filtering configured
+        }
+
+        Set<String> availableIds = scanners.stream()
+            .map(Scanner::getId)
+            .collect(java.util.stream.Collectors.toSet());
+
+        List<String> unknownIds = config.scanners().enabled().stream()
+            .filter(id -> !availableIds.contains(id))
+            .toList();
+
+        if (!unknownIds.isEmpty()) {
+            log.warn("Unknown scanner IDs in configuration: {}", unknownIds);
+            System.err.println("⚠ WARNING: Unknown scanner IDs in configuration:");
+            unknownIds.forEach(id -> System.err.println("    - " + id));
+            System.err.println();
+            System.err.println("  Available scanner IDs:");
+            availableIds.forEach(id -> System.err.println("    - " + id));
+            System.err.println();
+        }
     }
 
     /**
