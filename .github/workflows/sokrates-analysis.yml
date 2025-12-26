@@ -7,19 +7,10 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -59,39 +50,34 @@ jobs:
           java -jar sokrates.jar generateReports -confFile _sokrates/config.json
           echo "Sokrates reports generated successfully"
 
-      - name: Prepare GitHub Pages content
+      - name: Prepare Sokrates reports artifact
         run: |
           WEEK=$(date +%Y-W%U)
           echo "Preparing reports for week: $WEEK"
 
-          # Create directory structure
-          mkdir -p gh-pages/sokrates/latest
-          mkdir -p "gh-pages/sokrates/archive/$WEEK"
+          # Create directory structure for artifact
+          mkdir -p sokrates-reports/latest
+          mkdir -p "sokrates-reports/archive/$WEEK"
 
           # Copy reports to latest
           if [ -d "_sokrates/reports" ]; then
-            cp -r _sokrates/reports/* gh-pages/sokrates/latest/ || echo "Warning: No reports to copy to latest"
-            ls -la gh-pages/sokrates/latest/
+            cp -r _sokrates/reports/* sokrates-reports/latest/ || echo "Warning: No reports to copy to latest"
+            ls -la sokrates-reports/latest/
           else
             echo "Error: _sokrates/reports directory not found"
             exit 1
           fi
 
           # Archive this week's report
-          cp -r _sokrates/reports/* "gh-pages/sokrates/archive/$WEEK/" || echo "Warning: No reports to copy to archive"
+          cp -r _sokrates/reports/* "sokrates-reports/archive/$WEEK/" || echo "Warning: No reports to copy to archive"
 
-          # Keep only last 4 weeks of archives
-          cd gh-pages/sokrates/archive
-          ls -t | tail -n +5 | xargs -r rm -rf
-          cd ../../..
-
-          echo "Reports prepared for deployment"
-          echo "Contents of gh-pages/sokrates:"
-          ls -la gh-pages/sokrates/
+          echo "Reports prepared for artifact upload"
+          echo "Contents of sokrates-reports:"
+          ls -la sokrates-reports/
 
       - name: Create index page
         run: |
-          cat > gh-pages/sokrates/index.html <<'HTML'
+          cat > sokrates-reports/index.html <<'HTML'
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -133,16 +119,15 @@ jobs:
           HTML
           echo "Index page created"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload Sokrates reports as workflow artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: gh-pages/sokrates
+          name: sokrates-reports
+          path: sokrates-reports/
+          retention-days: 90
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Output deployment URL
+      - name: Output summary
         run: |
-          echo "✅ Sokrates reports deployed successfully!"
-          echo "📊 View latest report at: ${{ steps.deployment.outputs.page_url }}"
+          echo "✅ Sokrates reports generated successfully!"
+          echo "📦 Reports uploaded as workflow artifact 'sokrates-reports'"
+          echo "🔗 These reports will be included in TechDocs deployment"
