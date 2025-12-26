@@ -39,26 +39,51 @@ jobs:
 
       - name: Download latest Sokrates reports
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: dawidd6/action-download-artifact@v6
-        with:
-          workflow: sokrates-analysis.yml
-          name: sokrates-reports
-          path: ./site/sokrates
-          if_no_artifact_found: warn
-          search_artifacts: true
-        continue-on-error: true
-
-      - name: Verify Sokrates integration
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -d "./site/sokrates" ]; then
-            echo "✅ Sokrates reports successfully integrated into TechDocs"
-            echo "Contents of sokrates directory:"
-            ls -la ./site/sokrates/
-          else
-            echo "⚠️  No Sokrates reports found - site will deploy without them"
+          echo "🔍 Searching for latest Sokrates reports artifact..."
+
+          # Find the latest successful Sokrates workflow run
+          RUN_ID=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/${{ github.repository }}/actions/workflows/sokrates-analysis.yml/runs?status=success&per_page=1" \
+            --jq '.workflow_runs[0].id')
+
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "⚠️  No successful Sokrates workflow runs found yet"
             echo "This is normal if Sokrates analysis hasn't run yet"
+            exit 0
           fi
+
+          echo "📦 Found workflow run: $RUN_ID"
+
+          # Download the artifact
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name=="sokrates-reports") | .id' | head -1 | while read ARTIFACT_ID; do
+
+            if [ -n "$ARTIFACT_ID" ]; then
+              echo "📥 Downloading artifact: $ARTIFACT_ID"
+              gh api \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                "/repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip" > sokrates-reports.zip
+
+              # Extract to site directory
+              mkdir -p ./site/sokrates
+              unzip -q sokrates-reports.zip -d ./site/sokrates
+              echo "✅ Sokrates reports successfully integrated into TechDocs"
+              echo "Contents of sokrates directory:"
+              ls -la ./site/sokrates/
+            else
+              echo "⚠️  No sokrates-reports artifact found in workflow run"
+            fi
+          done
+        continue-on-error: true
 
       - name: Upload artifact
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
