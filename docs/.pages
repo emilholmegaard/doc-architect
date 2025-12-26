@@ -1,0 +1,17 @@
+title: Documentation
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Architecture Overview: architecture-overview.md
+    - Onboarding Guide: onboarding-guide.md
+  - User Guides:
+    - Docker Usage: docker-usage.md
+    - Local CI Testing: local-ci-testing.md
+    - Real-World Testing: real-world-testing.md
+    - Extending DocArchitect: extending.md
+    - Testing Guide: testing.md
+  - Development:
+    - CI/CD Setup: ci-cd-setup.md
+    - Claude Development Guide: claude-development-guide.md
+  - Architecture Decision Records:
+    - ... | adrs/*.md

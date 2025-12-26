@@ -13,9 +13,9 @@
 - Separation of concerns: scanners extract facts → aggregated model → generators → renderers.
 - Prefer base classes for shared mechanisms:
   - AbstractRegexScanner, AbstractJacksonScanner, AbstractJavaParserScanner (all extend AbstractScanner).
-- Align with ADRs in docs/adrs (C4 model, TechDocs, logging, testing, packaging).
+- Align with ADRs in docs/adrs (C4 model, TechDocs, logging, testing, packaging, scanner pre-filtering).
 
-## Project Structure 
+## Project Structure
 
 ```
 doc-architect/

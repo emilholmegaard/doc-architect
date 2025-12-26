@@ -88,6 +88,48 @@ public class KafkaScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
         return hasAnyFiles(context, FILE_PATTERN_NESTED, FILE_PATTERN_ROOT);
     }
 
+    /**
+     * Pre-filter files to only scan those containing Kafka-related imports or patterns.
+     *
+     * <p>This avoids attempting to parse files that don't contain Kafka code,
+     * reducing unnecessary WARN logs and improving performance.
+     *
+     * @param file path to C# source file
+     * @return true if file contains Kafka patterns, false otherwise
+     */
+    @Override
+    protected boolean shouldScanFile(Path file) {
+        // Skip test files unless they contain Kafka patterns
+        String filePath = file.toString();
+        boolean isTestFile = filePath.contains("/test/") || filePath.contains("\\test\\") ||
+                           filePath.contains("/Test/") || filePath.contains("\\Test\\") ||
+                           filePath.contains(".Tests/") || filePath.contains(".Tests\\");
+
+        try {
+            String content = readFileContent(file);
+
+            // Check for Kafka imports and patterns
+            boolean hasKafkaPatterns = content.contains("using Confluent.Kafka") ||
+                                      content.contains("IConsumer<") ||
+                                      content.contains("IProducer<") ||
+                                      content.contains("[KafkaConsumer") ||
+                                      content.contains("[Topic") ||
+                                      content.contains("ProduceAsync") ||
+                                      content.contains(".Consume(");
+
+            // For test files, require Kafka patterns
+            // For non-test files, allow if they have Kafka patterns
+            if (isTestFile) {
+                return hasKafkaPatterns;
+            }
+
+            return hasKafkaPatterns;
+        } catch (IOException e) {
+            log.debug("Failed to read file for pre-filtering: {}", file);
+            return false;
+        }
+    }
+
     @Override
     public ScanResult scan(ScanContext context) {
         log.info("Scanning Kafka message flows in .NET project: {}", context.rootPath());
@@ -107,7 +149,9 @@ public class KafkaScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
             try {
                 parseKafkaFlows(csFile, messageFlows);
             } catch (Exception e) {
-                log.warn("Failed to parse C# file: {} - {}", csFile, e.getMessage());
+                // Files without Kafka patterns are already filtered by shouldScanFile()
+                // Any remaining parse failures are logged at DEBUG level
+                log.debug("Failed to parse C# file: {} - {}", csFile, e.getMessage());
             }
         }
 
