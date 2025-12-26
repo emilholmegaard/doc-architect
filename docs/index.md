@@ -190,6 +190,40 @@ docker build -t doc-architect .
 
 See [docs/testing.md](docs/testing.md) for comprehensive testing guide.
 
+## Logging Configuration
+
+DocArchitect uses Logback for logging with the following defaults:
+
+- **Log Level**: INFO (configurable via `LOGBACK_LEVEL` environment variable)
+- **Output**: Console only
+- **Package-specific levels**:
+  - Scanners: `SCANNER_LOG_LEVEL` (default: INFO)
+  - Generators: `GENERATOR_LOG_LEVEL` (default: INFO)
+  - Renderers: `RENDERER_LOG_LEVEL` (default: INFO)
+
+### Adjusting Log Levels
+
+```bash
+# Set global log level to DEBUG
+docker run -e LOGBACK_LEVEL=DEBUG -v $(pwd):/workspace doc-architect scan
+
+# Enable DEBUG logging for scanners only
+docker run -e SCANNER_LOG_LEVEL=DEBUG -v $(pwd):/workspace doc-architect scan
+
+# Maven: Set log level for tests
+mvn test -Dlogback.level=DEBUG
+```
+
+### Custom Logback Configuration
+
+For advanced logging needs, mount a custom `logback.xml`:
+
+```bash
+docker run -v $(pwd)/logback.xml:/app/logback.xml \
+  -v $(pwd):/workspace \
+  doc-architect scan
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE)
