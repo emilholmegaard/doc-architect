@@ -6,7 +6,7 @@ DocArchitect uses automated code analysis to maintain high code quality and prov
 
 The latest code quality reports are available at:
 
-- **[Latest Report](../sokrates/)** - Current week's analysis
+- **[Latest Report](../sokrates/latest/html/)** - Current week's analysis
 - **[Report Archive](../sokrates/archive/)** - Historical reports (last 4 weeks)
 
 ## What's Analyzed

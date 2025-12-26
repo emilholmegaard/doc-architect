@@ -84,7 +84,7 @@ jobs:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Doc-Architect Code Analysis</title>
-            <meta http-equiv="refresh" content="0; url=latest/index.html">
+            <meta http-equiv="refresh" content="0; url=latest/html/index.html">
             <style>
               body {
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -112,7 +112,7 @@ jobs:
           <body>
             <div class="container">
               <h1>📊 Doc-Architect Code Analysis</h1>
-              <p>Redirecting to <a href="latest/index.html">latest report</a>...</p>
+              <p>Redirecting to <a href="latest/html/index.html">latest report</a>...</p>
             </div>
           </body>
           </html>
