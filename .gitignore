@@ -61,4 +61,4 @@ _sokrates/reports/
 _sokrates/history/
 
 # Act (local GitHub Actions testing)
-.act/
+.act/docs/_sokrates
