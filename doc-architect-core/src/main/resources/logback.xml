@@ -17,31 +17,9 @@
         </encoder>
     </appender>
 
-    <!-- File Appender (optional, can be enabled via property) -->
-    <if condition='property("doc-architect.log.file").contains("true")'>
-        <then>
-            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <file>${user.home}/.doc-architect/logs/doc-architect.log</file>
-                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                    <fileNamePattern>${user.home}/.doc-architect/logs/doc-architect-%d{yyyy-MM-dd}.log</fileNamePattern>
-                    <maxHistory>7</maxHistory>
-                    <totalSizeCap>100MB</totalSizeCap>
-                </rollingPolicy>
-                <encoder>
-                    <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-                </encoder>
-            </appender>
-        </then>
-    </if>
-
     <!-- Root Logger (INFO by default, can be overridden) -->
     <root level="${LOGBACK_LEVEL:-INFO}">
         <appender-ref ref="CONSOLE" />
-        <if condition='property("doc-architect.log.file").contains("true")'>
-            <then>
-                <appender-ref ref="FILE" />
-            </then>
-        </if>
     </root>
 
     <!-- Scanner Package Logging (default: INFO) -->
