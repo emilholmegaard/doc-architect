@@ -68,3 +68,4 @@ docs/
 - **docs/.pages**: Navigation structure for main sections
 - **docs/adrs/.pages**: Navigation structure for ADRs (template first, then auto-discover)
 - **docs-requirements.txt**: Python dependencies for building docs
+
