@@ -1,6 +1,6 @@
 # Code Quality Reports
 
-DocArchitect uses automated code analysis to maintain high code quality and provide visibility into the codebase's health. Weekly analysis reports are generated using [Sokrates](https://github.com/zeljkoobrenovic/sokrates), a comprehensive code analysis tool.
+DocArchitect uses automated code analysis to maintain high code quality and provide visibility into the codebase's health. Weekly analysis reports are generated using [Sokrates](https://github.com/zeljkoobrenovic/sokrates), a comprehensive code analysis tool that provides deep insights into code structure, complexity, and evolution.
 
 ## Accessing Reports
 
