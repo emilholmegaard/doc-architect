@@ -37,7 +37,7 @@ scanners:
     - maven-dependencies
     - spring-mvc-api
     - jpa-entities
-    - kafka-messaging  # Actually uses RabbitMQ, but test scanner detection
+    - rabbitmq-messaging  # PiggyMetrics uses RabbitMQ for messaging
 
 generators:
   default: mermaid
