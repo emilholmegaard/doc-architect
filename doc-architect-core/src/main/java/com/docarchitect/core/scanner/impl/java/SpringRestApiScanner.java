@@ -125,6 +125,55 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
         return hasAnyFiles(context, JAVA_FILE_PATTERN);
     }
 
+    /**
+     * Pre-filter files to only scan those containing Spring MVC imports or annotations.
+     *
+     * <p>This avoids attempting to parse files that don't contain Spring REST code,
+     * reducing unnecessary WARN logs and improving performance.
+     *
+     * @param file path to Java source file
+     * @return true if file contains Spring MVC patterns, false otherwise
+     */
+    @Override
+    protected boolean shouldScanFile(Path file) {
+        // Prioritize Controller files by naming convention
+        String fileName = file.getFileName().toString();
+        if (fileName.endsWith("Controller.java") || fileName.endsWith("RestController.java")) {
+            return true;
+        }
+
+        // Skip test files unless they contain Spring MVC patterns
+        String filePath = file.toString();
+        boolean isTestFile = filePath.contains("/test/") || filePath.contains("\\test\\");
+
+        try {
+            String content = readFileContent(file);
+
+            // Check for Spring MVC imports and annotations
+            boolean hasSpringMvcPatterns = content.contains("org.springframework.web.bind.annotation") ||
+                                          content.contains("org.springframework.stereotype.Controller") ||
+                                          content.contains("@RestController") ||
+                                          content.contains("@Controller") ||
+                                          content.contains("@RequestMapping") ||
+                                          content.contains("@GetMapping") ||
+                                          content.contains("@PostMapping") ||
+                                          content.contains("@PutMapping") ||
+                                          content.contains("@DeleteMapping") ||
+                                          content.contains("@PatchMapping");
+
+            // For test files, require Spring MVC patterns
+            // For non-test files, allow if they have Spring MVC patterns
+            if (isTestFile) {
+                return hasSpringMvcPatterns;
+            }
+
+            return hasSpringMvcPatterns;
+        } catch (IOException e) {
+            log.debug("Failed to read file for pre-filtering: {}", file);
+            return false;
+        }
+    }
+
     @Override
     public ScanResult scan(ScanContext context) {
         log.info("Scanning Spring REST APIs in: {}", context.rootPath());
@@ -141,15 +190,26 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
         }
 
         int parsedFiles = 0;
+        int skippedFiles = 0;
         for (Path javaFile : javaFiles) {
+            // Pre-filter files before attempting to parse
+            if (!shouldScanFile(javaFile)) {
+                skippedFiles++;
+                continue;
+            }
+
             try {
                 parseSpringController(javaFile, apiEndpoints, components);
                 parsedFiles++;
             } catch (Exception e) {
-                log.warn("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+                // Files without Spring MVC patterns are already filtered by shouldScanFile()
+                // Any remaining parse failures are logged at DEBUG level
+                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
                 // Continue processing other files instead of failing completely
             }
         }
+
+        log.debug("Pre-filtered {} files (not Spring MVC controllers)", skippedFiles);
 
         log.info("Found {} REST API endpoints across {} Java files (parsed {}/{})",
             apiEndpoints.size(), javaFiles.size(), parsedFiles, javaFiles.size());
