@@ -6,6 +6,7 @@ com.docarchitect.core.scanner.impl.java.GradleDependencyScanner
 com.docarchitect.core.scanner.impl.java.SpringRestApiScanner
 com.docarchitect.core.scanner.impl.java.JpaEntityScanner
 com.docarchitect.core.scanner.impl.java.KafkaScanner
+com.docarchitect.core.scanner.impl.java.RabbitMQScanner
 
 # Python Scanners
 com.docarchitect.core.scanner.impl.python.PipPoetryDependencyScanner
