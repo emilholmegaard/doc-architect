@@ -34,7 +34,7 @@ repositories:
 
 scanners:
   enabled:
-    - pip-dependencies
+    - pip-poetry-dependencies
     - graphql-schema
     - django-orm
 

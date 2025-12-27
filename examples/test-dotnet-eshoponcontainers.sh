@@ -35,7 +35,7 @@ repositories:
 scanners:
   enabled:
     - nuget-dependencies
-    - aspnet-core-api
+    - aspnetcore-rest
     - entity-framework
 
 generators:

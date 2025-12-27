@@ -35,7 +35,7 @@ repositories:
 scanners:
   enabled:
     - maven-dependencies
-    - spring-mvc-api
+    - spring-rest-api
 
 generators:
   default: mermaid

@@ -35,9 +35,9 @@ repositories:
 scanners:
   enabled:
     - nuget-dependencies
-    - aspnetcore-api
-    - efcore-entities
-    - sql-migrations
+    - aspnetcore-rest
+    - entity-framework
+    - sql-migration
 
 generators:
   default: mermaid
