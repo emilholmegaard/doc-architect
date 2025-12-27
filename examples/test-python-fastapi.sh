@@ -34,8 +34,8 @@ repositories:
 
 scanners:
   enabled:
-    - pip-dependencies
-    - fastapi-api
+    - pip-poetry-dependencies
+    - fastapi-rest
     - sqlalchemy-entities
 
 generators:

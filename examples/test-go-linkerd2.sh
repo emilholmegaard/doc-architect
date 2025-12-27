@@ -34,7 +34,7 @@ repositories:
 
 scanners:
   enabled:
-    - go-dependencies
+    - go-modules
     - protobuf-schema
 
 generators:
