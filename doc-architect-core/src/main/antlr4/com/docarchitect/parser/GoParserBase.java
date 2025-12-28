@@ -118,7 +118,7 @@ public abstract class GoParserBase extends Parser
         if (debug) System.out.println("isMethodExpr Returning " + result + " for " + la);
         return result;
     }
-    
+
     protected boolean isConversion()
     {
         BufferedTokenStream stream = (BufferedTokenStream)_input;

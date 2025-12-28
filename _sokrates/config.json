@@ -166,7 +166,20 @@
   },
   "generated": {
     "name": "generated",
-    "sourceFileFilters": [],
+    "sourceFileFilters": [
+      {
+        "pathPattern": ".*/src/main/antlr4/.*\\.java",
+        "contentPattern": "",
+        "exception": false,
+        "note": "ANTLR base classes for parser/lexer support"
+      },
+      {
+        "pathPattern": ".*/src/main/antlr4/.*\\.g4",
+        "contentPattern": "",
+        "exception": false,
+        "note": "ANTLR grammar definition files"
+      }
+    ],
     "files": []
   },
   "buildAndDeployment": {
