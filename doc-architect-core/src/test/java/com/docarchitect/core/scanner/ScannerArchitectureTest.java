@@ -180,9 +180,10 @@ class ScannerArchitectureTest {
                 "..scanner.impl.dotnet..",
                 "..scanner.impl.javascript..",
                 "..scanner.impl.go..",
+                "..scanner.impl.ruby..",
                 "..scanner.impl.schema.."
             )
-            .because("scanner implementations should be organized by technology (java, python, dotnet, javascript, go, schema)");
+            .because("scanner implementations should be organized by technology (java, python, dotnet, javascript, go, ruby, schema)");
 
         rule.check(scannerClasses);
     }
