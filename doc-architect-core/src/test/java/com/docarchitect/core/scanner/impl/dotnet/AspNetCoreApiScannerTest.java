@@ -327,4 +327,42 @@ public class BaseController : ControllerBase
             .extracting(ApiEndpoint::method)
             .containsExactlyInAnyOrder("GET", "GET", "POST");
     }
+
+    // Tests for shouldScanFile() pre-filtering logic
+
+    @Test
+    void scan_withFilenameConvention_scansControllerFiles() throws IOException {
+        createFile("src/Controllers/UsersController.cs", """
+            using Microsoft.AspNetCore.Mvc;
+
+            [ApiController]
+            [Route("api/[controller]")]
+            public class UsersController : ControllerBase
+            {
+                [HttpGet]
+                public IActionResult GetAll() => Ok();
+            }
+            """);
+
+        ScanResult result = scanner.scan(context);
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/api/users");
+    }
+
+    @Test
+    void scan_withNoAspNetPatterns_skipsFile() throws IOException {
+        createFile("src/Models/User.cs", """
+            namespace MyApp.Models
+            {
+                public class User
+                {
+                    public int Id { get; set; }
+                    public string Name { get; set; }
+                }
+            }
+            """);
+
+        ScanResult result = scanner.scan(context);
+        assertThat(result.apiEndpoints()).isEmpty();
+    }
 }

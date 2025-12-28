@@ -212,6 +212,90 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
         return hasAnyFiles(context, CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN);
     }
 
+    /**
+     * Pre-filter files to only scan those containing ASP.NET Core API patterns.
+     *
+     * <p>This avoids attempting to parse files that don't contain API code,
+     * reducing unnecessary processing and improving performance.
+     *
+     * <p><b>Detection Strategy (ordered by likelihood):</b>
+     * <ol>
+     *   <li>Filename convention: *Controller.cs, *Resource.cs, *Api.cs</li>
+     *   <li>ASP.NET Core MVC imports: Microsoft.AspNetCore.Mvc</li>
+     *   <li>HTTP method attributes: [HttpGet], [HttpPost], etc.</li>
+     *   <li>Controller attributes: [ApiController], [Route]</li>
+     *   <li>Controller base classes: ControllerBase, Controller</li>
+     * </ol>
+     *
+     * @param file path to C# source file
+     * @return true if file contains ASP.NET Core API patterns, false otherwise
+     */
+    protected boolean shouldScanFile(Path file) {
+        // Priority 1: Filename convention (fastest check, no I/O)
+        String fileName = file.getFileName().toString();
+        if (fileName.endsWith("Controller.cs") ||
+            fileName.endsWith("Resource.cs") ||
+            fileName.endsWith("Api.cs") ||
+            fileName.contains("Controller") ||
+            fileName.contains("Api")) {
+            log.trace("Including file by naming convention: {}", fileName);
+            return true;
+        }
+
+        // Skip test files unless they contain ASP.NET patterns
+        String filePath = file.toString();
+        boolean isTestFile = filePath.contains("/test/") || filePath.contains("\\test\\") ||
+                            filePath.contains(".test.") || filePath.contains(".Test.");
+
+        try {
+            String content = readFileContent(file);
+
+            // Priority 2: Check for ASP.NET Core MVC imports (loose pattern)
+            boolean hasAspNetMvcImport =
+                (content.contains("Microsoft.AspNetCore") && content.contains("Mvc")) ||
+                (content.contains("using") && content.contains("AspNetCore") && content.contains("Mvc"));
+
+            // Priority 3: Check for HTTP method attributes
+            boolean hasHttpMethodAttributes =
+                content.contains("[HttpGet") ||
+                content.contains("[HttpPost") ||
+                content.contains("[HttpPut") ||
+                content.contains("[HttpDelete") ||
+                content.contains("[HttpPatch");
+
+            // Priority 4: Check for controller attributes
+            boolean hasControllerAttributes =
+                content.contains("[ApiController]") ||
+                content.contains("[Route(") ||
+                content.contains("[Route \"");
+
+            // Priority 5: Check for controller base classes
+            boolean hasControllerBase =
+                (content.contains("ControllerBase") || content.contains(": Controller")) &&
+                (hasAspNetMvcImport || hasHttpMethodAttributes);
+
+            boolean hasAspNetPatterns = hasAspNetMvcImport || hasHttpMethodAttributes ||
+                                       hasControllerAttributes || hasControllerBase;
+
+            if (hasAspNetPatterns) {
+                log.debug("Including file with ASP.NET Core patterns: {} (mvcImport={}, httpAttrs={}, ctrlAttrs={}, ctrlBase={})",
+                    fileName, hasAspNetMvcImport, hasHttpMethodAttributes, hasControllerAttributes, hasControllerBase);
+            } else {
+                log.trace("Skipping file without ASP.NET Core patterns: {}", fileName);
+            }
+
+            // For test files, require ASP.NET patterns
+            if (isTestFile) {
+                return hasAspNetPatterns;
+            }
+
+            return hasAspNetPatterns;
+        } catch (IOException e) {
+            log.debug("Failed to read file for pre-filtering: {}", file);
+            return false;
+        }
+    }
+
     @Override
     public ScanResult scan(ScanContext context) {
         log.info("Scanning ASP.NET Core API endpoints in: {}", context.rootPath());
@@ -223,15 +307,28 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
             return emptyResult();
         }
 
+        int parsedFiles = 0;
+        int skippedFiles = 0;
         for (Path csFile : csFiles) {
+            // Pre-filter files before attempting to parse
+            if (!shouldScanFile(csFile)) {
+                skippedFiles++;
+                continue;
+            }
+
             try {
                 parseCSharpFile(csFile, apiEndpoints);
+                parsedFiles++;
             } catch (Exception e) {
-                log.warn("Failed to parse C# file: {} - {}", csFile, e.getMessage());
+                // Files without ASP.NET patterns are already filtered by shouldScanFile()
+                // Any remaining parse failures are logged at DEBUG level
+                log.debug("Failed to parse C# file: {} - {}", csFile, e.getMessage());
             }
         }
 
-        log.info("Found {} ASP.NET Core API endpoints", apiEndpoints.size());
+        log.debug("Pre-filtered {} files (not ASP.NET Core controllers)", skippedFiles);
+        log.info("Found {} ASP.NET Core API endpoints across {} C# files (parsed {}/{})",
+            apiEndpoints.size(), csFiles.size(), parsedFiles, csFiles.size());
 
         return buildSuccessResult(
             List.of(),
