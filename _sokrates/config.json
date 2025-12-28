@@ -50,6 +50,18 @@
       "note": "Compiled files"
     },
     {
+      "pathPattern": ".*/test-projects/.*",
+      "contentPattern": "",
+      "exception": false,
+      "note": "Git repos from examples"
+    },
+    {
+      "pathPattern": ".*/output/.*",
+      "contentPattern": "",
+      "exception": false,
+      "note": "Output from examples"
+    },
+    {
       "pathPattern": ".*/[.][a-zA-Z0-9_]+.*",
       "contentPattern": "",
       "exception": false,
