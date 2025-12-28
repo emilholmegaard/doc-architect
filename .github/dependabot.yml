@@ -48,3 +48,28 @@ updates:
     commit-message:
       prefix: "chore(ci)"
       include: "scope"
+
+  # Python dependencies (docs only)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "emilholmegaard"
+    labels:
+      - "dependencies"
+      - "python"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    ignore:
+      # Ignore test fixture dependencies - not production code
+      - dependency-name: "requests"
+      - dependency-name: "Flask"
+      - dependency-name: "fastapi"
+      - dependency-name: "SQLAlchemy"
+      - dependency-name: "psycopg2-binary"
+      - dependency-name: "pytest"
