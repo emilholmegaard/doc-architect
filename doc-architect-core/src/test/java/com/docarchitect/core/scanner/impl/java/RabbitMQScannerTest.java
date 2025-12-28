@@ -381,4 +381,79 @@ public class ExchangeProducer {
         assertThat(result.messageFlows()).hasSize(1);
         assertThat(result.messageFlows().get(0).topic()).isEqualTo("exchange-name");
     }
+
+    // Tests for shouldScanFile() pre-filtering logic
+
+    @Test
+    void scan_withWildcardImport_detectsListener() throws IOException {
+        createFile("src/main/java/com/example/MessageListener.java", """
+            package com.example;
+
+            import org.springframework.amqp.rabbit.annotation.*;
+
+            public class MessageListener {
+                @RabbitListener(queues = "test.queue")
+                public void handleMessage(String message) {
+                }
+            }
+            """);
+
+        ScanResult result = scanner.scan(context);
+        assertThat(result.messageFlows()).hasSize(1);
+        assertThat(result.messageFlows().get(0).topic()).isEqualTo("test.queue");
+    }
+
+    @Test
+    void scan_withFilenameConvention_scansListenerFiles() throws IOException {
+        createFile("src/main/java/com/example/OrderListener.java", """
+            package com.example;
+
+            import org.springframework.amqp.rabbit.annotation.RabbitListener;
+
+            public class OrderListener {
+                @RabbitListener(queues = "orders")
+                public void process(String order) {
+                }
+            }
+            """);
+
+        ScanResult result = scanner.scan(context);
+        assertThat(result.messageFlows()).hasSize(1);
+        assertThat(result.messageFlows().get(0).topic()).isEqualTo("orders");
+    }
+
+    @Test
+    void scan_withConsumerNamingConvention_scansConsumerFiles() throws IOException {
+        createFile("src/main/java/com/example/EventConsumer.java", """
+            package com.example;
+
+            import org.springframework.amqp.rabbit.annotation.RabbitListener;
+
+            public class EventConsumer {
+                @RabbitListener(queues = "events")
+                public void consume(String event) {
+                }
+            }
+            """);
+
+        ScanResult result = scanner.scan(context);
+        assertThat(result.messageFlows()).hasSize(1);
+        assertThat(result.messageFlows().get(0).topic()).isEqualTo("events");
+    }
+
+    @Test
+    void scan_withNoRabbitMQPatterns_skipsFile() throws IOException {
+        createFile("src/main/java/com/example/UserService.java", """
+            package com.example;
+
+            public class UserService {
+                public String getUser(Long id) {
+                    return "user";
+                }
+            }
+            """);
+
+        ScanResult result = scanner.scan(context);
+        assertThat(result.messageFlows()).isEmpty();
+    }
 }
