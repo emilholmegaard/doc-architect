@@ -35,7 +35,8 @@ repositories:
 scanners:
   enabled:
     - graphql-schema
-    # Note: bundler-dependencies and rails-api scanners not yet implemented
+    - bundler-dependencies
+    # Note: rails-api scanners not yet implemented
 
 generators:
   default: mermaid
