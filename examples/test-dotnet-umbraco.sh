@@ -30,7 +30,7 @@ project:
 
 repositories:
   - name: "umbraco"
-    path: "src"
+    path: "."
 
 scanners:
   enabled:

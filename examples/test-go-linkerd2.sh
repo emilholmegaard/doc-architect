@@ -35,7 +35,7 @@ repositories:
 scanners:
   enabled:
     - go-modules
-    - protobuf-schema
+    # Note: protobuf-schema scanner not yet implemented
 
 generators:
   default: mermaid

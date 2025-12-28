@@ -30,7 +30,7 @@ project:
 
 repositories:
   - name: "orchardcore"
-    path: "src"
+    path: "."
 
 scanners:
   enabled:
