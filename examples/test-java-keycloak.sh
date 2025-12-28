@@ -35,7 +35,7 @@ repositories:
 scanners:
   enabled:
     - maven-dependencies
-    - spring-rest-api
+    - jaxrs-api
     - jpa-entities
 
 generators:
@@ -64,7 +64,7 @@ echo "  Results: output/keycloak/"
 echo ""
 echo "Expected outputs:"
 echo "  - 50+ components (Maven modules)"
-echo "  - 100+ REST API endpoints"
+echo "  - 500+ JAX-RS API endpoints (vs 0 before)"
 echo "  - 150+ JPA entities"
 echo "  - Complex module dependencies"
 echo ""

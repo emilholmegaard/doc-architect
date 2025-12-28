@@ -4,6 +4,7 @@
 com.docarchitect.core.scanner.impl.java.MavenDependencyScanner
 com.docarchitect.core.scanner.impl.java.GradleDependencyScanner
 com.docarchitect.core.scanner.impl.java.SpringRestApiScanner
+com.docarchitect.core.scanner.impl.java.JaxRsApiScanner
 com.docarchitect.core.scanner.impl.java.JpaEntityScanner
 com.docarchitect.core.scanner.impl.java.KafkaScanner
 com.docarchitect.core.scanner.impl.java.RabbitMQScanner
