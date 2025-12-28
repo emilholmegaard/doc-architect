@@ -41,6 +41,12 @@
             <artifactId>avro</artifactId>
         </dependency>
 
+        <!-- Protocol Buffers (Protobuf) -->
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+        </dependency>
+
         <!-- Jackson XML/YAML/TOML -->
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
