@@ -50,6 +50,18 @@
       "note": "Compiled files"
     },
     {
+      "pathPattern": ".*/test-projects/.*",
+      "contentPattern": "",
+      "exception": false,
+      "note": "Git repos from examples"
+    },
+    {
+      "pathPattern": ".*/output/.*",
+      "contentPattern": "",
+      "exception": false,
+      "note": "Output from examples"
+    },
+    {
       "pathPattern": ".*/[.][a-zA-Z0-9_]+.*",
       "contentPattern": "",
       "exception": false,
@@ -166,7 +178,20 @@
   },
   "generated": {
     "name": "generated",
-    "sourceFileFilters": [],
+    "sourceFileFilters": [
+      {
+        "pathPattern": ".*/src/main/antlr4/.*\\.java",
+        "contentPattern": "",
+        "exception": false,
+        "note": "ANTLR base classes for parser/lexer support"
+      },
+      {
+        "pathPattern": ".*/src/main/antlr4/.*\\.g4",
+        "contentPattern": "",
+        "exception": false,
+        "note": "ANTLR grammar definition files"
+      }
+    ],
     "files": []
   },
   "buildAndDeployment": {
