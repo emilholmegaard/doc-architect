@@ -131,14 +131,25 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
      * <p>This avoids attempting to parse files that don't contain Spring REST code,
      * reducing unnecessary WARN logs and improving performance.
      *
+     * <p><b>Detection Strategy (ordered by likelihood):</b>
+     * <ol>
+     *   <li>Filename convention: *Controller.java, *RestController.java, *Resource.java</li>
+     *   <li>Spring Web package imports (including wildcards): springframework.web + annotation</li>
+     *   <li>Direct Spring MVC annotations: @RestController, @GetMapping, etc.</li>
+     *   <li>Base class patterns: extends *Controller with Spring imports</li>
+     * </ol>
+     *
      * @param file path to Java source file
      * @return true if file contains Spring MVC patterns, false otherwise
      */
     @Override
     protected boolean shouldScanFile(Path file) {
-        // Prioritize Controller files by naming convention
+        // Priority 1: Filename convention (fastest check, no I/O)
         String fileName = file.getFileName().toString();
-        if (fileName.endsWith("Controller.java") || fileName.endsWith("RestController.java")) {
+        if (fileName.endsWith("Controller.java") ||
+            fileName.endsWith("RestController.java") ||
+            fileName.endsWith("Resource.java")) {
+            log.trace("Including file by naming convention: {}", fileName);
             return true;
         }
 
@@ -149,17 +160,38 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
         try {
             String content = readFileContent(file);
 
-            // Check for Spring MVC imports and annotations
-            boolean hasSpringMvcPatterns = content.contains("org.springframework.web.bind.annotation") ||
-                                          content.contains("org.springframework.stereotype.Controller") ||
-                                          content.contains("@RestController") ||
-                                          content.contains("@Controller") ||
-                                          content.contains("@RequestMapping") ||
-                                          content.contains("@GetMapping") ||
-                                          content.contains("@PostMapping") ||
-                                          content.contains("@PutMapping") ||
-                                          content.contains("@DeleteMapping") ||
-                                          content.contains("@PatchMapping");
+            // Priority 2: Check for Spring Web package imports (loose pattern for wildcards)
+            // Matches: org.springframework.web.bind.annotation.* OR individual imports
+            boolean hasSpringWebImport =
+                (content.contains("springframework") && content.contains("web") && content.contains("annotation")) ||
+                (content.contains("springframework") && content.contains("stereotype") && content.contains("Controller"));
+
+            // Priority 3: Check for direct Spring MVC annotations (catches any usage)
+            boolean hasSpringAnnotations =
+                content.contains("@RestController") ||
+                content.contains("@Controller") ||
+                content.contains("@RequestMapping") ||
+                content.contains("@GetMapping") ||
+                content.contains("@PostMapping") ||
+                content.contains("@PutMapping") ||
+                content.contains("@DeleteMapping") ||
+                content.contains("@PatchMapping");
+
+            // Priority 4: Check for base class patterns (conservative)
+            // Matches: extends BaseController/BaseRestController/etc. with Spring imports
+            boolean extendsController =
+                content.contains("extends") &&
+                (content.contains("Controller") || content.contains("Resource")) &&
+                hasSpringWebImport;
+
+            boolean hasSpringMvcPatterns = hasSpringWebImport || hasSpringAnnotations || extendsController;
+
+            if (hasSpringMvcPatterns) {
+                log.debug("Including file with Spring MVC patterns: {} (webImport={}, annotations={}, extends={})",
+                    fileName, hasSpringWebImport, hasSpringAnnotations, extendsController);
+            } else {
+                log.trace("Skipping file without Spring MVC patterns: {}", fileName);
+            }
 
             // For test files, require Spring MVC patterns
             // For non-test files, allow if they have Spring MVC patterns

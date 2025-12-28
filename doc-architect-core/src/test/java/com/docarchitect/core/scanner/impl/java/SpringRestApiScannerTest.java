@@ -316,4 +316,264 @@ class SpringRestApiScannerTest extends ScannerTestBase {
         // Then: Should return false
         assertThat(applies).isFalse();
     }
+
+    // Tests for shouldScanFile() pre-filtering logic
+
+    @Test
+    void scan_withWildcardImport_detectsController() throws IOException {
+        // Given: Controller with wildcard import (import org.springframework.web.bind.annotation.*)
+        createFile("src/main/java/com/example/WildcardController.java", """
+            package com.example;
+
+            import org.springframework.web.bind.annotation.*;
+
+            @RestController
+            @RequestMapping("/api/wildcard")
+            public class WildcardController {
+
+                @GetMapping
+                public String test() {
+                    return "wildcard";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect the endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/api/wildcard");
+    }
+
+    @Test
+    void scan_withExtendsBaseController_detectsEndpoints() throws IOException {
+        // Given: Controller extending a base class (with @RestController on child)
+        createFile("src/main/java/com/example/BaseController.java", """
+            package com.example;
+
+            public abstract class BaseController {
+                protected String commonMethod() {
+                    return "common";
+                }
+            }
+            """);
+
+        createFile("src/main/java/com/example/ExtendedController.java", """
+            package com.example;
+
+            import org.springframework.web.bind.annotation.*;
+
+            @RestController
+            @RequestMapping("/api/extended")
+            public class ExtendedController extends BaseController {
+
+                @GetMapping
+                public String test() {
+                    return "extended";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect the endpoint in the extended controller
+        // Note: The shouldScanFile() will detect this file because it has both
+        // "extends" + "Controller" + Spring web imports
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSizeGreaterThanOrEqualTo(1);
+        assertThat(result.apiEndpoints())
+            .anyMatch(e -> "/api/extended".equals(e.path()));
+    }
+
+    @Test
+    void scan_withFilenameConvention_scansControllerFiles() throws IOException {
+        // Given: File named *Controller.java with Spring annotations
+        createFile("src/main/java/com/example/ApiController.java", """
+            package com.example;
+
+            import org.springframework.web.bind.annotation.*;
+
+            @RestController
+            @RequestMapping("/api")
+            public class ApiController {
+
+                @GetMapping("/test")
+                public String test() {
+                    return "test";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should scan file and detect endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/api/test");
+    }
+
+    @Test
+    void scan_withResourceNamingConvention_scansResourceFiles() throws IOException {
+        // Given: File named *Resource.java with Spring annotations
+        createFile("src/main/java/com/example/UserResource.java", """
+            package com.example;
+
+            import org.springframework.web.bind.annotation.*;
+
+            @RestController
+            @RequestMapping("/users")
+            public class UserResource {
+
+                @GetMapping
+                public String list() {
+                    return "users";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should scan file and detect endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/users");
+    }
+
+    @Test
+    void scan_withLooseSpringImportPattern_detectsController() throws IOException {
+        // Given: File with Spring imports spread across multiple lines
+        createFile("src/main/java/com/example/LooseImportController.java", """
+            package com.example;
+
+            import org.springframework.web.bind.annotation.GetMapping;
+            import org.springframework.web.bind.annotation.RequestMapping;
+            import org.springframework.web.bind.annotation.RestController;
+
+            @RestController
+            @RequestMapping("/api/loose")
+            public class LooseImportController {
+
+                @GetMapping
+                public String test() {
+                    return "loose";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect the endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/api/loose");
+    }
+
+    @Test
+    void scan_withOnlyStereotypeControllerImport_detectsController() throws IOException {
+        // Given: Controller using @Controller from stereotype package
+        createFile("src/main/java/com/example/StereotypeController.java", """
+            package com.example;
+
+            import org.springframework.stereotype.Controller;
+            import org.springframework.web.bind.annotation.GetMapping;
+            import org.springframework.web.bind.annotation.RequestMapping;
+
+            @Controller
+            @RequestMapping("/mvc")
+            public class StereotypeController {
+
+                @GetMapping
+                public String index() {
+                    return "index";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect the endpoint
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/mvc");
+    }
+
+    @Test
+    void scan_withNoSpringPatterns_skipsFile() throws IOException {
+        // Given: Regular Java class with no Spring patterns
+        createFile("src/main/java/com/example/RegularService.java", """
+            package com.example;
+
+            public class RegularService {
+                public String doSomething() {
+                    return "nothing";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should not detect any endpoints
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).isEmpty();
+    }
+
+    @Test
+    void scan_withTestFileContainingSpringPatterns_detectsEndpoints() throws IOException {
+        // Given: Test file with Spring MVC patterns
+        createFile("src/test/java/com/example/TestController.java", """
+            package com.example;
+
+            import org.springframework.web.bind.annotation.*;
+
+            @RestController
+            @RequestMapping("/test")
+            public class TestController {
+
+                @GetMapping
+                public String test() {
+                    return "test";
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect the endpoint even in test directory
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/test");
+    }
+
+    @Test
+    void scan_withTestFileWithoutSpringPatterns_skipsFile() throws IOException {
+        // Given: Test file without Spring MVC patterns
+        createFile("src/test/java/com/example/RegularTest.java", """
+            package com.example;
+
+            import org.junit.jupiter.api.Test;
+
+            public class RegularTest {
+                @Test
+                public void testSomething() {
+                    // test code
+                }
+            }
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should not detect any endpoints
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).isEmpty();
+    }
 }
