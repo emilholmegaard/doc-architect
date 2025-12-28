@@ -28,9 +28,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Duplicate scanner IDs</li>
  * </ul>
  *
- * <p>Expected scanner count as of Phase 6: 20 scanners
+ * <p>Expected scanner count: 21 scanners
  * <ul>
- *   <li>6 Java/JVM scanners (Maven, Gradle, Spring, JPA, Kafka, RabbitMQ)</li>
+ *   <li>7 Java/JVM scanners (Maven, Gradle, Spring, JAX-RS, JPA, Kafka, RabbitMQ)</li>
  *   <li>5 Python scanners (Pip/Poetry, FastAPI, Flask, SQLAlchemy, Django)</li>
  *   <li>3 .NET scanners (NuGet, ASP.NET Core, Entity Framework)</li>
  *   <li>6 Additional scanners (GraphQL, Avro, SQL, npm, Go, Express)</li>
@@ -43,10 +43,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScannerServiceLoaderTest {
 
     /**
-     * Expected number of scanner implementations as of Phase 6.
+     * Expected number of scanner implementations.
      * Update this constant when adding new scanners.
      */
-    private static final int EXPECTED_SCANNER_COUNT = 20;
+    private static final int EXPECTED_SCANNER_COUNT = 21;
 
     @Test
     void serviceLoader_discoversAllRegisteredScanners() {
@@ -119,6 +119,7 @@ class ScannerServiceLoaderTest {
                 "maven-dependencies",
                 "gradle-dependencies",
                 "spring-rest-api",
+                "jaxrs-api",
                 "jpa-entities",
                 "kafka-messaging",
                 "rabbitmq-messaging",
