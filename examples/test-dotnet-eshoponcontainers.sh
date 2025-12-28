@@ -30,7 +30,7 @@ project:
 
 repositories:
   - name: "eshoponcontainers"
-    path: "src"
+    path: "."
 
 scanners:
   enabled:

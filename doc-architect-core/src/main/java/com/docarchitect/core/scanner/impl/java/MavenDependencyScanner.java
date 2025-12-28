@@ -197,12 +197,15 @@ public class MavenDependencyScanner extends AbstractJacksonScanner {
         if (version != null) properties.put(PROPERTY_PROJECT_VERSION, version);
 
         // Extract custom properties
-        @SuppressWarnings("unchecked")
-        Map<String, Object> propertiesSection = (Map<String, Object>) pom.get(KEY_PROPERTIES);
-        if (propertiesSection != null) {
+        Object propertiesSectionObj = pom.get(KEY_PROPERTIES);
+        if (propertiesSectionObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> propertiesSection = (Map<String, Object>) propertiesSectionObj;
             propertiesSection.forEach((key, value) ->
                 properties.put(key, String.valueOf(value))
             );
+        } else if (propertiesSectionObj != null) {
+            log.debug("Unexpected properties type in POM {}: {}", pomFile, propertiesSectionObj.getClass().getName());
         }
 
         // Create component for this Maven project

@@ -12,6 +12,7 @@ import graphql.language.*;
 import graphql.parser.Parser;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -103,6 +104,10 @@ public class GraphQLScanner extends AbstractRegexScanner {
     private static final String COMMA_SEPARATOR = ", ";
     private static final String COLON_SEPARATOR = ": ";
 
+    // File size limits to prevent DoS-style parsing errors (e.g., Saleor's 15k+ token schemas)
+    private static final long MAX_FILE_SIZE_BYTES = 2_000_000; // 2MB max per schema file
+    private static final int MAX_SCHEMA_LINES = 10_000; // ~10k lines max
+
     @Override
     public String getId() {
         return SCANNER_ID;
@@ -150,12 +155,18 @@ public class GraphQLScanner extends AbstractRegexScanner {
             return emptyResult();
         }
 
+        List<String> warnings = new ArrayList<>();
         for (Path schemaFile : schemaFiles) {
             try {
+                // Pre-filter: Skip files that are too large to parse safely
+                if (!shouldScanFile(schemaFile, warnings)) {
+                    continue;
+                }
                 parseSchemaFile(schemaFile, apiEndpoints, dataEntities);
             } catch (Exception e) {
                 log.error("Failed to parse GraphQL schema: {}", schemaFile, e);
-                return failedResult(List.of("Failed to parse GraphQL schema: " + schemaFile + " - " + e.getMessage()));
+                // Don't fail the entire scan - just skip this file and log a warning
+                warnings.add("Failed to parse GraphQL schema: " + schemaFile.getFileName() + " - " + e.getMessage());
             }
         }
 
@@ -169,8 +180,56 @@ public class GraphQLScanner extends AbstractRegexScanner {
             List.of(), // No message flows
             dataEntities,
             List.of(), // No relationships
-            List.of()  // No warnings
+            warnings
         );
+    }
+
+    /**
+     * Pre-filter files to skip those that are too large to parse safely.
+     *
+     * <p>The graphql-java parser has a token limit (15,000 tokens by default) to prevent
+     * DoS attacks. Very large schema files (e.g., Saleor's monolithic schema.graphql)
+     * will exceed this limit and fail to parse.
+     *
+     * <p><b>Detection Strategy:</b>
+     * <ol>
+     *   <li>Check file size - skip files larger than 2MB</li>
+     *   <li>Check line count - skip files with more than 10,000 lines</li>
+     * </ol>
+     *
+     * @param file path to GraphQL schema file
+     * @param warnings list to add warning messages for skipped files
+     * @return true if file should be scanned, false if it should be skipped
+     */
+    private boolean shouldScanFile(Path file, List<String> warnings) {
+        try {
+            // Check 1: File size
+            long fileSize = Files.size(file);
+            if (fileSize > MAX_FILE_SIZE_BYTES) {
+                String msg = String.format("Skipping large GraphQL schema file: %s (%d KB) - exceeds %d KB limit",
+                    file.getFileName(), fileSize / 1024, MAX_FILE_SIZE_BYTES / 1024);
+                log.warn(msg);
+                warnings.add(msg);
+                return false;
+            }
+
+            // Check 2: Line count (simple heuristic - count newlines)
+            String content = readFileContent(file);
+            long lineCount = content.lines().count();
+            if (lineCount > MAX_SCHEMA_LINES) {
+                String msg = String.format("Skipping large GraphQL schema file: %s (%d lines) - exceeds %d line limit",
+                    file.getFileName(), lineCount, MAX_SCHEMA_LINES);
+                log.warn(msg);
+                warnings.add(msg);
+                return false;
+            }
+
+            return true;
+        } catch (IOException e) {
+            log.debug("Failed to check file size for pre-filtering: {}", file, e);
+            // If we can't check the file, try to scan it anyway
+            return true;
+        }
     }
 
     /**
