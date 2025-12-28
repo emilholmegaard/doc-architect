@@ -94,11 +94,33 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
      * <p>This avoids attempting to parse files that don't contain RabbitMQ code,
      * reducing unnecessary WARN logs and improving performance.
      *
+     * <p><b>Detection Strategy (ordered by likelihood):</b>
+     * <ol>
+     *   <li>Filename convention: *Listener.java, *Consumer.java, *Producer.java, *Config.java</li>
+     *   <li>Spring AMQP package imports (loose pattern for wildcards): springframework + amqp</li>
+     *   <li>RabbitMQ package imports: rabbitmq</li>
+     *   <li>Direct RabbitMQ annotations: @RabbitListener, @EnableRabbit, etc.</li>
+     *   <li>RabbitMQ classes: RabbitTemplate, Queue, Exchange, Binding</li>
+     * </ol>
+     *
      * @param file path to Java source file
      * @return true if file contains RabbitMQ patterns, false otherwise
      */
     @Override
     protected boolean shouldScanFile(Path file) {
+        // Priority 1: Filename convention (fastest check, no I/O)
+        String fileName = file.getFileName().toString();
+        if (fileName.endsWith("Listener.java") ||
+            fileName.endsWith("Consumer.java") ||
+            fileName.endsWith("Producer.java") ||
+            fileName.endsWith("MessageHandler.java") ||
+            fileName.contains("RabbitMQ") ||
+            fileName.contains("Rabbit") ||
+            (fileName.contains("Config") && fileName.endsWith(".java"))) {
+            log.trace("Including file by naming convention: {}", fileName);
+            return true;
+        }
+
         // Skip test files unless they contain RabbitMQ patterns
         String filePath = file.toString();
         boolean isTestFile = filePath.contains("/test/") || filePath.contains("\\test\\");
@@ -106,13 +128,44 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
         try {
             String content = readFileContent(file);
 
-            // Check for RabbitMQ imports and annotations
-            boolean hasRabbitMQPatterns = content.contains("org.springframework.amqp") ||
-                                         content.contains("com.rabbitmq") ||
-                                         content.contains("@RabbitListener") ||
-                                         content.contains("@RabbitHandler") ||
-                                         content.contains("@EnableRabbit") ||
-                                         content.contains("RabbitTemplate");
+            // Priority 2: Check for Spring AMQP package imports (loose pattern for wildcards)
+            // Matches: org.springframework.amqp.* OR individual imports
+            boolean hasSpringAmqpImport =
+                (content.contains("springframework") && content.contains("amqp")) ||
+                (content.contains("springframework") && content.contains("rabbit"));
+
+            // Priority 3: Check for RabbitMQ package imports
+            boolean hasRabbitMQImport =
+                content.contains("rabbitmq") ||
+                content.contains("com.rabbitmq");
+
+            // Priority 4: Check for direct RabbitMQ annotations
+            boolean hasRabbitMQAnnotations =
+                content.contains("@RabbitListener") ||
+                content.contains("@RabbitHandler") ||
+                content.contains("@EnableRabbit") ||
+                content.contains("@Queue") ||
+                content.contains("@Exchange") ||
+                content.contains("@QueueBinding");
+
+            // Priority 5: Check for RabbitMQ classes (catches usage even without annotations)
+            boolean hasRabbitMQClasses =
+                content.contains("RabbitTemplate") ||
+                (content.contains("Queue") && content.contains("amqp")) ||
+                (content.contains("Exchange") && content.contains("amqp")) ||
+                (content.contains("Binding") && content.contains("amqp")) ||
+                content.contains("SimpleMessageListenerContainer") ||
+                content.contains("RabbitAdmin");
+
+            boolean hasRabbitMQPatterns = hasSpringAmqpImport || hasRabbitMQImport ||
+                                         hasRabbitMQAnnotations || hasRabbitMQClasses;
+
+            if (hasRabbitMQPatterns) {
+                log.debug("Including file with RabbitMQ patterns: {} (amqpImport={}, rabbitImport={}, annotations={}, classes={})",
+                    fileName, hasSpringAmqpImport, hasRabbitMQImport, hasRabbitMQAnnotations, hasRabbitMQClasses);
+            } else {
+                log.trace("Skipping file without RabbitMQ patterns: {}", fileName);
+            }
 
             // For test files, require RabbitMQ patterns
             // For non-test files, allow if they have RabbitMQ patterns
