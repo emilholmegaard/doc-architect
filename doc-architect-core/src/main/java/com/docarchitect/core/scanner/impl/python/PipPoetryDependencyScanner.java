@@ -49,11 +49,16 @@ import com.fasterxml.jackson.dataformat.toml.TomlMapper;
 public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
     /**
-     * Regex pattern for requirements.txt lines: package==1.0.0, package>=2.0.0, etc.
-     * Captures: (1) package name, (2) version operator, (3) version spec.
+     * Regex pattern for requirements.txt lines: package==1.0.0, package[extra]>=2.0.0, etc.
+     * Captures: (1) package name (with optional extras in brackets), (2) version operator, (3) version spec.
+     * Supports:
+     * - Simple packages: django==4.2.0
+     * - Packages with extras: django[bcrypt]~=5.2.8, psycopg[binary]>=3.2.9
+     * - Packages with multiple extras: celery[redis, sqs]>=4.4.5 (allows spaces in extras)
+     * - Complex version specs: Adyen>=4.0.0,<5 (captures full version part)
      */
     private static final Pattern REQUIREMENTS_PATTERN = Pattern.compile(
-        "^([a-zA-Z0-9_-]+)\\s*([=<>~!]+)\\s*(.+)$"
+        "^([a-zA-Z0-9_-]+(?:\\[[a-zA-Z0-9_,\\s-]+\\])?)\\s*([=<>~!]+)\\s*(.+)$"
     );
 
     /**
@@ -93,6 +98,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
     private static final String CONFIG_KEY_PROJECT = "project";
     private static final String CONFIG_KEY_DEPENDENCIES = "dependencies";
     private static final String CONFIG_KEY_OPTIONAL_DEPENDENCIES = "optional-dependencies";
+    private static final String CONFIG_KEY_DEPENDENCY_GROUPS = "dependency-groups";
     private static final String CONFIG_KEY_TOOL = "tool";
     private static final String CONFIG_KEY_POETRY = "poetry";
     private static final String CONFIG_KEY_DEV_DEPENDENCIES = "dev-dependencies";
@@ -110,10 +116,12 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
     private static final String COMMENT_PREFIX = "#";
 
     // File patterns
-    private static final String PATTERN_REQUIREMENTS = "**/requirements*.txt";
-    private static final String PATTERN_PYPROJECT = "**/pyproject.toml";
-    private static final String PATTERN_SETUP_PY = "**/setup.py";
-    private static final String PATTERN_PIPFILE = "**/Pipfile";
+    // Note: Using {**/,} prefix to match both root-level and nested files
+    // because Java's PathMatcher ** doesn't match zero directories
+    private static final String PATTERN_REQUIREMENTS = "{**/,}requirements*.txt";
+    private static final String PATTERN_PYPROJECT = "{**/,}pyproject.toml";
+    private static final String PATTERN_SETUP_PY = "{**/,}setup.py";
+    private static final String PATTERN_PIPFILE = "{**/,}Pipfile";
     
     // Scanner priority
     private static final int SCANNER_PRIORITY = 10;
@@ -151,12 +159,20 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context,
+        boolean applies = hasAnyFiles(context,
             PATTERN_REQUIREMENTS,
             PATTERN_PYPROJECT,
             PATTERN_SETUP_PY,
             PATTERN_PIPFILE
         );
+        log.debug("PipPoetryDependencyScanner appliesTo: {} (found files: requirements={}, pyproject={}, setup={}, pipfile={})",
+            applies,
+            context.findFiles(PATTERN_REQUIREMENTS).findAny().isPresent(),
+            context.findFiles(PATTERN_PYPROJECT).findAny().isPresent(),
+            context.findFiles(PATTERN_SETUP_PY).findAny().isPresent(),
+            context.findFiles(PATTERN_PIPFILE).findAny().isPresent()
+        );
+        return applies;
     }
 
     @Override
@@ -278,14 +294,19 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
     }
 
     /**
-     * Parses pyproject.toml (PEP 621 format).
-     * Looks for [project.dependencies] and [project.optional-dependencies].
+     * Parses pyproject.toml (PEP 621 and PEP 735 formats).
+     * Looks for:
+     * - [project.dependencies] (PEP 621)
+     * - [project.optional-dependencies] (PEP 621)
+     * - [dependency-groups] (PEP 735)
+     * - [tool.poetry.dependencies] (Poetry)
+     * - [tool.poetry.dev-dependencies] (Poetry)
      */
     private void parsePyprojectToml(Path file, String sourceComponentId, List<Dependency> dependencies) throws IOException {
         String content = readFileContent(file);
         JsonNode root = tomlMapper.readTree(content);
 
-        // Parse [project.dependencies]
+        // Parse [project.dependencies] (PEP 621)
         JsonNode project = root.get(CONFIG_KEY_PROJECT);
         if (project != null) {
             JsonNode deps = project.get(CONFIG_KEY_DEPENDENCIES);
@@ -295,7 +316,7 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                 }
             }
 
-            // Parse [project.optional-dependencies]
+            // Parse [project.optional-dependencies] (PEP 621)
             JsonNode optionalDeps = project.get(CONFIG_KEY_OPTIONAL_DEPENDENCIES);
             if (optionalDeps != null && optionalDeps.isObject()) {
                 optionalDeps.fields().forEachRemaining(entry -> {
@@ -306,6 +327,21 @@ public class PipPoetryDependencyScanner extends AbstractJacksonScanner {
                     }
                 });
             }
+        }
+
+        // Parse [dependency-groups] (PEP 735) - used by uv, Hatch, and modern Python tools
+        JsonNode dependencyGroups = root.get(CONFIG_KEY_DEPENDENCY_GROUPS);
+        if (dependencyGroups != null && dependencyGroups.isObject()) {
+            dependencyGroups.fields().forEachRemaining(entry -> {
+                String groupName = entry.getKey();
+                String scope = groupName.equals("dev") || groupName.equals("test") ? SCOPE_TEST : SCOPE_OPTIONAL;
+
+                if (entry.getValue().isArray()) {
+                    for (JsonNode dep : entry.getValue()) {
+                        parseDependencySpec(dep.asText(), sourceComponentId, scope, dependencies);
+                    }
+                }
+            });
         }
 
         // Parse [tool.poetry.dependencies] (Poetry format)
