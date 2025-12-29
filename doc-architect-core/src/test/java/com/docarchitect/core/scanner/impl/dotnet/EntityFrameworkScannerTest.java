@@ -297,4 +297,261 @@ public class Settings
         DataEntity entity = result.dataEntities().get(0);
         assertThat(entity.primaryKey()).isNull();
     }
+
+    @Test
+    void scan_fluentApiConfiguration_detectsEntity() throws IOException {
+        // Given: Entity configured via Fluent API in OnModelCreating
+        createFile("Data/AppDbContext.cs", """
+using Microsoft.EntityFrameworkCore;
+
+public class AppDbContext : DbContext
+{
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable("Products");
+            entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<Category>();
+    }
+}
+""");
+
+        createFile("Models/Product.cs", """
+public class Product
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public decimal Price { get; set; }
+}
+""");
+
+        createFile("Models/Category.cs", """
+public class Category
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+}
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect entities from Fluent API
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(result.dataEntities())
+            .extracting(DataEntity::name)
+            .contains("Products", "Categories");
+    }
+
+    @Test
+    void scan_baseEntityInheritance_detectsAllEntities() throws IOException {
+        // Given: Entities inheriting from BaseEntity
+        createFile("Models/BaseEntity.cs", """
+public class BaseEntity
+{
+    public int Id { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+""");
+
+        createFile("Models/Product.cs", """
+public class Product : BaseEntity
+{
+    public string Name { get; set; }
+    public decimal Price { get; set; }
+}
+""");
+
+        createFile("Models/Order.cs", """
+public class Order : BaseEntity
+{
+    public string OrderNumber { get; set; }
+    public decimal Total { get; set; }
+}
+""");
+
+        createFile("Data/AppDbContext.cs", """
+using Microsoft.EntityFrameworkCore;
+
+public class AppDbContext : DbContext
+{
+    public DbSet<Product> Products { get; set; }
+    public DbSet<Order> Orders { get; set; }
+}
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect Product and Order (and possibly BaseEntity if discovered)
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSizeGreaterThanOrEqualTo(2);
+        assertThat(result.dataEntities())
+            .extracting(DataEntity::name)
+            .contains("Products", "Orders");
+    }
+
+    @Test
+    void scan_auditableEntityPattern_detectsEntities() throws IOException {
+        // Given: Entities inheriting from AuditableEntity (common pattern)
+        createFile("Models/AuditableEntity.cs", """
+public class AuditableEntity
+{
+    public int Id { get; set; }
+    public string CreatedBy { get; set; }
+    public DateTime CreatedDate { get; set; }
+    public string ModifiedBy { get; set; }
+    public DateTime? ModifiedDate { get; set; }
+}
+""");
+
+        createFile("Models/Invoice.cs", """
+public class Invoice : AuditableEntity
+{
+    public string InvoiceNumber { get; set; }
+    public decimal Amount { get; set; }
+}
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect Invoice through inheritance pattern
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities())
+            .extracting(DataEntity::name)
+            .contains("Invoices");
+    }
+
+    @Test
+    void scan_multipleDbContexts_detectsAllEntities() throws IOException {
+        // Given: Multiple DbContext classes
+        createFile("Data/CatalogDbContext.cs", """
+using Microsoft.EntityFrameworkCore;
+
+public class CatalogDbContext : DbContext
+{
+    public DbSet<Product> Products { get; set; }
+    public DbSet<Category> Categories { get; set; }
+}
+""");
+
+        createFile("Data/OrderingDbContext.cs", """
+using Microsoft.EntityFrameworkCore;
+
+public class OrderingDbContext : DbContext
+{
+    public DbSet<Order> Orders { get; set; }
+    public DbSet<OrderItem> OrderItems { get; set; }
+}
+""");
+
+        createFile("Models/Product.cs", """
+public class Product
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+}
+""");
+
+        createFile("Models/Category.cs", """
+public class Category
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+}
+""");
+
+        createFile("Models/Order.cs", """
+public class Order
+{
+    public int Id { get; set; }
+    public string OrderNumber { get; set; }
+}
+""");
+
+        createFile("Models/OrderItem.cs", """
+public class OrderItem
+{
+    public int Id { get; set; }
+    public int Quantity { get; set; }
+}
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect all entities from both contexts
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSizeGreaterThanOrEqualTo(4);
+        assertThat(result.dataEntities())
+            .extracting(DataEntity::name)
+            .contains("Products", "Categories", "Orders", "OrderItems");
+    }
+
+    @Test
+    void scan_complexNavigationProperties_extractsRelationships() throws IOException {
+        // Given: Complex entity relationships
+        createFile("Data/AppDbContext.cs", """
+using Microsoft.EntityFrameworkCore;
+
+public class AppDbContext : DbContext
+{
+    public DbSet<Blog> Blogs { get; set; }
+    public DbSet<Post> Posts { get; set; }
+    public DbSet<Comment> Comments { get; set; }
+}
+""");
+
+        createFile("Models/Blog.cs", """
+using System.Collections.Generic;
+
+public class Blog
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+    public ICollection<Post> Posts { get; set; }
+}
+""");
+
+        createFile("Models/Post.cs", """
+using System.Collections.Generic;
+
+public class Post
+{
+    public int Id { get; set; }
+    public string Title { get; set; }
+    public int BlogId { get; set; }
+    public Blog Blog { get; set; }
+    public List<Comment> Comments { get; set; }
+}
+""");
+
+        createFile("Models/Comment.cs", """
+public class Comment
+{
+    public int Id { get; set; }
+    public string Text { get; set; }
+    public int PostId { get; set; }
+    public Post Post { get; set; }
+}
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect relationships
+        assertThat(result.success()).isTrue();
+        assertThat(result.relationships()).isNotEmpty();
+
+        // Verify entities were detected
+        assertThat(result.dataEntities())
+            .extracting(DataEntity::name)
+            .contains("Blogs", "Posts", "Comments");
+    }
 }
