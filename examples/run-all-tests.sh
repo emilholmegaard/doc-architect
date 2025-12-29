@@ -44,6 +44,13 @@ run_test "Kafka Spring Cloud Stream" "./examples/test-kafka-spring-cloud-stream.
 run_test "RabbitMQ Spring AMQP Tutorials" "./examples/test-rabbitmq-tutorial.sh"
 run_test "Eventuate Tram Sagas" "./examples/test-eventuate-tram.sh"
 
+# Run advanced messaging framework tests
+run_test "Kafka Streams Java Examples" "./examples/test-kafka-streams-java.sh"
+run_test "Kafka Streams .NET Examples" "./examples/test-kafka-streams-dotnet.sh"
+run_test "Kafka Streams Python (Faust)" "./examples/test-kafka-streams-python.sh"
+run_test "Spring Integration EIP Patterns" "./examples/test-spring-integration.sh"
+run_test "Apache Camel Routes" "./examples/test-apache-camel.sh"
+
 # Run existing tests
 run_test "Spring Boot Microservices (PiggyMetrics)" "./examples/test-spring-microservices.sh"
 run_test ".NET Clean Architecture (eShopOnWeb)" "./examples/test-dotnet-solution.sh"
@@ -81,6 +88,13 @@ echo "  - output/messaging-validation/    (Minimal Test - CRITICAL) ⭐⭐⭐"
 echo "  - output/kafka-stream-samples/    (Kafka Spring Cloud Stream) ⭐"
 echo "  - output/rabbitmq-tutorials/      (RabbitMQ Spring AMQP) ⭐"
 echo "  - output/eventuate-tram/          (Eventuate Tram Sagas) ⭐"
+echo ""
+echo "Advanced messaging frameworks:"
+echo "  - output/kafka-streams-java/      (Kafka Streams Java)"
+echo "  - output/kafka-streams-dotnet/    (Kafka Streams .NET)"
+echo "  - output/kafka-streams-python/    (Kafka Streams Python/Faust)"
+echo "  - output/spring-integration/      (Spring Integration EIP)"
+echo "  - output/apache-camel/            (Apache Camel Routes)"
 echo ""
 echo "General test projects:"
 echo "  - output/piggymetrics/        (Spring Boot Microservices)"

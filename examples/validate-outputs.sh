@@ -883,6 +883,131 @@ validate_messaging_validation() {
     fi
 }
 
+# Validate Kafka Streams Java Examples
+validate_kafka_streams_java() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Kafka Streams Java Examples"
+    echo "=========================================="
+
+    validate_min_count "kafka-streams-java" "components" 10
+    validate_min_count "kafka-streams-java" "dependencies" 20
+
+    # Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Kafka Streams Message Flows${NC}"
+    local flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "output/kafka-streams-java/index.md" 2>/dev/null | grep -oE "[0-9]+" | head -1 || echo "0")
+
+    ((TOTAL_CHECKS++))
+    if [ "$flow_count" -ge 15 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 15 (Kafka Streams topologies)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 15${NC}"
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Kafka Streams .NET Examples
+validate_kafka_streams_dotnet() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Kafka Streams .NET Examples"
+    echo "=========================================="
+
+    validate_min_count "kafka-streams-dotnet" "components" 5
+    validate_min_count "kafka-streams-dotnet" "dependencies" 10
+
+    # Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating .NET Kafka Message Flows${NC}"
+    local flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "output/kafka-streams-dotnet/index.md" 2>/dev/null | grep -oE "[0-9]+" | head -1 || echo "0")
+
+    ((TOTAL_CHECKS++))
+    if [ "$flow_count" -ge 8 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 8 (Kafka producers/consumers)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 8${NC}"
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Kafka Streams Python (Faust) Examples
+validate_kafka_streams_python() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Kafka Streams Python (Faust)"
+    echo "=========================================="
+
+    validate_min_count "kafka-streams-python" "components" 3
+    validate_min_count "kafka-streams-python" "dependencies" 15
+
+    # Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Faust Stream Processing${NC}"
+    local flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "output/kafka-streams-python/index.md" 2>/dev/null | grep -oE "[0-9]+" | head -1 || echo "0")
+
+    ((TOTAL_CHECKS++))
+    if [ "$flow_count" -ge 6 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 6 (Faust agents/topics)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 6${NC}"
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Spring Integration Examples
+validate_spring_integration() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Spring Integration Samples"
+    echo "=========================================="
+
+    validate_min_count "spring-integration" "components" 30
+    validate_min_count "spring-integration" "dependencies" 50
+
+    # Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Spring Integration Message Flows${NC}"
+    local flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "output/spring-integration/index.md" 2>/dev/null | grep -oE "[0-9]+" | head -1 || echo "0")
+
+    ((TOTAL_CHECKS++))
+    if [ "$flow_count" -ge 10 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 10 (EIP patterns)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 10${NC}"
+        ((FAILED_CHECKS++))
+    fi
+}
+
+# Validate Apache Camel Examples
+validate_apache_camel() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Apache Camel Examples"
+    echo "=========================================="
+
+    validate_min_count "apache-camel" "components" 50
+    validate_min_count "apache-camel" "dependencies" 100
+
+    # Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Apache Camel Routes${NC}"
+    local flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "output/apache-camel/index.md" 2>/dev/null | grep -oE "[0-9]+" | head -1 || echo "0")
+
+    ((TOTAL_CHECKS++))
+    if [ "$flow_count" -ge 20 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 20 (Camel routes)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 20${NC}"
+        ((FAILED_CHECKS++))
+    fi
+}
+
 # Main execution
 echo "=========================================="
 echo "DocArchitect Output Validation"
@@ -902,7 +1027,17 @@ validate_eventuate_tram
 
 echo ""
 echo "=========================================="
-echo "PART 2: General Project Validation"
+echo "PART 2: Advanced Messaging Frameworks"
+echo "=========================================="
+validate_kafka_streams_java
+validate_kafka_streams_dotnet
+validate_kafka_streams_python
+validate_spring_integration
+validate_apache_camel
+
+echo ""
+echo "=========================================="
+echo "PART 3: General Project Validation"
 echo "=========================================="
 validate_piggymetrics
 validate_eshopweb
