@@ -197,6 +197,8 @@
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
                         <release>21</release>
+                        <!-- Enable incremental compilation -->
+                        <useIncrementalCompilation>true</useIncrementalCompilation>
                     </configuration>
                 </plugin>
 
@@ -221,6 +223,9 @@
                             <exclude>**/*IntegrationTest.java</exclude>
                             <exclude>**/*IT.java</exclude>
                         </excludes>
+                        <!-- Reuse forks to reduce JVM startup overhead -->
+                        <reuseForks>true</reuseForks>
+                        <forkCount>1</forkCount>
                     </configuration>
                 </plugin>
 
