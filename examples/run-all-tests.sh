@@ -36,7 +36,10 @@ run_test() {
     fi
 }
 
-# Run messaging tests first (validation of message flow scanners)
+# Run messaging validation test first (minimal test case - MUST pass)
+run_test "Messaging Validation (Minimal)" "./examples/test-messaging-validation.sh"
+
+# Run messaging tests (validation of message flow scanners)
 run_test "Kafka Spring Cloud Stream" "./examples/test-kafka-spring-cloud-stream.sh"
 run_test "RabbitMQ Spring AMQP Tutorials" "./examples/test-rabbitmq-tutorial.sh"
 run_test "Eventuate Tram Sagas" "./examples/test-eventuate-tram.sh"
@@ -74,6 +77,7 @@ echo ""
 echo "Results available in:"
 echo ""
 echo "Messaging validation projects:"
+echo "  - output/messaging-validation/    (Minimal Test - CRITICAL) ⭐⭐⭐"
 echo "  - output/kafka-stream-samples/    (Kafka Spring Cloud Stream) ⭐"
 echo "  - output/rabbitmq-tutorials/      (RabbitMQ Spring AMQP) ⭐"
 echo "  - output/eventuate-tram/          (Eventuate Tram Sagas) ⭐"

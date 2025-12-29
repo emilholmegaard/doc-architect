@@ -735,6 +735,154 @@ validate_mattermost() {
     fi
 }
 
+# Validate Kafka Spring Cloud Stream (Messaging validation)
+validate_kafka_stream_samples() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Kafka Spring Cloud Stream"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "kafka-stream-samples" "components" 5
+    validate_min_count "kafka-stream-samples" "dependencies" 10
+
+    # CRITICAL: Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Message Flows (CRITICAL)${NC}"
+
+    local message_flow_file="output/kafka-stream-samples/index.md"
+    local flow_count=0
+
+    if [ -f "$message_flow_file" ]; then
+        flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "$message_flow_file" | grep -oE "[0-9]+" | head -1 || echo "0")
+    fi
+
+    ((TOTAL_CHECKS++))
+
+    if [ "$flow_count" -ge 8 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 8 (minimum)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 8 (expected Kafka topics/streams)${NC}"
+        ((FAILED_CHECKS++))
+        if [ "$flow_count" -eq 0 ]; then
+            echo -e "${RED}  ⚠ CRITICAL: KafkaScanner returning 0 results${NC}"
+            ((CRITICAL_FAILURES++))
+        fi
+    fi
+}
+
+# Validate RabbitMQ Spring AMQP Tutorials (Messaging validation)
+validate_rabbitmq_tutorials() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: RabbitMQ Spring AMQP Tutorials"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "rabbitmq-tutorials" "components" 6
+
+    # CRITICAL: Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Message Flows (CRITICAL)${NC}"
+
+    local message_flow_file="output/rabbitmq-tutorials/index.md"
+    local flow_count=0
+
+    if [ -f "$message_flow_file" ]; then
+        flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "$message_flow_file" | grep -oE "[0-9]+" | head -1 || echo "0")
+    fi
+
+    ((TOTAL_CHECKS++))
+
+    if [ "$flow_count" -ge 5 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 5 (minimum)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 5 (expected @RabbitListener)${NC}"
+        ((FAILED_CHECKS++))
+        if [ "$flow_count" -eq 0 ]; then
+            echo -e "${RED}  ⚠ CRITICAL: RabbitMQScanner returning 0 results${NC}"
+            ((CRITICAL_FAILURES++))
+        fi
+    fi
+
+    # Content validation - Check for @RabbitListener patterns
+    if [ -f "output/rabbitmq-tutorials/message-flows.md" ]; then
+        check_contains "output/rabbitmq-tutorials/message-flows.md" "queue\|Queue" "RabbitMQ queue declarations"
+    fi
+}
+
+# Validate Eventuate Tram Sagas (Messaging validation)
+validate_eventuate_tram() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Eventuate Tram Sagas"
+    echo "=========================================="
+
+    # Minimum counts
+    validate_min_count "eventuate-tram" "components" 3
+    validate_min_count "eventuate-tram" "dependencies" 15
+    validate_min_count "eventuate-tram" "api_endpoints" 5
+
+    # CRITICAL: Message flow validation
+    echo ""
+    echo -e "${BLUE}Validating Message Flows (CRITICAL)${NC}"
+
+    local message_flow_file="output/eventuate-tram/index.md"
+    local flow_count=0
+
+    if [ -f "$message_flow_file" ]; then
+        flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "$message_flow_file" | grep -oE "[0-9]+" | head -1 || echo "0")
+    fi
+
+    ((TOTAL_CHECKS++))
+
+    if [ "$flow_count" -ge 10 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 10 (minimum)${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 10 (expected Kafka domain events)${NC}"
+        ((FAILED_CHECKS++))
+        if [ "$flow_count" -eq 0 ]; then
+            echo -e "${RED}  ⚠ CRITICAL: KafkaScanner not detecting event-driven patterns${NC}"
+            ((CRITICAL_FAILURES++))
+        fi
+    fi
+}
+
+# Validate Messaging Validation (Minimal test case)
+validate_messaging_validation() {
+    echo ""
+    echo "=========================================="
+    echo "Validating: Messaging Validation (Minimal)"
+    echo "=========================================="
+
+    # CRITICAL: This minimal test MUST pass
+    echo ""
+    echo -e "${BLUE}Validating Message Flows (MINIMAL TEST)${NC}"
+
+    local message_flow_file="output/messaging-validation/index.md"
+    local flow_count=0
+
+    if [ -f "$message_flow_file" ]; then
+        flow_count=$(grep -E "Message Flows.*\|.*[0-9]+" "$message_flow_file" | grep -oE "[0-9]+" | head -1 || echo "0")
+    fi
+
+    ((TOTAL_CHECKS++))
+
+    if [ "$flow_count" -ge 4 ]; then
+        echo -e "${GREEN}✓ Message Flows: $flow_count >= 4 (validation passed)${NC}"
+        echo -e "${GREEN}  Scanners ARE working correctly!${NC}"
+        ((PASSED_CHECKS++))
+    else
+        echo -e "${RED}✗ FAIL: Message Flows: $flow_count < 4 (expected at least 4)${NC}"
+        echo -e "${RED}  ⚠ CRITICAL: Scanners failing on minimal test case${NC}"
+        ((FAILED_CHECKS++))
+        ((CRITICAL_FAILURES++))
+    fi
+}
+
 # Main execution
 echo "=========================================="
 echo "DocArchitect Output Validation"
@@ -743,6 +891,19 @@ echo "This script validates scanner effectiveness"
 echo "against production open-source projects."
 echo ""
 
+# First validate the messaging validation projects (critical)
+echo "=========================================="
+echo "PART 1: Messaging Scanner Validation"
+echo "=========================================="
+validate_messaging_validation
+validate_kafka_stream_samples
+validate_rabbitmq_tutorials
+validate_eventuate_tram
+
+echo ""
+echo "=========================================="
+echo "PART 2: General Project Validation"
+echo "=========================================="
 validate_piggymetrics
 validate_eshopweb
 validate_fastapi
