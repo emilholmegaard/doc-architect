@@ -35,6 +35,7 @@ repositories:
 scanners:
   enabled:
     - go-modules
+    - go-http-router
 
 generators:
   default: mermaid
@@ -65,6 +66,6 @@ echo ""
 echo "Expected outputs:"
 echo "  - 1 main component (monolith)"
 echo "  - 100+ Go module dependencies"
-echo "  - REST API routes"
+echo "  - 80+ REST API endpoints (Gin framework)"
 echo "  - Database models"
 echo ""
