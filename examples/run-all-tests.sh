@@ -36,7 +36,12 @@ run_test() {
     fi
 }
 
-# Run all tests
+# Run messaging tests first (validation of message flow scanners)
+run_test "Kafka Spring Cloud Stream" "./examples/test-kafka-spring-cloud-stream.sh"
+run_test "RabbitMQ Spring AMQP Tutorials" "./examples/test-rabbitmq-tutorial.sh"
+run_test "Eventuate Tram Sagas" "./examples/test-eventuate-tram.sh"
+
+# Run existing tests
 run_test "Spring Boot Microservices (PiggyMetrics)" "./examples/test-spring-microservices.sh"
 run_test ".NET Clean Architecture (eShopOnWeb)" "./examples/test-dotnet-solution.sh"
 run_test "Python FastAPI" "./examples/test-python-fastapi.sh"
@@ -67,6 +72,13 @@ fi
 
 echo ""
 echo "Results available in:"
+echo ""
+echo "Messaging validation projects:"
+echo "  - output/kafka-stream-samples/    (Kafka Spring Cloud Stream) ⭐"
+echo "  - output/rabbitmq-tutorials/      (RabbitMQ Spring AMQP) ⭐"
+echo "  - output/eventuate-tram/          (Eventuate Tram Sagas) ⭐"
+echo ""
+echo "General test projects:"
 echo "  - output/piggymetrics/        (Spring Boot Microservices)"
 echo "  - output/eshopweb/            (.NET Clean Architecture)"
 echo "  - output/fastapi/             (Python FastAPI)"

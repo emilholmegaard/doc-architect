@@ -35,11 +35,12 @@ repositories:
 scanners:
   enabled:
     - maven-dependencies
-    - spring-components
     - spring-rest-api
     - jpa-entities
     - mongodb  # PiggyMetrics uses MongoDB for data storage
-    - rabbitmq-messaging  # PiggyMetrics uses RabbitMQ for messaging
+    # Note: rabbitmq-messaging enabled but will find 0 flows
+    # (RabbitMQ used only for Spring Cloud Bus infrastructure)
+    - rabbitmq-messaging
 
 generators:
   default: mermaid
@@ -68,8 +69,11 @@ echo "✓ PiggyMetrics scan complete."
 echo "  Results: output/piggymetrics/"
 echo ""
 echo "Expected outputs:"
-echo "  - 7+ components (one per service)"
-echo "  - 20+ REST endpoints"
-echo "  - 10+ MongoDB entities (with @DBRef relationships)"
-echo "  - Service-to-service relationships"
+echo "  - 9 components (Maven modules) ✅"
+echo "  - 11+ REST endpoints ✅"
+echo "  - 5+ MongoDB entities ✅"
+echo "  - 0 message flows ✅ (uses REST + Feign, not async messaging)"
+echo ""
+echo "Note: PiggyMetrics uses RabbitMQ only for infrastructure (Spring Cloud Bus)"
+echo "      Business communication is via REST APIs, not message queues."
 echo ""
