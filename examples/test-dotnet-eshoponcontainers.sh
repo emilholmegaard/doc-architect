@@ -52,7 +52,9 @@ EOF
 # Run DocArchitect
 echo ""
 echo "Running DocArchitect on eShopOnContainers..."
-docker run --rm \
+# Create output directory with correct permissions before Docker mount
+mkdir -p "$(pwd)/output/eshopcontainers"
+ --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
     -v "$(pwd)/output/eshoponcontainers:/output" \
     ghcr.io/emilholmegaard/doc-architect:latest \

@@ -230,6 +230,7 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
      * @param file path to C# source file
      * @return true if file contains ASP.NET Core API patterns, false otherwise
      */
+    @Override
     protected boolean shouldScanFile(Path file) {
         // Priority 1: Filename convention (fastest check, no I/O)
         String fileName = file.getFileName().toString();

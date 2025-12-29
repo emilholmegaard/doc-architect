@@ -50,6 +50,8 @@ EOF
 # Run DocArchitect
 echo ""
 echo "Running DocArchitect on Gitea..."
+# Create output directory with correct permissions before Docker mount
+mkdir -p "$(pwd)/output/gitea"
 docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
     -v "$(pwd)/output/gitea:/output" \

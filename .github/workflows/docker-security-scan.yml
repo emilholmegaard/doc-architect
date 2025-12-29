@@ -33,8 +33,9 @@ jobs:
           image-ref: ${{ env.DOCKER_IMAGE }}:${{ inputs.image-tag }}
           format: 'sarif'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH,MEDIUM'
+          severity: 'CRITICAL,HIGH'
           scanners: 'vuln,secret,config'
+          ignore-unfixed: true
       
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v4

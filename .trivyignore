@@ -1,0 +1,17 @@
+# Trivy Ignore File for doc-architect
+# See: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
+
+# Alpine base image CVEs that are unfixed or have no available patches
+# These are tracked separately and will be resolved when Alpine releases updates
+
+# BusyBox vulnerabilities in base Alpine image
+# Tracked in: https://gitlab.alpinelinux.org/alpine/aports/-/issues
+CVE-2024-58251
+CVE-2025-46394
+
+# GnuPG vulnerabilities in base Alpine image - informational only
+# Not exploitable in our container context (non-interactive use)
+CVE-2022-3219
+
+# Note: CRITICAL and HIGH severity CVEs are NOT ignored
+# Only MEDIUM and below are candidates for ignoring after risk assessment

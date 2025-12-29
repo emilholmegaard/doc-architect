@@ -53,6 +53,8 @@ EOF
 # Run DocArchitect
 echo ""
 echo "Running DocArchitect on eShopOnWeb..."
+# Create output directory with correct permissions before Docker mount
+mkdir -p "$(pwd)/output/eshopweb"
 docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
     -v "$(pwd)/output/eshopweb:/output" \
