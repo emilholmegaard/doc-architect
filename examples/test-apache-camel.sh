@@ -41,6 +41,7 @@ scanners:
     - kafka-messaging
     - rabbitmq-messaging
     - spring-rest-api
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
     - jpa-entities
     - java-components
 

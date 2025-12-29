@@ -48,3 +48,4 @@ com.docarchitect.core.scanner.impl.schema.GraphQLScanner
 com.docarchitect.core.scanner.impl.schema.AvroSchemaScanner
 com.docarchitect.core.scanner.impl.schema.ProtobufSchemaScanner
 com.docarchitect.core.scanner.impl.schema.SqlMigrationScanner
+com.docarchitect.core.scanner.impl.schema.RestEventFlowScanner

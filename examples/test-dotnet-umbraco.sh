@@ -38,6 +38,7 @@ scanners:
     - dotnet-solution
     - aspnetcore-rest
     - entity-framework
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
 
 generators:
   default: mermaid

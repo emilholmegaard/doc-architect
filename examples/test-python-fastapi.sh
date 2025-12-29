@@ -38,6 +38,7 @@ scanners:
     - fastapi-rest
     - sqlalchemy-entities
     - celery-tasks
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
 
 generators:
   default: mermaid
