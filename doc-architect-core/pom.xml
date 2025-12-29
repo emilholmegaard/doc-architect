@@ -147,8 +147,10 @@
                 </executions>
                 <configuration>
                     <outputDirectory>${project.build.directory}/generated-sources/antlr4</outputDirectory>
-                    <listener>true</listener>
-                    <visitor>true</visitor>
+                    <!-- Optimize ANTLR generation -->
+                    <listener>false</listener>
+                    <visitor>false</visitor>
+                    <treatWarningsAsErrors>false</treatWarningsAsErrors>
                 </configuration>
             </plugin>
             <plugin>

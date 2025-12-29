@@ -33,6 +33,7 @@ class ScannerArchitectureTest {
         scannerClasses = new ClassFileImporter()
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
             .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_JARS)
+            .withImportOption(location -> !location.contains("/jrt:/"))  // Exclude JDK modules (Java 21 compatibility)
             .importPackages("com.docarchitect.core.scanner");
     }
 
