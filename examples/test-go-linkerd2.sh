@@ -35,6 +35,7 @@ repositories:
 scanners:
   enabled:
     - go-modules
+    - go-http-router
     - protobuf-schema
 
 generators:
@@ -66,6 +67,7 @@ echo ""
 echo "Expected outputs:"
 echo "  - 10+ microservices components"
 echo "  - 50+ Go module dependencies"
+echo "  - HTTP API endpoints (net/http framework)"
 echo "  - gRPC service definitions"
 echo "  - Protobuf schemas"
 echo ""
