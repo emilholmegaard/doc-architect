@@ -141,4 +141,123 @@ setup(
         // Then: Should return false
         assertThat(applies).isFalse();
     }
+
+    @Test
+    void scan_withPyprojectTomlDependencyGroups_extractsDependencies() throws IOException {
+        // Given: pyproject.toml with PEP 735 dependency-groups (used by Saleor, uv, Hatch)
+        createFile("app/pyproject.toml", """
+[project]
+name = "saleor"
+version = "3.23.0"
+dependencies = [
+    "django[bcrypt]~=5.2.8",
+    "Adyen>=4.0.0,<5",
+    "psycopg[binary]>=3.2.9,<4",
+    "celery[redis, sqs]>=4.4.5,<6.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.2,<9",
+    "coverage~=7.6",
+    "ruff>=0.12.2,<0.13",
+]
+test = [
+    "pytest-django==4.11.1",
+    "pytest-cov>=6.0.0,<7",
+]
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract all dependencies including dev groups
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies()).hasSizeGreaterThanOrEqualTo(9);
+
+        // Verify compile-scope dependencies (from project.dependencies)
+        assertThat(result.dependencies())
+            .filteredOn(d -> d.scope().equals("compile"))
+            .extracting(Dependency::artifactId)
+            .contains("django[bcrypt]", "Adyen", "psycopg[binary]", "celery[redis, sqs]");
+
+        // Verify test-scope dependencies (from dependency-groups.dev and .test)
+        assertThat(result.dependencies())
+            .filteredOn(d -> d.scope().equals("test"))
+            .extracting(Dependency::artifactId)
+            .containsAnyOf("pytest", "coverage", "ruff", "pytest-django", "pytest-cov");
+    }
+
+    @Test
+    void scan_withPackageExtras_preservesExtrasInArtifactId() throws IOException {
+        // Given: requirements.txt with package extras
+        createFile("app/requirements.txt", String.join(System.lineSeparator(),
+            "django[bcrypt]~=5.2.8",
+            "psycopg[binary]>=3.2.9",
+            "celery[redis,sqs]>=4.4.5"
+        ));
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should preserve extras in artifact ID
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies())
+            .extracting(Dependency::artifactId)
+            .contains("django[bcrypt]", "psycopg[binary]", "celery[redis,sqs]");
+    }
+
+    @Test
+    void scan_withComplexVersionSpecs_extractsFullVersionString() throws IOException {
+        // Given: requirements.txt with complex version specifiers
+        createFile("app/requirements.txt", String.join(System.lineSeparator(),
+            "Adyen>=4.0.0,<5",
+            "babel>=2.8,<2.18",
+            "boto3~=1.28",
+            "cryptography>=44.0.2,<45"
+        ));
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract full version specifications
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies()).hasSize(4);
+
+        assertThat(result.dependencies())
+            .filteredOn(d -> d.artifactId().equals("Adyen"))
+            .extracting(Dependency::version)
+            .containsExactly("4.0.0,<5");
+
+        assertThat(result.dependencies())
+            .filteredOn(d -> d.artifactId().equals("babel"))
+            .extracting(Dependency::version)
+            .containsExactly("2.8,<2.18");
+    }
+
+    @Test
+    void scan_withPipfile_extractsDependencies() throws IOException {
+        // Given: Pipfile with dependencies
+        createFile("app/Pipfile", """
+[packages]
+django = "~=4.2"
+requests = "*"
+celery = {version = ">=5.0", extras = ["redis"]}
+
+[dev-packages]
+pytest = "*"
+black = "==23.0.0"
+""");
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract dependencies
+        assertThat(result.success()).isTrue();
+        assertThat(result.dependencies()).hasSizeGreaterThanOrEqualTo(5);
+
+        assertThat(result.dependencies())
+            .extracting(Dependency::artifactId)
+            .contains("django", "requests", "celery", "pytest", "black");
+    }
 }
