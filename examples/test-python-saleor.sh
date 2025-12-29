@@ -38,6 +38,7 @@ scanners:
     - django-apps
     - graphql-schema
     - django-orm
+    - celery-tasks
 
 generators:
   default: mermaid

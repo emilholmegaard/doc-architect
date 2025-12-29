@@ -139,4 +139,78 @@ public final class PythonAst {
             importedNames = importedNames != null ? List.copyOf(importedNames) : List.of();
         }
     }
+
+    /**
+     * Represents a Python module-level function definition.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * @shared_task(queue='emails')
+     * def send_email(to, subject):
+     *     pass
+     * }</pre>
+     *
+     * @param name function name (e.g., "send_email")
+     * @param parameters list of parameter names
+     * @param decorators list of decorator expressions (e.g., ["shared_task(queue='emails')"])
+     * @param lineNumber line number where function is defined (1-indexed)
+     * @param isAsync whether this is an async function
+     */
+    public record Function(
+        String name,
+        List<String> parameters,
+        List<String> decorators,
+        int lineNumber,
+        boolean isAsync
+    ) {
+        public Function {
+            Objects.requireNonNull(name, "name must not be null");
+            parameters = parameters != null ? List.copyOf(parameters) : List.of();
+            decorators = decorators != null ? List.copyOf(decorators) : List.of();
+        }
+
+        /**
+         * Check if this function has a specific decorator.
+         *
+         * <p>Matches exact name or decorator with parameters.
+         *
+         * @param decoratorName decorator name to check (e.g., "task", "shared_task")
+         * @return true if this function has the decorator
+         */
+        public boolean hasDecorator(String decoratorName) {
+            return decorators.stream()
+                .anyMatch(dec ->
+                    dec.equals(decoratorName) ||
+                    dec.startsWith(decoratorName + "(") ||
+                    dec.contains("." + decoratorName + "(") ||
+                    dec.contains("." + decoratorName)
+                );
+        }
+    }
+
+    /**
+     * Represents a function call/invocation in Python code.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * send_email.delay('user@example.com', 'Welcome')
+     * process_data.apply_async(args=[123], queue='priority')
+     * }</pre>
+     *
+     * @param functionName name of the function being called (e.g., "send_email")
+     * @param method method being invoked (e.g., "delay", "apply_async")
+     * @param arguments full argument string
+     * @param lineNumber line number where call occurs (1-indexed)
+     */
+    public record FunctionCall(
+        String functionName,
+        String method,
+        String arguments,
+        int lineNumber
+    ) {
+        public FunctionCall {
+            Objects.requireNonNull(functionName, "functionName must not be null");
+            Objects.requireNonNull(method, "method must not be null");
+        }
+    }
 }

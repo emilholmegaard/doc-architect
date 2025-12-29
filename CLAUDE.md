@@ -14,6 +14,7 @@
 - Prefer base classes for shared mechanisms:
   - AbstractRegexScanner, AbstractJacksonScanner, AbstractJavaParserScanner (all extend AbstractScanner).
 - Align with ADRs in docs/adrs (C4 model, TechDocs, logging, testing, packaging, scanner pre-filtering).
+- All documentation are placed in docs/ and decorated with yaml for mkdocs
 
 ## Project Structure
 
@@ -98,6 +99,7 @@ void generate_withValidInput_returnsDeterministicId() {
 
 ## Libraries & Parsers (prefer proven libs)
 
+- AST from ANTLR when possible, to avoid regular expressions
 - GraphQL → graphql-java (avoid regex for rich grammars)
 - Avro → Apache Avro (avoid plain JSON parsing)
 - SQL → JSqlParser where applicable
