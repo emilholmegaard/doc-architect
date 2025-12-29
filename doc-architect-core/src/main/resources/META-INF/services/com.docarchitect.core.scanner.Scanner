@@ -19,6 +19,7 @@ com.docarchitect.core.scanner.impl.python.FastAPIScanner
 com.docarchitect.core.scanner.impl.python.FlaskScanner
 com.docarchitect.core.scanner.impl.python.SqlAlchemyScanner
 com.docarchitect.core.scanner.impl.python.DjangoOrmScanner
+com.docarchitect.core.scanner.impl.python.CeleryScanner
 
 # .NET Scanners
 com.docarchitect.core.scanner.impl.dotnet.NuGetDependencyScanner

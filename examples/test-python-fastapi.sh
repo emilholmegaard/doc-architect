@@ -37,6 +37,7 @@ scanners:
     - pip-poetry-dependencies
     - fastapi-rest
     - sqlalchemy-entities
+    - celery-tasks
 
 generators:
   default: mermaid
