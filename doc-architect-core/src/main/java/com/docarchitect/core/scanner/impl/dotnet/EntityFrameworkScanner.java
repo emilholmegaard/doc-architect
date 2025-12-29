@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Scanner for Entity Framework (EF Core) database entities in C# source files.
@@ -175,6 +176,7 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
         Set<String> entityNames = new HashSet<>();
+        Map<String, String> baseClassMap = new HashMap<>(); // Maps entity name to base class name
 
         List<Path> csFiles = context.findFiles(CS_FILE_PATTERN).toList();
 
@@ -182,7 +184,7 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
             return emptyResult();
         }
 
-        // First pass: Find DbContext and collect entity names
+        // First pass: Find DbContext and collect entity names from DbSet properties
         for (Path csFile : csFiles) {
             try {
                 collectEntityNamesFromDbContext(csFile, entityNames);
@@ -191,7 +193,36 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
             }
         }
 
-        // Second pass: Parse entity classes
+        // Second pass: Find entities from OnModelCreating Fluent API
+        for (Path csFile : csFiles) {
+            try {
+                collectEntityNamesFromFluentApi(csFile, entityNames);
+            } catch (Exception e) {
+                log.warn("Failed to parse Fluent API in file: {} - {}", csFile, e.getMessage());
+            }
+        }
+
+        // Third pass: Build inheritance map for all classes
+        for (Path csFile : csFiles) {
+            try {
+                buildInheritanceMap(csFile, baseClassMap);
+            } catch (Exception e) {
+                log.warn("Failed to build inheritance map from file: {} - {}", csFile, e.getMessage());
+            }
+        }
+
+        // Fourth pass: Detect entities through inheritance (e.g., classes inheriting from BaseEntity)
+        for (Path csFile : csFiles) {
+            try {
+                collectEntityNamesFromInheritance(csFile, entityNames, baseClassMap);
+            } catch (Exception e) {
+                log.warn("Failed to detect entities by inheritance in file: {} - {}", csFile, e.getMessage());
+            }
+        }
+
+        log.debug("Discovered {} potential entity types", entityNames.size());
+
+        // Final pass: Parse entity classes
         for (Path csFile : csFiles) {
             try {
                 parseEntityClasses(csFile, entityNames, dataEntities, relationships);
@@ -232,6 +263,111 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
     }
 
     /**
+     * Collects entity names from OnModelCreating Fluent API configurations.
+     *
+     * <p>Patterns detected:</p>
+     * <ul>
+     *   <li>{@code modelBuilder.Entity<User>()}</li>
+     *   <li>{@code modelBuilder.Entity<Order>(entity => {...})}</li>
+     * </ul>
+     */
+    private void collectEntityNamesFromFluentApi(Path file, Set<String> entityNames) throws IOException {
+        String content = readFileContent(file);
+
+        // Pattern: modelBuilder.Entity<EntityName>
+        Pattern fluentApiPattern = Pattern.compile("modelBuilder\\.Entity<(\\w+)>", Pattern.DOTALL);
+        Matcher matcher = fluentApiPattern.matcher(content);
+
+        while (matcher.find()) {
+            String entityType = matcher.group(1);
+            entityNames.add(entityType);
+            log.debug("Found entity from Fluent API: {}", entityType);
+        }
+    }
+
+    /**
+     * Builds a map of class names to their base classes.
+     *
+     * @param file the C# file to parse
+     * @param baseClassMap map to populate with class-to-base-class relationships
+     */
+    private void buildInheritanceMap(Path file, Map<String, String> baseClassMap) throws IOException {
+        List<DotNetAst.CSharpClass> classes = parseAstFile(file);
+
+        for (DotNetAst.CSharpClass csharpClass : classes) {
+            String className = csharpClass.name();
+            List<String> baseClasses = csharpClass.baseClasses();
+
+            if (!baseClasses.isEmpty()) {
+                // Store the first base class (C# only supports single inheritance for classes)
+                String baseClass = baseClasses.get(0);
+                baseClassMap.put(className, baseClass);
+                log.debug("Inheritance: {} extends {}", className, baseClass);
+            }
+        }
+    }
+
+    /**
+     * Detects entities through inheritance patterns.
+     *
+     * <p>Common patterns in EF Core projects:</p>
+     * <ul>
+     *   <li>Classes inheriting from BaseEntity</li>
+     *   <li>Classes inheriting from AuditableEntity</li>
+     *   <li>Classes inheriting from Entity</li>
+     *   <li>Any class that inherits from a class already identified as an entity</li>
+     * </ul>
+     *
+     * @param file the C# file to parse
+     * @param entityNames set of known entity names (will be updated)
+     * @param baseClassMap map of class-to-base-class relationships
+     */
+    private void collectEntityNamesFromInheritance(Path file, Set<String> entityNames,
+                                                   Map<String, String> baseClassMap) throws IOException {
+        List<DotNetAst.CSharpClass> classes = parseAstFile(file);
+
+        // Common base entity class names
+        Set<String> commonBaseEntityNames = Set.of(
+            "BaseEntity", "Entity", "AuditableEntity", "EntityBase",
+            "BaseAuditableEntity", "AuditEntity", "DomainEntity"
+        );
+
+        for (DotNetAst.CSharpClass csharpClass : classes) {
+            String className = csharpClass.name();
+            List<String> baseClasses = csharpClass.baseClasses();
+
+            // Skip if already identified as an entity
+            if (entityNames.contains(className)) {
+                continue;
+            }
+
+            // Skip DbContext classes
+            if (baseClasses.stream().anyMatch(base -> base.contains("DbContext"))) {
+                continue;
+            }
+
+            // Check if inherits from a common base entity class
+            for (String baseClass : baseClasses) {
+                if (commonBaseEntityNames.contains(baseClass) ||
+                    commonBaseEntityNames.stream().anyMatch(baseClass::endsWith)) {
+                    entityNames.add(className);
+                    log.debug("Found entity by inheritance: {} extends {}", className, baseClass);
+                    break;
+                }
+            }
+
+            // Check if inherits from an already-known entity
+            for (String baseClass : baseClasses) {
+                if (entityNames.contains(baseClass)) {
+                    entityNames.add(className);
+                    log.debug("Found entity by entity inheritance: {} extends {}", className, baseClass);
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
      * Parses entity classes and extracts properties and relationships.
      */
     private void parseEntityClasses(Path file, Set<String> entityNames,
@@ -247,6 +383,11 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
                 continue;
             }
 
+            // Skip if already processed (avoid duplicates from multiple files)
+            if (dataEntities.stream().anyMatch(e -> e.name().equals(className))) {
+                continue;
+            }
+
             // Extract properties and detect primary key
             List<DataEntity.Field> fields = extractEntityFieldsFromAst(csharpClass, entityNames);
             String primaryKey = findPrimaryKeyFromProperties(csharpClass);
@@ -254,23 +395,21 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
             // Extract relationships
             extractNavigationRelationshipsFromAst(csharpClass, entityNames, relationships);
 
-            // Create DataEntity
-            if (!fields.isEmpty()) {
-                String tableName = toPlural(className);
+            // Create DataEntity (even if no fields, as it might have inherited fields)
+            String tableName = toPlural(className);
 
-                DataEntity entity = new DataEntity(
-                    className,
-                    tableName,
-                    ENTITY_TYPE,
-                    fields,
-                    primaryKey,
-                    "Entity Framework Entity: " + className
-                );
+            DataEntity entity = new DataEntity(
+                className,
+                tableName,
+                ENTITY_TYPE,
+                fields,
+                primaryKey,
+                "Entity Framework Entity: " + className
+            );
 
-                dataEntities.add(entity);
-                log.debug("Found Entity Framework entity: {} -> table: {} with PK: {}",
-                    className, tableName, primaryKey != null ? primaryKey : "none");
-            }
+            dataEntities.add(entity);
+            log.debug("Found Entity Framework entity: {} -> table: {} with {} fields and PK: {}",
+                className, tableName, fields.size(), primaryKey != null ? primaryKey : "none");
         }
     }
 
