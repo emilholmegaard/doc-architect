@@ -38,7 +38,8 @@ scanners:
     - dotnet-solution
     - aspnetcore-rest
     - entity-framework
-    - rabbitmq-messaging  # eShopOnContainers uses RabbitMQ for event bus
+    - rabbitmq-messaging  # Event bus (RabbitMQ for dev, Azure Service Bus for production)
+    - dotnet-kafka-messaging  # Check for any Kafka usage
 
 generators:
   default: mermaid
@@ -67,9 +68,16 @@ echo "✓ eShopOnContainers scan complete."
 echo "  Results: output/eshoponcontainers/"
 echo ""
 echo "Expected outputs:"
-echo "  - 10+ microservices components"
-echo "  - 50+ REST API endpoints"
-echo "  - 30+ Entity Framework entities"
-echo "  - gRPC service definitions"
-echo "  - Inter-service communication patterns"
+echo "  - 10+ microservices components (Catalog, Basket, Ordering, Identity, etc.)"
+echo "  - 50+ REST API endpoints (HTTP APIs for each microservice)"
+echo "  - 30+ Entity Framework entities (domain models)"
+echo "  - 15+ message flows (event-driven integration events)"
+echo "  - gRPC service definitions (inter-service communication)"
+echo "  - Event bus patterns (RabbitMQ/Azure Service Bus)"
+echo ""
+echo "Event Bus Implementation:"
+echo "  - Development: RabbitMQ (EventBusRabbitMQ.cs)"
+echo "  - Production: Azure Service Bus (optional, via configuration)"
+echo "  - Integration Events: OrderStatusChangedEvent, UserCheckoutAcceptedEvent, etc."
+echo "  - Publish-Subscribe pattern for loosely coupled microservices"
 echo ""
