@@ -37,7 +37,7 @@
         <jackson.version>2.18.2</jackson.version>
         <graphql-java.version>25.0</graphql-java.version>
         <avro.version>1.12.1</avro.version>
-        <protobuf.version>4.29.2</protobuf.version>
+        <protobuf.version>4.33.2</protobuf.version>
         <janino.version>3.1.12</janino.version>
 
         <!-- Plugin Versions -->
