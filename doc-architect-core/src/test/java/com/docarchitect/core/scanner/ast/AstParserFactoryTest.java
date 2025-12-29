@@ -98,10 +98,17 @@ class AstParserFactoryTest {
     }
 
     @Test
+    void isAvailable_rubyReturnsTrue() {
+        // When/Then: Implemented with ANTLR + regex fallback
+        assertThat(AstParserFactory.isAvailable("ruby")).isTrue();
+        assertThat(AstParserFactory.isAvailable("rails")).isTrue();
+    }
+
+    @Test
     void isAvailable_unknownLanguageReturnsFalse() {
         // When/Then
-        assertThat(AstParserFactory.isAvailable("ruby")).isFalse();
         assertThat(AstParserFactory.isAvailable("php")).isFalse();
+        assertThat(AstParserFactory.isAvailable("rust")).isFalse();
     }
 
     @Test

@@ -28,12 +28,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Duplicate scanner IDs</li>
  * </ul>
  *
- * <p>Expected scanner count: 23 scanners
+ * <p>Expected scanner count: 24 scanners
  * <ul>
  *   <li>7 Java/JVM scanners (Maven, Gradle, Spring, JAX-RS, JPA, Kafka, RabbitMQ)</li>
  *   <li>5 Python scanners (Pip/Poetry, FastAPI, Flask, SQLAlchemy, Django)</li>
  *   <li>3 .NET scanners (NuGet, ASP.NET Core, Entity Framework)</li>
- *   <li>1 Ruby scanner (Bundler)</li>
+ *   <li>2 Ruby scanners (Bundler, Rails API)</li>
  *   <li>7 Additional scanners (GraphQL, Avro, Protobuf, SQL, npm, Go, Express)</li>
  * </ul>
  *
@@ -47,7 +47,7 @@ class ScannerServiceLoaderTest {
      * Expected number of scanner implementations.
      * Update this constant when adding new scanners.
      */
-    private static final int EXPECTED_SCANNER_COUNT = 23;
+    private static final int EXPECTED_SCANNER_COUNT = 24;
 
     @Test
     void serviceLoader_discoversAllRegisteredScanners() {

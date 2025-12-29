@@ -11,18 +11,26 @@ import com.docarchitect.core.util.Technologies;
 /**
  * Factory for creating language-specific AST parsers.
  *
- * <p>This factory implements the Factory pattern with lazy initialization and caching.
+ * <p>
+ * This factory implements the Factory pattern with lazy initialization and
+ * caching.
  * Parser instances are created on-demand and reused across scanner invocations.
  *
- * <p><b>Supported Languages:</b></p>
+ * <p>
+ * <b>Supported Languages:</b>
+ * </p>
  * <ul>
- *   <li>Python: {@link #getPythonParser()}</li>
- *   <li>.NET (C#): {@link #getDotNetParser()}</li>
- *   <li>JavaScript/TypeScript: {@link #getJavaScriptParser()}</li>
- *   <li>Go: {@link #getGoParser()}</li>
+ * <li>Python: {@link #getPythonParser()}</li>
+ * <li>.NET (C#): {@link #getDotNetParser()}</li>
+ * <li>JavaScript/TypeScript: {@link #getJavaScriptParser()}</li>
+ * <li>Go: {@link #getGoParser()}</li>
+ * <li>Ruby/Rails: {@link #getRubyParser()}</li>
  * </ul>
  *
- * <p><b>Usage Example:</b></p>
+ * <p>
+ * <b>Usage Example:</b>
+ * </p>
+ * 
  * <pre>{@code
  * // Get Python parser
  * AstParser<PythonAst.PythonClass> pythonParser = AstParserFactory.getPythonParser();
@@ -35,15 +43,21 @@ import com.docarchitect.core.util.Technologies;
  * List<DotNetAst.CSharpClass> classes = dotNetParser.parseFile(csFile);
  * }</pre>
  *
- * <p><b>Thread Safety:</b></p>
- * <p>This factory is thread-safe. Parser instances are cached in a {@link ConcurrentHashMap}
- * and initialized only once per language.</p>
+ * <p>
+ * <b>Thread Safety:</b>
+ * </p>
+ * <p>
+ * This factory is thread-safe. Parser instances are cached in a
+ * {@link ConcurrentHashMap}
+ * and initialized only once per language.
+ * </p>
  *
  * @see AstParser
  * @see PythonAst
  * @see DotNetAst
  * @see JavaScriptAst
  * @see GoAst
+ * @see RubyAst
  * @since 1.0.0
  */
 public final class AstParserFactory {
@@ -60,68 +74,86 @@ public final class AstParserFactory {
     /**
      * Gets the Python AST parser.
      *
-     * <p>Uses ANTLR Python3 grammar with graceful fallback to regex parsing.
+     * <p>
+     * Uses ANTLR Python3 grammar with graceful fallback to regex parsing.
      * Supports both Python 2.7 and Python 3.x.
      *
      * @return Python parser instance (cached, thread-safe)
      */
     @SuppressWarnings("unchecked")
     public static AstParser<PythonAst.PythonClass> getPythonParser() {
-        return (AstParser<PythonAst.PythonClass>) parserCache.computeIfAbsent(Technologies.PYTHON, lang ->
-            createParser("com.docarchitect.core.scanner.impl.python.util.PythonAstParserAdapter", "Python")
-        );
+        return (AstParser<PythonAst.PythonClass>) parserCache.computeIfAbsent(Technologies.PYTHON,
+                lang -> createParser("com.docarchitect.core.scanner.impl.python.util.PythonAstParserAdapter",
+                        "Python"));
     }
 
     /**
      * Gets the .NET (C#) AST parser.
      *
-     * <p>Uses ANTLR C# grammar with graceful fallback to regex parsing.
+     * <p>
+     * Uses ANTLR C# grammar with graceful fallback to regex parsing.
      * Supports C# 7.0 through C# 12.0.
      *
      * @return .NET parser instance (cached, thread-safe)
      */
     @SuppressWarnings("unchecked")
     public static AstParser<DotNetAst.CSharpClass> getDotNetParser() {
-        return (AstParser<DotNetAst.CSharpClass>) parserCache.computeIfAbsent(Technologies.DOTNET, lang ->
-            createParser("com.docarchitect.core.scanner.impl.dotnet.util.CSharpAstParserAdapter", ".NET")
-        );
+        return (AstParser<DotNetAst.CSharpClass>) parserCache.computeIfAbsent(Technologies.DOTNET,
+                lang -> createParser("com.docarchitect.core.scanner.impl.dotnet.util.CSharpAstParserAdapter", ".NET"));
     }
 
     /**
      * Gets the JavaScript/TypeScript AST parser.
      *
-     * <p>Uses ANTLR JavaScript grammar with graceful fallback to regex parsing.
+     * <p>
+     * Uses ANTLR JavaScript grammar with graceful fallback to regex parsing.
      * Supports ES5, ES6, ES2015+ and all TypeScript versions.
      *
      * @return JavaScript parser instance (cached, thread-safe)
      */
     @SuppressWarnings("unchecked")
     public static AstParser<JavaScriptAst.ExpressRoute> getJavaScriptParser() {
-        return (AstParser<JavaScriptAst.ExpressRoute>) parserCache.computeIfAbsent(Technologies.JAVASCRIPT, lang ->
-            createParser("com.docarchitect.core.scanner.impl.javascript.util.JavaScriptAstParserAdapter", "JavaScript")
-        );
+        return (AstParser<JavaScriptAst.ExpressRoute>) parserCache.computeIfAbsent(Technologies.JAVASCRIPT,
+                lang -> createParser("com.docarchitect.core.scanner.impl.javascript.util.JavaScriptAstParserAdapter",
+                        "JavaScript"));
     }
 
     /**
      * Gets the Go AST parser.
      *
-     * <p>Uses go/parser from Go standard library via process execution.
-     * For go.mod files, use {@link com.docarchitect.core.scanner.impl.go.GoModScanner} instead
+     * <p>
+     * Uses go/parser from Go standard library via process execution.
+     * For go.mod files, use
+     * {@link com.docarchitect.core.scanner.impl.go.GoModScanner} instead
      * (regex-based parsing is appropriate for Go's simple module format).
      *
      * @return Go parser instance (cached, thread-safe)
      */
     @SuppressWarnings("unchecked")
     public static AstParser<GoAst.GoStruct> getGoParser() {
-        return (AstParser<GoAst.GoStruct>) parserCache.computeIfAbsent(Technologies.GO, lang ->
-            createParser("com.docarchitect.core.scanner.impl.go.util.GoAstParserAdapter", "Go")
-        );
+        return (AstParser<GoAst.GoStruct>) parserCache.computeIfAbsent(Technologies.GO,
+                lang -> createParser("com.docarchitect.core.scanner.impl.go.util.GoAstParserAdapter", "Go"));
+    }
+
+    /**
+     * Gets the Ruby/Rails AST parser.
+     *
+     * <p>
+     * Uses ANTLR Ruby grammar with graceful fallback to regex parsing.
+     * Supports Ruby 2.x, 3.x and Rails 5.x, 6.x, 7.x.
+     *
+     * @return Ruby parser instance (cached, thread-safe)
+     */
+    @SuppressWarnings("unchecked")
+    public static AstParser<RubyAst.RubyClass> getRubyParser() {
+        return (AstParser<RubyAst.RubyClass>) parserCache.computeIfAbsent(Technologies.RUBY,
+                lang -> createParser("com.docarchitect.core.scanner.impl.ruby.util.RubyAstParserAdapter", "Ruby"));
     }
 
     /**
      * Helper method to create parser instances via reflection.
      *
-     * @param className fully qualified class name
+     * @param className   fully qualified class name
      * @param displayName display name for logging
      * @return parser instance
      * @throws IllegalStateException if parser cannot be created
@@ -144,7 +176,8 @@ public final class AstParserFactory {
     /**
      * Clears the parser cache (useful for testing).
      *
-     * <p><b>Warning:</b> This method is intended for testing only.
+     * <p>
+     * <b>Warning:</b> This method is intended for testing only.
      * Do not call this in production code.
      */
     public static void clearCache() {
@@ -155,7 +188,8 @@ public final class AstParserFactory {
     /**
      * Checks if a parser for the given language is available.
      *
-     * @param language language identifier ("python", "dotnet", "javascript", "go")
+     * @param language language identifier ("python", "dotnet", "javascript", "go",
+     *                 "ruby")
      * @return true if parser is available and initialized
      */
     public static boolean isAvailable(String language) {
@@ -164,7 +198,7 @@ public final class AstParserFactory {
                 case Technologies.PYTHON:
                     return getPythonParser().isAvailable();
                 case Technologies.DOTNET:
-                case "csharp":
+                case Technologies.CSHARP:
                     return getDotNetParser().isAvailable();
                 case Technologies.JAVASCRIPT:
                 case Technologies.TYPESCRIPT:
@@ -172,6 +206,9 @@ public final class AstParserFactory {
                 case Technologies.GO:
                 case Technologies.GOLANG:
                     return getGoParser().isAvailable();
+                case Technologies.RUBY:
+                case Technologies.RAILS:
+                    return getRubyParser().isAvailable();
                 default:
                     return false;
             }
