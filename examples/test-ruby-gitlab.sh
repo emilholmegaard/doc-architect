@@ -36,7 +36,8 @@ scanners:
   enabled:
     - graphql-schema
     - bundler-dependencies
-    # Note: rails-api scanners not yet implemented
+    - rails-api
+    - rails-route
 
 generators:
   default: mermaid
