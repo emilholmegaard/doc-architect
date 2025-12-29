@@ -28,11 +28,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Duplicate scanner IDs</li>
  * </ul>
  *
- * <p>Expected scanner count: 24 scanners
+ * <p>Expected scanner count: 28 scanners
  * <ul>
- *   <li>7 Java/JVM scanners (Maven, Gradle, Spring, JAX-RS, JPA, Kafka, RabbitMQ)</li>
- *   <li>5 Python scanners (Pip/Poetry, FastAPI, Flask, SQLAlchemy, Django)</li>
- *   <li>3 .NET scanners (NuGet, ASP.NET Core, Entity Framework)</li>
+ *   <li>8 Java/JVM scanners (Maven, Gradle, Spring Components, Spring REST, JAX-RS, JPA, Kafka, RabbitMQ)</li>
+ *   <li>6 Python scanners (Pip/Poetry, Django Apps, FastAPI, Flask, SQLAlchemy, Django ORM)</li>
+ *   <li>5 .NET scanners (NuGet, Solution File, ASP.NET Core, Entity Framework, Kafka)</li>
  *   <li>2 Ruby scanners (Bundler, Rails API)</li>
  *   <li>7 Additional scanners (GraphQL, Avro, Protobuf, SQL, npm, Go, Express)</li>
  * </ul>
@@ -47,7 +47,7 @@ class ScannerServiceLoaderTest {
      * Expected number of scanner implementations.
      * Update this constant when adding new scanners.
      */
-    private static final int EXPECTED_SCANNER_COUNT = 24;
+    private static final int EXPECTED_SCANNER_COUNT = 28;
 
     @Test
     void serviceLoader_discoversAllRegisteredScanners() {
@@ -119,20 +119,25 @@ class ScannerServiceLoaderTest {
             .contains(
                 "maven-dependencies",
                 "gradle-dependencies",
+                "spring-components",
                 "spring-rest-api",
                 "jaxrs-api",
                 "jpa-entities",
                 "kafka-messaging",
                 "rabbitmq-messaging",
                 "pip-poetry-dependencies",
+                "django-apps",
                 "fastapi-rest",
                 "flask-rest",
                 "sqlalchemy-entities",
                 "django-orm",
                 "nuget-dependencies",
+                "dotnet-solution",
                 "aspnetcore-rest",
                 "entity-framework",
+                "dotnet-kafka-messaging",
                 "bundler-dependencies",
+                "rails-api",
                 "graphql-schema",
                 "avro-schema",
                 "protobuf-schema",

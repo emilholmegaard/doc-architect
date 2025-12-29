@@ -35,6 +35,7 @@ repositories:
 scanners:
   enabled:
     - maven-dependencies
+    - spring-components
     - spring-rest-api
     - jpa-entities
     - rabbitmq-messaging  # PiggyMetrics uses RabbitMQ for messaging

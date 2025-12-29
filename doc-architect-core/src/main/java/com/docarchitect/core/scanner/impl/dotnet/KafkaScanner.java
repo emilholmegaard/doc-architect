@@ -30,7 +30,7 @@ import com.docarchitect.core.util.Technologies;
  */
 public class KafkaScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
 
-    private static final String SCANNER_ID = "kafka-messaging";
+    private static final String SCANNER_ID = "dotnet-kafka-messaging";
     private static final String SCANNER_DISPLAY_NAME = "Kafka Message Flow Scanner (.NET)";
     private static final String FILE_PATTERN_NESTED = "**/*.cs";
     private static final String FILE_PATTERN_ROOT = "*.cs";

@@ -35,8 +35,10 @@ repositories:
 scanners:
   enabled:
     - nuget-dependencies
+    - dotnet-solution
     - aspnetcore-rest
     - entity-framework
+    - rabbitmq-messaging  # eShopOnContainers uses RabbitMQ for event bus
 
 generators:
   default: mermaid
