@@ -43,6 +43,8 @@ public final class Technologies {
 
     /** Technology identifier for Ruby. */
     public static final String RUBY = "ruby";
+    /** Technology identifier for Rails. */
+    public static final String RAILS = "rails";
 
     /** Technology identifier for Groovy. */
     public static final String GROOVY = "groovy";
@@ -53,7 +55,6 @@ public final class Technologies {
     /** Technology identifier for Node.js runtime. */
     public static final String NODE = "node";
 
-    
     private Technologies() {
         // Prevent instantiation
     }
