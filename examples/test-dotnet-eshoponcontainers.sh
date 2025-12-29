@@ -40,6 +40,7 @@ scanners:
     - entity-framework
     - rabbitmq-messaging  # Event bus (RabbitMQ for dev, Azure Service Bus for production)
     - dotnet-kafka-messaging  # Check for any Kafka usage
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
 
 generators:
   default: mermaid

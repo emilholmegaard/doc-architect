@@ -37,6 +37,7 @@ scanners:
     - go-modules
     - go-http-router
     - protobuf-schema
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
 
 generators:
   default: mermaid

@@ -36,6 +36,7 @@ scanners:
   enabled:
     - maven-dependencies
     - spring-rest-api
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
     - jpa-entities
     - kafka-messaging
     - spring-components

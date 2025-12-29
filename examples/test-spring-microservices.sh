@@ -41,6 +41,7 @@ scanners:
     # Note: rabbitmq-messaging enabled but will find 0 flows
     # (RabbitMQ used only for Spring Cloud Bus infrastructure)
     - rabbitmq-messaging
+    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
 
 generators:
   default: mermaid
@@ -72,8 +73,8 @@ echo "Expected outputs:"
 echo "  - 9 components (Maven modules) ✅"
 echo "  - 11+ REST endpoints ✅"
 echo "  - 5+ MongoDB entities ✅"
-echo "  - 0 message flows ✅ (uses REST + Feign, not async messaging)"
+echo "  - REST-based event flows and CRUD patterns ✅ (REST Event Flow Scanner)"
 echo ""
-echo "Note: PiggyMetrics uses RabbitMQ only for infrastructure (Spring Cloud Bus)"
-echo "      Business communication is via REST APIs, not message queues."
+echo "Note: PiggyMetrics uses REST + Feign for inter-service communication"
+echo "      The REST Event Flow Scanner detects RESTful CRUD patterns and event-like endpoints."
 echo ""
