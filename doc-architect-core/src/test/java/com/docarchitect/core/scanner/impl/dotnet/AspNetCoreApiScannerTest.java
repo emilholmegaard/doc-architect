@@ -365,4 +365,310 @@ public class BaseController : ControllerBase
         ScanResult result = scanner.scan(context);
         assertThat(result.apiEndpoints()).isEmpty();
     }
+
+    // ========== Minimal API Tests (ASP.NET Core 6+) ==========
+
+    @Test
+    void scan_withMinimalApiMapGet_detectsEndpoint() throws IOException {
+        createFile("Program.cs", """
+using Microsoft.AspNetCore.Builder;
+
+var app = WebApplication.Create();
+
+app.MapGet("/api/products", () => {
+    return Results.Ok(new[] { "Product1", "Product2" });
+});
+
+app.Run();
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/api/products");
+        assertThat(result.apiEndpoints().get(0).method()).isEqualTo("GET");
+    }
+
+    @Test
+    void scan_withMinimalApiMultipleEndpoints_detectsAll() throws IOException {
+        createFile("Endpoints/ProductEndpoints.cs", """
+using Microsoft.AspNetCore.Builder;
+
+public static class ProductEndpoints
+{
+    public static void MapProductEndpoints(this WebApplication app)
+    {
+        app.MapGet("/api/products", () => Results.Ok());
+        app.MapPost("/api/products", (Product p) => Results.Created("", p));
+        app.MapPut("/api/products/{id}", (int id, Product p) => Results.Ok());
+        app.MapDelete("/api/products/{id}", (int id) => Results.NoContent());
+        app.MapPatch("/api/products/{id}", (int id) => Results.Ok());
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(5);
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method)
+            .containsExactlyInAnyOrder("GET", "POST", "PUT", "DELETE", "PATCH");
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::path)
+            .containsExactlyInAnyOrder(
+                "/api/products",
+                "/api/products",
+                "/api/products/{id}",
+                "/api/products/{id}",
+                "/api/products/{id}"
+            );
+    }
+
+    @Test
+    void scan_withMinimalApiWithParameters_extractsParameters() throws IOException {
+        createFile("Program.cs", """
+using Microsoft.AspNetCore.Builder;
+
+var app = WebApplication.Create();
+
+app.MapPost("/api/users", (User user) => Results.Created("", user));
+app.MapGet("/api/users/{id}", (int id) => Results.Ok());
+
+app.Run();
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(2);
+
+        // POST endpoint should have Body parameter
+        ApiEndpoint postEndpoint = result.apiEndpoints().stream()
+            .filter(e -> e.method().equals("POST"))
+            .findFirst()
+            .orElseThrow();
+        assertThat(postEndpoint.requestSchema()).contains("Body: user: User");
+
+        // GET endpoint should have Route parameter
+        ApiEndpoint getEndpoint = result.apiEndpoints().stream()
+            .filter(e -> e.method().equals("GET"))
+            .findFirst()
+            .orElseThrow();
+        assertThat(getEndpoint.requestSchema()).contains("Route: id: int");
+    }
+
+    @Test
+    void scan_withMinimalApiRouteGroups_detectsEndpoints() throws IOException {
+        createFile("Program.cs", """
+using Microsoft.AspNetCore.Builder;
+
+var app = WebApplication.Create();
+var group = app.MapGroup("/api/v1");
+
+group.MapGet("/products", () => Results.Ok());
+group.MapPost("/products", (Product p) => Results.Created("", p));
+
+app.Run();
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(2);
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::path)
+            .containsExactlyInAnyOrder("/products", "/products");
+    }
+
+    // ========== Razor Pages Tests ==========
+
+    @Test
+    void scan_withRazorPageOnGetOnPost_detectsHandlers() throws IOException {
+        createFile("Pages/Products/Index.cshtml.cs", """
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace MyApp.Pages.Products
+{
+    public class IndexModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+
+        public void OnPost()
+        {
+        }
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(2);
+
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method)
+            .containsExactlyInAnyOrder("GET", "POST");
+
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::path)
+            .allMatch(path -> path.equals("/Products"));
+    }
+
+    @Test
+    void scan_withRazorPageAsyncHandlers_detectsEndpoints() throws IOException {
+        createFile("Pages/Products/Details.cshtml.cs", """
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Threading.Tasks;
+
+namespace MyApp.Pages.Products
+{
+    public class DetailsModel : PageModel
+    {
+        public async Task OnGetAsync(int id)
+        {
+        }
+
+        public async Task OnPostAsync(int id)
+        {
+        }
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(2);
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method)
+            .containsExactlyInAnyOrder("GET", "POST");
+    }
+
+    @Test
+    void scan_withRazorPageIndexPage_derivesRootRoute() throws IOException {
+        createFile("Pages/Index.cshtml.cs", """
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+public class IndexModel : PageModel
+{
+    public void OnGet() { }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1);
+        assertThat(result.apiEndpoints().get(0).path()).isEqualTo("/");
+    }
+
+    @Test
+    void scan_withRazorPageNestedDirectory_derivesCorrectRoute() throws IOException {
+        createFile("Pages/Admin/Users/Edit.cshtml.cs", """
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace MyApp.Pages.Admin.Users
+{
+    public class EditModel : PageModel
+    {
+        public void OnGet(int id) { }
+        public void OnPost(int id) { }
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(2);
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::path)
+            .allMatch(path -> path.equals("/Admin/Users/Edit"));
+    }
+
+    @Test
+    void scan_withRazorPageAllHttpMethods_detectsAll() throws IOException {
+        createFile("Pages/Products/Manage.cshtml.cs", """
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using System.Threading.Tasks;
+
+namespace MyApp.Pages.Products
+{
+    public class ManageModel : PageModel
+    {
+        public void OnGet() { }
+        public void OnPost() { }
+        public void OnPut() { }
+        public void OnDelete() { }
+        public void OnPatch() { }
+    }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(5);
+        assertThat(result.apiEndpoints())
+            .extracting(ApiEndpoint::method)
+            .containsExactlyInAnyOrder("GET", "POST", "PUT", "DELETE", "PATCH");
+    }
+
+    // ========== Integration Tests: All Three Patterns Together ==========
+
+    @Test
+    void scan_withMixedPatterns_detectsAllEndpoints() throws IOException {
+        // MVC Controller
+        createFile("Controllers/ApiController.cs", """
+using Microsoft.AspNetCore.Mvc;
+
+[ApiController]
+[Route("api/data")]
+public class ApiController : ControllerBase
+{
+    [HttpGet]
+    public IActionResult Get() => Ok();
+}
+""");
+
+        // Minimal API
+        createFile("Program.cs", """
+var app = WebApplication.Create();
+app.MapGet("/api/status", () => Results.Ok());
+app.Run();
+""");
+
+        // Razor Page
+        createFile("Pages/Index.cshtml.cs", """
+using Microsoft.AspNetCore.Mvc.RazorPages;
+public class IndexModel : PageModel
+{
+    public void OnGet() { }
+}
+""");
+
+        ScanResult result = scanner.scan(context);
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(3);
+
+        // Verify MVC Controller endpoint
+        assertThat(result.apiEndpoints())
+            .filteredOn(e -> e.path().equals("/api/data"))
+            .hasSize(1);
+
+        // Verify Minimal API endpoint
+        assertThat(result.apiEndpoints())
+            .filteredOn(e -> e.path().equals("/api/status"))
+            .hasSize(1);
+
+        // Verify Razor Page endpoint
+        assertThat(result.apiEndpoints())
+            .filteredOn(e -> e.path().equals("/"))
+            .hasSize(1);
+    }
 }
