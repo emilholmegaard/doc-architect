@@ -28,7 +28,7 @@ class KafkaScannerTest extends ScannerTestBase {
 
     @Test
     void shouldHaveCorrectMetadata() {
-        assertThat(scanner.getId()).isEqualTo("kafka-messaging");
+        assertThat(scanner.getId()).isEqualTo("dotnet-kafka-messaging");
         assertThat(scanner.getDisplayName()).isEqualTo("Kafka Message Flow Scanner (.NET)");
         assertThat(scanner.getPriority()).isEqualTo(70);
         assertThat(scanner.getSupportedFilePatterns()).containsExactlyInAnyOrder("**/*.cs", "*.cs");

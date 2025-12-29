@@ -35,6 +35,7 @@ repositories:
 scanners:
   enabled:
     - nuget-dependencies
+    - dotnet-solution
     - aspnetcore-rest
     - entity-framework
     - sql-migration

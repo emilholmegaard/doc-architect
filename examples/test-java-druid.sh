@@ -35,7 +35,9 @@ repositories:
 scanners:
   enabled:
     - maven-dependencies
+    - spring-components
     - spring-rest-api
+    - kafka-messaging  # Druid uses Kafka for stream ingestion
 
 generators:
   default: mermaid
