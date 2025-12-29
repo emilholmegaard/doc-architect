@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -286,5 +287,128 @@ class GraphQLScannerTest extends ScannerTestBase {
 
         // Then: Should return false
         assertThat(applies).isFalse();
+    }
+
+    @Test
+    void scan_withLargeSchema_usesDefaultLimits() throws IOException {
+        // Given: A schema file with many lines (but within default 50k limit)
+        StringBuilder largeSchema = new StringBuilder();
+        largeSchema.append("type Query {\n");
+        for (int i = 0; i < 1000; i++) {
+            largeSchema.append("  field").append(i).append(": String\n");
+        }
+        largeSchema.append("}\n");
+
+        createFile("schema/large.graphql", largeSchema.toString());
+
+        // When: Scanner is executed with default limits
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should parse successfully
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(1000);
+        assertThat(result.warnings()).isEmpty();
+    }
+
+    @Test
+    void scan_withConfiguredLimits_respectsConfiguration() throws IOException {
+        // Given: A schema file with 100 lines
+        StringBuilder schema = new StringBuilder();
+        schema.append("type Query {\n");
+        for (int i = 0; i < 98; i++) {
+            schema.append("  field").append(i).append(": String\n");
+        }
+        schema.append("}\n");
+
+        createFile("schema/medium.graphql", schema.toString());
+
+        // When: Scanner is executed with low limit (50 lines)
+        context = createContext(Map.of("maxSchemaLines", 50));
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip the file with warning
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).isEmpty();
+        assertThat(result.warnings()).hasSize(1);
+        assertThat(result.warnings().get(0)).contains("exceeds 50 line limit");
+    }
+
+    @Test
+    void scan_withIncreasedLimit_parsesSaleorSizedSchema() throws IOException {
+        // Given: A very large schema file (simulating Saleor's 35k lines)
+        // Create a realistic large schema with multiple types (not just one huge Query type)
+        StringBuilder largeSchema = new StringBuilder();
+
+        // Create many entity types (more realistic than one giant Query type)
+        for (int i = 0; i < 3000; i++) {
+            largeSchema.append("type Entity").append(i).append(" {\n");
+            largeSchema.append("  id: ID!\n");
+            largeSchema.append("  name: String!\n");
+            largeSchema.append("  description: String\n");
+            largeSchema.append("  createdAt: String\n");
+            largeSchema.append("  updatedAt: String\n");
+            largeSchema.append("}\n\n");
+        }
+
+        // Add a Query type with fields referencing these entities
+        largeSchema.append("type Query {\n");
+        for (int i = 0; i < 100; i++) {
+            largeSchema.append("  getEntity").append(i).append("(id: ID!): Entity").append(i).append("\n");
+        }
+        largeSchema.append("}\n");
+
+        createFile("schema/saleor.graphql", largeSchema.toString());
+
+        // When: Scanner is executed with increased limit (50k lines)
+        context = createContext(Map.of("maxSchemaLines", 50000));
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should parse successfully
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).hasSize(3000); // 3000 entity types
+        assertThat(result.apiEndpoints()).hasSize(100); // 100 query operations
+        assertThat(result.warnings()).isEmpty();
+    }
+
+    @Test
+    void scan_withFileSizeLimit_skipsTooLargeFiles() throws IOException {
+        // Given: A large schema file (in bytes)
+        StringBuilder largeSchema = new StringBuilder();
+        // Create a schema that's > 1MB in size
+        for (int i = 0; i < 100000; i++) {
+            largeSchema.append("type Type").append(i).append(" { id: ID! }\n");
+        }
+
+        createFile("schema/huge.graphql", largeSchema.toString());
+
+        // When: Scanner is executed with 500KB file size limit
+        context = createContext(Map.of("maxFileSizeBytes", 500_000));
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should skip the file with warning
+        assertThat(result.success()).isTrue();
+        assertThat(result.dataEntities()).isEmpty();
+        assertThat(result.warnings()).hasSize(1);
+        assertThat(result.warnings().get(0)).contains("exceeds").contains("KB limit");
+    }
+
+    @Test
+    void scan_withPerformanceLogging_logsLargeFileParsing() throws IOException {
+        // Given: A moderately large schema file
+        StringBuilder schema = new StringBuilder();
+        schema.append("type Query {\n");
+        for (int i = 0; i < 500; i++) {
+            schema.append("  field").append(i).append(": String\n");
+        }
+        schema.append("}\n");
+
+        createFile("schema/perf.graphql", schema.toString());
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should parse successfully (performance logging is tested via logs, not assertions)
+        assertThat(result.success()).isTrue();
+        assertThat(result.apiEndpoints()).hasSize(500);
     }
 }
