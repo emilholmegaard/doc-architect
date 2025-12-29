@@ -18,12 +18,14 @@ import java.util.regex.Pattern;
 /**
  * Scanner for ASP.NET Core REST API endpoints in C# source files.
  *
- * <p>Uses regex patterns to extract controller attributes and action methods.
- * Similar to Spring's annotation-based approach, but for C# attributes.
+ * <p>Detects three types of ASP.NET Core API patterns using AST parsing and regex:
+ * <ol>
+ *   <li><b>MVC Controllers</b> - Traditional attribute-based routing</li>
+ *   <li><b>Minimal APIs</b> - Fluent routing (ASP.NET Core 6+)</li>
+ *   <li><b>Razor Pages</b> - Convention-based page handlers</li>
+ * </ol>
  *
- * <p><b>Supported Patterns</b></p>
- *
- * <p><b>Controller Attributes:</b></p>
+ * <p><b>Pattern 1: MVC Controllers</b></p>
  * <pre>{@code
  * [ApiController]
  * [Route("api/[controller]")]
@@ -40,7 +42,39 @@ import java.util.regex.Pattern;
  * }
  * }</pre>
  *
- * <p><b>HTTP Method Attributes</b></p>
+ * <p><b>Pattern 2: Minimal APIs (ASP.NET Core 6+)</b></p>
+ * <pre>{@code
+ * app.MapGet("/api/products", () => {
+ *     return Results.Ok(products);
+ * });
+ *
+ * app.MapPost("/api/products", (Product p) => {
+ *     return Results.Created($"/api/products/{p.Id}", p);
+ * });
+ *
+ * app.MapGet("/api/products/{id}", (int id) => {
+ *     return Results.Ok(GetProduct(id));
+ * });
+ * }</pre>
+ *
+ * <p><b>Pattern 3: Razor Pages</b></p>
+ * <pre>{@code
+ * // File: Pages/Products/Index.cshtml.cs
+ * public class IndexModel : PageModel
+ * {
+ *     public void OnGet() { }  // → GET /Products/Index
+ *     public void OnPost() { } // → POST /Products/Index
+ * }
+ *
+ * // File: Pages/Products/Details.cshtml.cs
+ * public class DetailsModel : PageModel
+ * {
+ *     public void OnGet(int id) { }    // → GET /Products/Details
+ *     public void OnPost(int id) { }   // → POST /Products/Details
+ * }
+ * }</pre>
+ *
+ * <p><b>HTTP Method Attributes (MVC)</b></p>
  * <ul>
  *   <li>{@code [HttpGet]} - GET requests</li>
  *   <li>{@code [HttpPost]} - POST requests</li>
@@ -49,7 +83,7 @@ import java.util.regex.Pattern;
  *   <li>{@code [HttpPatch]} - PATCH requests</li>
  * </ul>
  *
- * <p><b>Parameter Attributes</b></p>
+ * <p><b>Parameter Attributes (MVC)</b></p>
  * <ul>
  *   <li>{@code [FromRoute]} - Path parameter</li>
  *   <li>{@code [FromQuery]} - Query parameter</li>
@@ -57,13 +91,11 @@ import java.util.regex.Pattern;
  *   <li>{@code [FromHeader]} - Header parameter</li>
  * </ul>
  *
- * <p><b>Regex Patterns</b></p>
+ * <p><b>Parsing Strategy</b></p>
  * <ul>
- *   <li>{@code CLASS_PATTERN}: {@code public\s+class\s+(\w+)\s*:\s*ControllerBase}</li>
- *   <li>{@code ROUTE_PATTERN}: {@code \[Route\("(.+?)"\)\]}</li>
- *   <li>{@code HTTP_METHOD_PATTERN}: {@code \[Http(Get|Post|Put|Delete|Patch)(?:\("(.+?)")?\]}</li>
- *   <li>{@code METHOD_PATTERN}: {@code public\s+\w+\s+(\w+)\s*\((.+?)\)}</li>
- *   <li>{@code PARAM_PATTERN}: {@code \[From(Route|Query|Body|Header)\]\s*(\w+)\s+(\w+)}</li>
+ *   <li>MVC Controllers: AST-based parsing via {@link com.docarchitect.core.scanner.impl.dotnet.util.CSharpAstParser}</li>
+ *   <li>Minimal APIs: Regex pattern matching (cannot be reliably parsed via AST)</li>
+ *   <li>Razor Pages: AST-based parsing with convention-based route derivation</li>
  * </ul>
  *
  * @see ApiEndpoint
@@ -88,6 +120,7 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
     // File patterns
     private static final String CONTROLLER_FILE_PATTERN = "**/*Controller.cs";
     private static final String CS_FILE_PATTERN = "**/*.cs";
+    private static final String CS_FILE_PATTERN_ROOT = "*.cs";
     
     // C# keywords and identifiers
     private static final String CONTROLLER_SUFFIX = "Controller";
@@ -182,6 +215,22 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
      */
     private static final Pattern ROUTE_PARAM_PATTERN = Pattern.compile("\\{(\\w+)(?::\\w+)?\\}");
 
+    /**
+     * Regex to match Minimal API patterns: app.MapGet("/api/products", ...).
+     * Captures: (1) HTTP method (Get, Post, etc.), (2) route template.
+     */
+    private static final Pattern MINIMAL_API_PATTERN = Pattern.compile(
+        "(?:app|group|routes|builder)\\.Map(Get|Post|Put|Delete|Patch)\\s*\\(\\s*\"([^\"]+)\""
+    );
+
+    /**
+     * Regex to match Razor Pages OnXxx handler methods: OnGet(), OnPostAsync().
+     * Captures: (1) HTTP method (Get, Post, etc.).
+     */
+    private static final Pattern RAZOR_PAGE_HANDLER_PATTERN = Pattern.compile(
+        "public\\s+(?:async\\s+)?(?:Task<?[^>]*>?\\s+)?On(Get|Post|Put|Delete|Patch)(?:Async)?\\s*\\("
+    );
+
     @Override
     public String getId() {
         return SCANNER_ID;
@@ -199,7 +248,7 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
 
     @Override
     public Set<String> getSupportedFilePatterns() {
-        return Set.of(CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN);
+        return Set.of(CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN, CS_FILE_PATTERN_ROOT);
     }
 
     @Override
@@ -209,7 +258,7 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
 
     @Override
     public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN);
+        return hasAnyFiles(context, CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN, CS_FILE_PATTERN_ROOT);
     }
 
     /**
@@ -220,11 +269,13 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
      *
      * <p><b>Detection Strategy (ordered by likelihood):</b>
      * <ol>
-     *   <li>Filename convention: *Controller.cs, *Resource.cs, *Api.cs</li>
-     *   <li>ASP.NET Core MVC imports: Microsoft.AspNetCore.Mvc</li>
+     *   <li>Filename convention: *Controller.cs, *Resource.cs, *Api.cs, *Model.cs (Razor Pages)</li>
+     *   <li>ASP.NET Core imports: Microsoft.AspNetCore.Mvc, Microsoft.AspNetCore.Builder</li>
      *   <li>HTTP method attributes: [HttpGet], [HttpPost], etc.</li>
      *   <li>Controller attributes: [ApiController], [Route]</li>
      *   <li>Controller base classes: ControllerBase, Controller</li>
+     *   <li>Minimal API patterns: app.MapGet, app.MapPost, etc.</li>
+     *   <li>Razor Pages patterns: PageModel, OnGet, OnPost</li>
      * </ol>
      *
      * @param file path to C# source file
@@ -238,7 +289,13 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
             fileName.endsWith("Resource.cs") ||
             fileName.endsWith("Api.cs") ||
             fileName.contains("Controller") ||
-            fileName.contains("Api")) {
+            fileName.contains("Api") ||
+            // Razor Pages typically use *Model.cs or *.cshtml.cs
+            (fileName.endsWith("Model.cs") && !fileName.contains("ViewModel")) ||
+            fileName.endsWith(".cshtml.cs") ||
+            // Minimal APIs often in Program.cs or *Endpoints.cs
+            fileName.equals("Program.cs") ||
+            fileName.endsWith("Endpoints.cs")) {
             log.trace("Including file by naming convention: {}", fileName);
             return true;
         }
@@ -251,10 +308,18 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
         try {
             String content = readFileContent(file);
 
-            // Priority 2: Check for ASP.NET Core MVC imports (loose pattern)
+            // Priority 2: Check for ASP.NET Core imports (expanded)
             boolean hasAspNetMvcImport =
                 (content.contains("Microsoft.AspNetCore") && content.contains("Mvc")) ||
                 (content.contains("using") && content.contains("AspNetCore") && content.contains("Mvc"));
+
+            boolean hasAspNetBuilderImport =
+                content.contains("Microsoft.AspNetCore.Builder") ||
+                (content.contains("using") && content.contains("AspNetCore") && content.contains("Builder"));
+
+            boolean hasAspNetRazorImport =
+                content.contains("Microsoft.AspNetCore.Mvc.RazorPages") ||
+                (content.contains("using") && content.contains("RazorPages"));
 
             // Priority 3: Check for HTTP method attributes
             boolean hasHttpMethodAttributes =
@@ -275,12 +340,31 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
                 (content.contains("ControllerBase") || content.contains(": Controller")) &&
                 (hasAspNetMvcImport || hasHttpMethodAttributes);
 
-            boolean hasAspNetPatterns = hasAspNetMvcImport || hasHttpMethodAttributes ||
-                                       hasControllerAttributes || hasControllerBase;
+            // Priority 6: Check for Minimal API patterns (ASP.NET Core 6+)
+            boolean hasMinimalApiPatterns =
+                content.contains("app.Map") ||
+                content.contains(".MapGet(") ||
+                content.contains(".MapPost(") ||
+                content.contains(".MapPut(") ||
+                content.contains(".MapDelete(") ||
+                content.contains(".MapPatch(");
+
+            // Priority 7: Check for Razor Pages patterns
+            boolean hasRazorPagePatterns =
+                content.contains(": PageModel") ||
+                content.contains("OnGet(") ||
+                content.contains("OnPost(") ||
+                content.contains("OnPut(") ||
+                content.contains("OnDelete(");
+
+            boolean hasAspNetPatterns = hasAspNetMvcImport || hasAspNetBuilderImport || hasAspNetRazorImport ||
+                                       hasHttpMethodAttributes || hasControllerAttributes || hasControllerBase ||
+                                       hasMinimalApiPatterns || hasRazorPagePatterns;
 
             if (hasAspNetPatterns) {
-                log.debug("Including file with ASP.NET Core patterns: {} (mvcImport={}, httpAttrs={}, ctrlAttrs={}, ctrlBase={})",
-                    fileName, hasAspNetMvcImport, hasHttpMethodAttributes, hasControllerAttributes, hasControllerBase);
+                log.debug("Including file with ASP.NET Core patterns: {} (mvcImport={}, builderImport={}, razorImport={}, httpAttrs={}, ctrlAttrs={}, ctrlBase={}, minimalApi={}, razorPages={})",
+                    fileName, hasAspNetMvcImport, hasAspNetBuilderImport, hasAspNetRazorImport, hasHttpMethodAttributes,
+                    hasControllerAttributes, hasControllerBase, hasMinimalApiPatterns, hasRazorPagePatterns);
             } else {
                 log.trace("Skipping file without ASP.NET Core patterns: {}", fileName);
             }
@@ -302,7 +386,12 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
         log.info("Scanning ASP.NET Core API endpoints in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
-        List<Path> csFiles = context.findFiles(CS_FILE_PATTERN).toList();
+        // Need to search both subdirectories and root level
+        List<Path> csFiles = new ArrayList<>();
+        csFiles.addAll(context.findFiles(CS_FILE_PATTERN).toList());
+        csFiles.addAll(context.findFiles(CS_FILE_PATTERN_ROOT).toList());
+        // Remove duplicates (in case a file matches both patterns)
+        csFiles = csFiles.stream().distinct().toList();
 
         if (csFiles.isEmpty()) {
             return emptyResult();
@@ -343,22 +432,34 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
     }
 
     private void parseCSharpFile(Path file, List<ApiEndpoint> apiEndpoints) throws IOException {
-        // Use AST parser to parse C# file
-        List<DotNetAst.CSharpClass> classes = parseAstFile(file);
+        // Read file content for pattern matching
+        String content = readFileContent(file);
 
-        for (DotNetAst.CSharpClass csharpClass : classes) {
-            String className = csharpClass.name();
+        // Pattern 3: Minimal APIs (check first, doesn't require AST parsing)
+        // Must be done before AST parsing because Minimal API files may not have proper class structures
+        extractMinimalApiEndpoints(content, file, apiEndpoints);
 
-            // Only process controller classes
-            if (!className.endsWith("Controller")) {
-                continue;
+        // Try to parse with AST for MVC Controllers and Razor Pages
+        try {
+            List<DotNetAst.CSharpClass> classes = parseAstFile(file);
+
+            for (DotNetAst.CSharpClass csharpClass : classes) {
+                String className = csharpClass.name();
+
+                // Pattern 1: MVC Controllers
+                if (className.endsWith("Controller")) {
+                    String baseRoute = extractBaseRouteFromAst(csharpClass);
+                    extractActionMethodsFromAst(csharpClass, baseRoute, apiEndpoints);
+                }
+                // Pattern 2: Razor Pages
+                else if (className.endsWith("Model") || csharpClass.inheritsFrom("PageModel")) {
+                    extractRazorPageHandlers(csharpClass, file, apiEndpoints);
+                }
             }
-
-            // Extract base route from [Route] attribute
-            String baseRoute = extractBaseRouteFromAst(csharpClass);
-
-            // Extract action methods
-            extractActionMethodsFromAst(csharpClass, baseRoute, apiEndpoints);
+        } catch (Exception e) {
+            // AST parsing failed - this is ok for files like Program.cs that don't have proper class structures
+            // Minimal API endpoints were already extracted above
+            log.trace("AST parsing failed for {}, skipping class-based endpoint extraction: {}", file.getFileName(), e.getMessage());
         }
     }
 
@@ -591,5 +692,231 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
      */
     private boolean isPrimitiveType(String type) {
         return PRIMITIVE_TYPES.contains(type.toLowerCase());
+    }
+
+    /**
+     * Extracts Minimal API endpoints from file content.
+     *
+     * <p>Minimal APIs (introduced in ASP.NET Core 6) use a fluent syntax like:
+     * <pre>{@code
+     * app.MapGet("/api/products", () => { });
+     * app.MapPost("/api/products", (Product p) => { });
+     * }</pre>
+     *
+     * @param content file content
+     * @param file source file path
+     * @param apiEndpoints list to add discovered endpoints to
+     */
+    private void extractMinimalApiEndpoints(String content, Path file, List<ApiEndpoint> apiEndpoints) {
+        Matcher matcher = MINIMAL_API_PATTERN.matcher(content);
+
+        while (matcher.find()) {
+            String httpMethod = matcher.group(1).toUpperCase(); // Get, Post, etc.
+            String routeTemplate = matcher.group(2); // "/api/products"
+
+            // Normalize path
+            String fullPath = routeTemplate.startsWith(PATH_SEPARATOR) ? routeTemplate : PATH_SEPARATOR + routeTemplate;
+
+            // Extract parameters from lambda (simplified - just detect presence)
+            String requestSchema = extractMinimalApiParameters(content, matcher.end());
+
+            ApiEndpoint endpoint = new ApiEndpoint(
+                file.getFileName().toString(),
+                ApiType.REST,
+                fullPath,
+                httpMethod,
+                "MinimalAPI",
+                requestSchema,
+                DEFAULT_RETURN_TYPE,
+                null
+            );
+
+            apiEndpoints.add(endpoint);
+            log.debug("Found Minimal API endpoint: {} {} in {}", httpMethod, fullPath, file.getFileName());
+        }
+    }
+
+    /**
+     * Extracts parameters from Minimal API lambda expression (simplified).
+     *
+     * <p>This is a basic implementation that detects common parameter patterns.
+     * For complex lambdas, consider enhancing with more sophisticated parsing.
+     */
+    private String extractMinimalApiParameters(String content, int startPos) {
+        // Look ahead for lambda parameters like (Product p) or (int id, Product p)
+        int endPos = Math.min(startPos + 200, content.length());
+        String snippet = content.substring(startPos, endPos);
+
+        // Simple pattern: (Type name, Type2 name2)
+        Pattern paramPattern = Pattern.compile("\\(([^)]+)\\)\\s*=>");
+        Matcher matcher = paramPattern.matcher(snippet);
+
+        if (matcher.find()) {
+            String params = matcher.group(1).trim();
+            if (!params.isEmpty() && !params.equals("")) {
+                // Parse parameters: "Product p" or "int id, Product p"
+                List<String> bodyParams = new ArrayList<>();
+                List<String> routeParams = new ArrayList<>();
+
+                for (String param : params.split(",")) {
+                    String trimmed = param.trim();
+                    Matcher simpleParam = SIMPLE_PARAM_PATTERN.matcher(trimmed);
+                    if (simpleParam.find()) {
+                        String type = simpleParam.group(1);
+                        String name = simpleParam.group(2);
+
+                        if (isPrimitiveType(type)) {
+                            routeParams.add(name + TYPE_SEPARATOR + type);
+                        } else {
+                            bodyParams.add(name + TYPE_SEPARATOR + type);
+                        }
+                    }
+                }
+
+                List<String> allParams = new ArrayList<>();
+                if (!routeParams.isEmpty()) {
+                    allParams.add(SCHEMA_LABEL_ROUTE + String.join(PARAM_SEPARATOR, routeParams));
+                }
+                if (!bodyParams.isEmpty()) {
+                    allParams.add(SCHEMA_LABEL_BODY + String.join(PARAM_SEPARATOR, bodyParams));
+                }
+
+                return allParams.isEmpty() ? null : String.join(SCHEMA_SEPARATOR, allParams);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Extracts Razor Pages handler methods from a PageModel class.
+     *
+     * <p>Razor Pages use convention-based routing where:
+     * <ul>
+     *   <li>OnGet() handles GET requests</li>
+     *   <li>OnPost() handles POST requests</li>
+     *   <li>OnGetAsync() handles async GET requests</li>
+     * </ul>
+     *
+     * <p>The route is derived from the file path (e.g., Pages/Products/Index.cshtml.cs -> /Products/Index)
+     *
+     * @param csharpClass parsed class AST
+     * @param file source file path
+     * @param apiEndpoints list to add discovered endpoints to
+     */
+    private void extractRazorPageHandlers(DotNetAst.CSharpClass csharpClass, Path file, List<ApiEndpoint> apiEndpoints) {
+        // Derive route from file path
+        String filePath = file.toString();
+        String route = deriveRazorPageRoute(filePath);
+
+        for (DotNetAst.Method method : csharpClass.methods()) {
+            String methodName = method.name();
+
+            // Match OnGet, OnPost, OnGetAsync, OnPostAsync, etc.
+            if (methodName.startsWith("On") && (methodName.contains("Get") || methodName.contains("Post") ||
+                methodName.contains("Put") || methodName.contains("Delete") || methodName.contains("Patch"))) {
+
+                // Extract HTTP method from handler name
+                String httpMethod = extractHttpMethodFromHandler(methodName);
+                if (httpMethod == null) {
+                    continue;
+                }
+
+                // Extract parameters
+                String requestSchema = buildRequestSchemaFromAst(method.parameters(), route);
+
+                // Check for handler-specific route (e.g., OnGetDetails with [RouteAttribute])
+                String handlerRoute = route;
+                for (DotNetAst.Attribute attribute : method.attributes()) {
+                    if (attribute.name().equals("Route") && !attribute.arguments().isEmpty()) {
+                        String customRoute = attribute.arguments().get(0).replace("\"", "");
+                        handlerRoute = customRoute.startsWith(PATH_SEPARATOR) ? customRoute : PATH_SEPARATOR + customRoute;
+                    }
+                }
+
+                ApiEndpoint endpoint = new ApiEndpoint(
+                    csharpClass.name(),
+                    ApiType.REST,
+                    handlerRoute,
+                    httpMethod,
+                    csharpClass.name() + "." + methodName,
+                    requestSchema,
+                    method.returnType(),
+                    null
+                );
+
+                apiEndpoints.add(endpoint);
+                log.debug("Found Razor Page handler: {} {} -> {}", httpMethod, handlerRoute, methodName);
+            }
+        }
+    }
+
+    /**
+     * Derives the route for a Razor Page from its file path.
+     *
+     * <p>Convention: Pages/Products/Index.cshtml.cs -> /Products/Index
+     * <p>Special case: Pages/Index.cshtml.cs -> /
+     */
+    private String deriveRazorPageRoute(String filePath) {
+        // Normalize path separators
+        String normalized = filePath.replace('\\', '/');
+
+        // Find "Pages/" directory
+        int pagesIndex = normalized.indexOf("/Pages/");
+        if (pagesIndex == -1) {
+            pagesIndex = normalized.indexOf("Pages/");
+        }
+
+        if (pagesIndex != -1) {
+            // Extract path after Pages/
+            String afterPages = normalized.substring(pagesIndex + "Pages/".length());
+
+            // Remove .cshtml.cs or .cs extension
+            afterPages = afterPages.replace(".cshtml.cs", "").replace(".cs", "");
+
+            // Remove "Model" suffix from class name if present
+            if (afterPages.endsWith("Model")) {
+                afterPages = afterPages.substring(0, afterPages.length() - "Model".length());
+            }
+
+            // Handle Index pages -> directory route
+            if (afterPages.endsWith("/Index")) {
+                afterPages = afterPages.substring(0, afterPages.length() - "/Index".length());
+            } else if (afterPages.equals("Index")) {
+                return PATH_SEPARATOR;
+            }
+
+            return afterPages.startsWith(PATH_SEPARATOR) ? afterPages : PATH_SEPARATOR + afterPages;
+        }
+
+        // Fallback: use filename
+        int lastSlash = normalized.lastIndexOf('/');
+        String fileName = lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
+        fileName = fileName.replace(".cshtml.cs", "").replace(".cs", "");
+        if (fileName.endsWith("Model")) {
+            fileName = fileName.substring(0, fileName.length() - "Model".length());
+        }
+
+        return PATH_SEPARATOR + fileName;
+    }
+
+    /**
+     * Extracts HTTP method from Razor Page handler name.
+     *
+     * <p>Examples: OnGet -> GET, OnPostAsync -> POST, OnGetDetails -> GET
+     */
+    private String extractHttpMethodFromHandler(String handlerName) {
+        if (handlerName.contains("Get")) {
+            return "GET";
+        } else if (handlerName.contains("Post")) {
+            return "POST";
+        } else if (handlerName.contains("Put")) {
+            return "PUT";
+        } else if (handlerName.contains("Delete")) {
+            return "DELETE";
+        } else if (handlerName.contains("Patch")) {
+            return "PATCH";
+        }
+        return null;
     }
 }
