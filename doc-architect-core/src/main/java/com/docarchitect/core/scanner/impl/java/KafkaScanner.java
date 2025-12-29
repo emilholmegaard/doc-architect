@@ -91,11 +91,32 @@ public class KafkaScanner extends AbstractJavaParserScanner {
      * <p>This avoids attempting to parse files that don't contain Kafka code,
      * reducing unnecessary WARN logs and improving performance.
      *
+     * <p><b>Detection Strategy (ordered by likelihood):</b>
+     * <ol>
+     *   <li>Filename convention: *Listener.java, *Consumer.java, *Producer.java, *Config.java</li>
+     *   <li>Apache Kafka package imports: org.apache.kafka</li>
+     *   <li>Spring Kafka package imports: org.springframework.kafka</li>
+     *   <li>Direct Kafka annotations: @KafkaListener, @EnableKafka, @SendTo</li>
+     *   <li>Kafka classes: KafkaTemplate</li>
+     * </ol>
+     *
      * @param file path to Java source file
      * @return true if file contains Kafka patterns, false otherwise
      */
     @Override
     protected boolean shouldScanFile(Path file) {
+        // Priority 1: Filename convention (fastest check, no I/O)
+        String fileName = file.getFileName().toString();
+        if (fileName.endsWith("Listener.java") ||
+            fileName.endsWith("Consumer.java") ||
+            fileName.endsWith("Producer.java") ||
+            fileName.endsWith("MessageHandler.java") ||
+            fileName.contains("Kafka") ||
+            (fileName.contains("Config") && fileName.endsWith(".java"))) {
+            log.debug("Including file by naming convention: {}", fileName);
+            return true;
+        }
+
         // Skip test files unless they contain Kafka patterns
         String filePath = file.toString();
         boolean isTestFile = filePath.contains("/test/") || filePath.contains("\\test\\");
@@ -103,13 +124,24 @@ public class KafkaScanner extends AbstractJavaParserScanner {
         try {
             String content = readFileContent(file);
 
-            // Check for Kafka imports and annotations
-            boolean hasKafkaPatterns = content.contains("org.apache.kafka") ||
-                                      content.contains("org.springframework.kafka") ||
-                                      content.contains("@KafkaListener") ||
-                                      content.contains("@EnableKafka") ||
-                                      content.contains("@SendTo") ||
-                                      content.contains("KafkaTemplate");
+            // Priority 2-5: Check for Kafka imports, annotations, and classes
+            boolean hasApacheKafkaImport = content.contains("org.apache.kafka");
+            boolean hasSpringKafkaImport = content.contains("org.springframework.kafka");
+            boolean hasKafkaAnnotations =
+                content.contains("@KafkaListener") ||
+                content.contains("@EnableKafka") ||
+                content.contains("@SendTo");
+            boolean hasKafkaClasses = content.contains("KafkaTemplate");
+
+            boolean hasKafkaPatterns = hasApacheKafkaImport || hasSpringKafkaImport ||
+                                      hasKafkaAnnotations || hasKafkaClasses;
+
+            if (hasKafkaPatterns) {
+                log.debug("Including file with Kafka patterns: {} (apacheImport={}, springImport={}, annotations={}, classes={})",
+                    fileName, hasApacheKafkaImport, hasSpringKafkaImport, hasKafkaAnnotations, hasKafkaClasses);
+            } else {
+                log.debug("Skipping file without Kafka patterns: {}", fileName);
+            }
 
             // For test files, require Kafka patterns
             // For non-test files, allow if they have Kafka patterns
@@ -131,21 +163,36 @@ public class KafkaScanner extends AbstractJavaParserScanner {
         List<MessageFlow> messageFlows = new ArrayList<>();
         List<Path> javaFiles = context.findFiles(FILE_PATTERN).toList();
 
+        log.debug("Found {} total Java files to examine", javaFiles.size());
+
         if (javaFiles.isEmpty()) {
+            log.debug("No Java files found in: {}", context.rootPath());
             return emptyResult();
         }
 
+        int scannedCount = 0;
+        int skippedCount = 0;
+
         for (Path javaFile : javaFiles) {
             try {
+                int beforeCount = messageFlows.size();
                 parseKafkaFlows(javaFile, messageFlows);
+                int afterCount = messageFlows.size();
+
+                if (afterCount > beforeCount) {
+                    scannedCount++;
+                    log.debug("Found {} message flow(s) in: {}", afterCount - beforeCount, javaFile.getFileName());
+                }
             } catch (Exception e) {
                 // Files without Kafka patterns are already filtered by shouldScanFile()
                 // Any remaining parse failures are logged at DEBUG level
                 log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+                skippedCount++;
             }
         }
 
-        log.info("Found {} Kafka message flows", messageFlows.size());
+        log.info("Found {} Kafka message flows (scanned {} files, skipped {} files)",
+                 messageFlows.size(), scannedCount, skippedCount);
 
         return buildSuccessResult(
             List.of(),
