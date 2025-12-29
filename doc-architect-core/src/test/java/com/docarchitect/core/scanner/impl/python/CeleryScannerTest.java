@@ -46,7 +46,7 @@ class CeleryScannerTest extends ScannerTestBase {
 
     @Test
     void appliesTo_withPythonFiles_returnsTrue() throws IOException {
-        createFile("test.py", "# test");
+        createFile("app/test.py", "# test");
 
         assertThat(scanner.appliesTo(context)).isTrue();
     }
@@ -66,7 +66,7 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email(to, subject, body):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         // Create views.py with task invocation
         String viewsContent = """
@@ -75,7 +75,7 @@ class CeleryScannerTest extends ScannerTestBase {
             def register_user(email):
                 send_email.delay(email, 'Welcome', 'Thank you for registering')
             """;
-        createFile("views.py", viewsContent);
+        createFile("app/views.py", viewsContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -97,14 +97,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def process_data(data_id):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import process_data
 
             process_data.delay(123)
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -125,14 +125,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_notification(user_id):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_notification
 
             send_notification.delay(456)
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -152,14 +152,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def background_job():
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import background_job
 
             background_job.delay()
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -177,14 +177,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email(to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_email
 
             send_email.delay('user@example.com')
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -202,14 +202,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email_task(to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_email_task
 
             send_email_task.delay('user@example.com')
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -227,14 +227,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def process_image(image_id):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import process_image
 
             process_image.apply_async(args=[123])
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -252,14 +252,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email(to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_email
 
             send_email.apply_async(args=['user@example.com'], queue='priority')
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -277,14 +277,14 @@ class CeleryScannerTest extends ScannerTestBase {
             async def async_task(data):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import async_task
 
             async_task.delay({'key': 'value'})
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -310,7 +310,7 @@ class CeleryScannerTest extends ScannerTestBase {
             def process_payment(payment_id):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_email, send_sms, process_payment
@@ -319,7 +319,7 @@ class CeleryScannerTest extends ScannerTestBase {
             send_sms.delay('+1234567890')
             process_payment.apply_async(args=[123])
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -348,7 +348,7 @@ class CeleryScannerTest extends ScannerTestBase {
             def register_user(email):
                 send_email.delay(email)
             """;
-        createFile("service.py", content);
+        createFile("app/service.py", content);
 
         ScanResult result = scanner.scan(context);
 
@@ -368,21 +368,21 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email(to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String service1Content = """
             from tasks import send_email
 
             send_email.delay('user1@example.com')
             """;
-        createFile("service1.py", service1Content);
+        createFile("app/service1.py", service1Content);
 
         String service2Content = """
             from tasks import send_email
 
             send_email.delay('user2@example.com')
             """;
-        createFile("service2.py", service2Content);
+        createFile("app/service2.py", service2Content);
 
         ScanResult result = scanner.scan(context);
 
@@ -401,7 +401,7 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email(to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -415,7 +415,7 @@ class CeleryScannerTest extends ScannerTestBase {
             def regular_function():
                 pass
             """;
-        createFile("utils.py", content);
+        createFile("app/utils.py", content);
 
         ScanResult result = scanner.scan(context);
 
@@ -424,7 +424,7 @@ class CeleryScannerTest extends ScannerTestBase {
 
     @Test
     void scan_withEmptyFile_returnsEmpty() throws IOException {
-        createFile("empty.py", "");
+        createFile("app/empty.py", "");
 
         ScanResult result = scanner.scan(context);
 
@@ -440,14 +440,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_urgent_email(self, to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_urgent_email
 
             send_urgent_email.delay('admin@example.com')
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
@@ -466,14 +466,14 @@ class CeleryScannerTest extends ScannerTestBase {
             def send_email(to):
                 pass
             """;
-        createFile("tasks.py", tasksContent);
+        createFile("app/tasks.py", tasksContent);
 
         String serviceContent = """
             from tasks import send_email
 
             send_email.delay('user@example.com')
             """;
-        createFile("service.py", serviceContent);
+        createFile("app/service.py", serviceContent);
 
         ScanResult result = scanner.scan(context);
 
