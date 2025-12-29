@@ -279,9 +279,10 @@ public class JaxRsApiScanner extends AbstractJavaParserScanner {
      *
      * @param javaFile path to Java file
      * @param apiEndpoints list to add discovered API endpoints
-     * @param components list to add discovered components
+     * @param components list to add discovered components (reserved for future use)
      * @throws IOException if file cannot be read
      */
+    @SuppressWarnings("unused")
     private void parseJaxRsResource(Path javaFile, List<ApiEndpoint> apiEndpoints, List<Component> components) throws IOException {
         // Parse Java source using JavaParser
         var compilationUnit = parseJavaFile(javaFile);
@@ -514,11 +515,11 @@ public class JaxRsApiScanner extends AbstractJavaParserScanner {
      * @return combined path
      */
     private String combinePaths(String basePath, String methodPath) {
+        if (methodPath == null || methodPath.isEmpty()) {
+            return basePath != null && !basePath.isEmpty() ? basePath : PATH_SEPARATOR;
+        }
         if (basePath == null || basePath.isEmpty()) {
             return methodPath.startsWith(PATH_SEPARATOR) ? methodPath : PATH_SEPARATOR + methodPath;
-        }
-        if (methodPath == null || methodPath.isEmpty()) {
-            return basePath;
         }
 
         String cleanBase = basePath.endsWith(PATH_SEPARATOR) ? basePath.substring(0, basePath.length() - 1) : basePath;

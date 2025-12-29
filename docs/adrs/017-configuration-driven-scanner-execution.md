@@ -1,10 +1,29 @@
-# ADR 017: Configuration-Driven Scanner Execution
+---
+# Backstage TechDocs metadata
+id: adr-017-configuration-driven-scanner-execution
+title: ADR-017: Configuration-Driven Scanner Execution
+description: Fix critical bug where CLI discovered scanners but executed 0 scanners due to missing configuration loading
+tags:
+  - adr
+  - configuration
+  - scanners
+  - bug-fix
+  - yaml
+---
+# ADR-017: Configuration-Driven Scanner Execution
 
-**Status:** Accepted
-**Date:** 2025-12-26
-**Context:** Issue #104 - CLI discovers scanners but executes 0 scanners
+| Property | Value |
+|----------|-------|
+| **Status** | Accepted |
+| **Date** | 2025-12-26 |
+| **Deciders** | Development Team |
+| **Technical Story** | Issue #104 - CLI discovers scanners but executes 0 scanners |
+| **Supersedes** | N/A |
+| **Superseded by** | N/A |
 
-## Context and Problem Statement
+---
+
+## Context
 
 The CLI was discovering all available scanners via SPI (ServiceLoader) but executing **0 scanners**, resulting in no components, dependencies, APIs, or entities being extracted from real-world projects like Keycloak. This completely broke the tool's core functionality.
 
@@ -144,25 +163,36 @@ private void validateScannerConfig(List<Scanner> scanners, ProjectConfig config)
 
 ### Positive
 
-1. **Fixes Critical Bug**: Resolves issue #104 - scanners now actually execute
-2. **User Control**: Users can enable/disable specific scanners via config
-3. **Clear Feedback**: Users get actionable warnings when config doesn't match available scanners
-4. **Performance**: Can skip irrelevant scanners (e.g., disable Python scanners for Java projects)
-5. **Debugging**: Debug logging shows exactly which scanners were considered and why they were skipped
-6. **Defaults Work**: Empty or missing config enables all scanners (backward compatible)
+✅ **Fixes Critical Bug** - Resolves issue #104, scanners now actually execute
+✅ **User Control** - Users can enable/disable specific scanners via config
+✅ **Clear Feedback** - Users get actionable warnings when config doesn't match available scanners
+✅ **Performance** - Can skip irrelevant scanners (e.g., disable Python scanners for Java projects)
+✅ **Debugging** - Debug logging shows exactly which scanners were considered and why
+✅ **Defaults Work** - Empty or missing config enables all scanners (backward compatible)
 
 ### Negative
 
-1. **Config Required**: Users must use correct scanner IDs (but we validate and warn)
-2. **Breaking Change**: Old configs with `spring-mvc-api` need updating (but tool warns)
+⚠️ **Config Required** - Users must use correct scanner IDs (but we validate and warn)
+⚠️ **Breaking Change** - Old configs with `spring-mvc-api` need updating (but tool warns)
 
 ### Neutral
 
-1. **Additional Classes**: Added `ProjectConfig` and `ConfigLoader` (~200 LOC)
-2. **Test Coverage**: Added 21 comprehensive unit tests for config loading
-3. **Documentation**: Requires updating config examples and documentation
+- **Additional Classes** - Added `ProjectConfig` and `ConfigLoader` (~200 LOC)
+- **Test Coverage** - Added 21 comprehensive unit tests for config loading
+- **Documentation** - Requires updating config examples and documentation
 
-## Implementation
+## Alternatives Considered
+
+### Alternative 1: Auto-correct Scanner IDs
+**Rejected** - Would hide misconfiguration and create unpredictable behavior. Better to warn users explicitly.
+
+### Alternative 2: Execute All Scanners Regardless of Config
+**Rejected** - Defeats purpose of configuration and wastes resources scanning irrelevant technologies.
+
+### Alternative 3: Fail Fast on Unknown Scanner IDs
+**Rejected** - Too strict; warning is better UX as it allows scan to continue with known scanners.
+
+## Implementation Details
 
 ### Files Created
 
@@ -195,56 +225,19 @@ test-projects/openhab-core/docarchitect.yaml
   - Fixed: spring-mvc-api → spring-rest-api
 ```
 
-### Test Results
-
-- **All 680 tests pass** (including 21 new config tests)
-- **Build successful**: Maven compile and package succeed
-- **Coverage**: Config classes have 100% test coverage
-
-## Scanner ID Reference
-
-For future config authoring, the correct scanner IDs are:
-
-### Java
-- `maven-dependencies` - Maven POM scanner
-- `gradle-dependencies` - Gradle build scanner
-- `spring-rest-api` - Spring MVC/REST scanner (NOT spring-mvc-api)
-- `jpa-entities` - JPA entity scanner
-- `kafka-messaging` - Kafka messaging scanner
-
-### Python
-- `pip-poetry-dependencies` - Python dependency scanner
-- `fastapi-rest` - FastAPI scanner
-- `flask-rest` - Flask scanner
-- `django-orm` - Django ORM scanner
-
-### .NET
-- `nuget-dependencies` - NuGet dependency scanner
-- `aspnetcore-rest` - ASP.NET Core API scanner
-- `entity-framework` - Entity Framework scanner
-
-### JavaScript
-- `npm-dependencies` - NPM dependency scanner
-- `express-api` - Express.js scanner
-
-### Go
-- `go-modules` - go.mod scanner
-
-### Schema
-- `graphql-schema` - GraphQL schema scanner
-- `avro-schema` - Apache Avro schema scanner
-- `sql-migration` - SQL migration scanner
-
-## Related
-
-- **Issue**: #104 - CLI discovers scanners but executes 0 scanners
-- **ADR 002**: CLI Framework (Picocli) - Command structure
-- **ADR 006**: Technology-based package organization - Scanner organization
-- **ADR 016**: Import-based scanner pre-filtering - Related optimization
-
 ## Verification
 
-To verify this works:
+### Test Results
+
+| Test Type | Result |
+|-----------|--------|
+| Unit tests (680 total) | ✅ All passing |
+| New config tests | ✅ 21 tests added |
+| Maven compile | ✅ Success |
+| Maven package | ✅ Success |
+| Config class coverage | ✅ 100% |
+
+### Verification Script
 
 ```bash
 # Create a test config
@@ -286,3 +279,55 @@ Expected warning:
     - spring-rest-api
     ...
 ```
+
+## Scanner ID Reference
+
+For future config authoring, the correct scanner IDs are:
+
+### Java
+- `maven-dependencies` - Maven POM scanner
+- `gradle-dependencies` - Gradle build scanner
+- `spring-rest-api` - Spring MVC/REST scanner (NOT spring-mvc-api)
+- `jpa-entities` - JPA entity scanner
+- `kafka-messaging` - Kafka messaging scanner
+- `jaxrs-api` - JAX-RS API scanner
+
+### Python
+- `pip-poetry-dependencies` - Python dependency scanner
+- `fastapi-rest` - FastAPI scanner
+- `flask-rest` - Flask scanner
+- `django-orm` - Django ORM scanner
+- `sqlalchemy-orm` - SQLAlchemy scanner
+
+### .NET
+- `nuget-dependencies` - NuGet dependency scanner
+- `aspnetcore-rest` - ASP.NET Core API scanner
+- `entity-framework` - Entity Framework scanner
+
+### JavaScript
+- `npm-dependencies` - NPM dependency scanner
+- `express-api` - Express.js scanner
+
+### Go
+- `go-modules` - go.mod scanner
+
+### Ruby
+- `bundler-dependencies` - Bundler Gemfile scanner
+- `rails-api` - Ruby on Rails API scanner
+
+### Schema
+- `graphql-schema` - GraphQL schema scanner
+- `avro-schema` - Apache Avro schema scanner
+- `sql-migration` - SQL migration scanner
+
+## Related ADRs
+
+- [ADR-002: CLI Framework (Picocli)](002-cli-framework-picocli.md) - Command structure
+- [ADR-006: Technology-based Package Organization](006-technology-based-package-organization.md) - Scanner organization
+- [ADR-016: Import-based Scanner Pre-filtering](016-import-based-scanner-pre-filtering.md) - Related optimization
+
+## References
+
+- [GitHub Issue #104](https://github.com/emilholmegaard/doc-architect/issues/104) - CLI discovers scanners but executes 0 scanners
+- [Jackson YAML Documentation](https://github.com/FasterXML/jackson-dataformats-text)
+- [Java ServiceLoader Documentation](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/ServiceLoader.html)

@@ -52,6 +52,8 @@ EOF
 # Run DocArchitect
 echo ""
 echo "Running DocArchitect on FastAPI project..."
+# Create output directory with correct permissions before Docker mount
+mkdir -p "$(pwd)/output/fastapi"
 docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
     -v "$(pwd)/output/fastapi:/output" \

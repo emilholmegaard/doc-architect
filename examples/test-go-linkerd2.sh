@@ -51,6 +51,8 @@ EOF
 # Run DocArchitect
 echo ""
 echo "Running DocArchitect on Linkerd2..."
+# Create output directory with correct permissions before Docker mount
+mkdir -p "$(pwd)/output/linkerd2"
 docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
     -v "$(pwd)/output/linkerd2:/output" \
