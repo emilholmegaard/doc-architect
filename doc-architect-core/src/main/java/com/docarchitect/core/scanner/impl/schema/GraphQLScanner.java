@@ -10,6 +10,8 @@ import com.docarchitect.core.util.Technologies;
 
 import graphql.language.*;
 import graphql.parser.Parser;
+import graphql.parser.ParserEnvironment;
+import graphql.parser.ParserOptions;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -26,10 +28,12 @@ import java.util.*;
  * <p><b>Parsing Strategy:</b>
  * <ol>
  *   <li>Locate .graphql and .gql files using pattern matching</li>
+ *   <li>Pre-filter files based on configurable size/line limits</li>
  *   <li>Parse schema using graphql-java Parser (robust AST-based parsing)</li>
  *   <li>Extract type definitions → DataEntity records</li>
  *   <li>Extract Query fields → ApiEndpoint records (type=GRAPHQL)</li>
  *   <li>Extract Mutation fields → ApiEndpoint records (type=GRAPHQL)</li>
+ *   <li>Log performance metrics for large schema files</li>
  * </ol>
  *
  * <p><b>Supported GraphQL Constructs:</b>
@@ -41,13 +45,26 @@ import java.util.*;
  *   <li>Field definitions with types and nullability</li>
  * </ul>
  *
+ * <p><b>Configuration:</b>
+ * <p>Schema size limits can be configured in {@code docarchitect.yaml}:
+ * <pre>{@code
+ * scanners:
+ *   config:
+ *     graphql-schema:
+ *       maxFileSizeBytes: 10000000  # 10MB (default: 5MB)
+ *       maxSchemaLines: 100000      # 100k lines (default: 50k)
+ * }</pre>
+ *
+ * <p>These limits prevent DoS-style parsing errors with extremely large schemas (e.g., Saleor's 35k+ line schema).
+ * Files exceeding the limits will be skipped with a warning.
+ *
  * <p><b>Usage Example:</b>
  * <pre>{@code
  * Scanner scanner = new GraphQLScanner();
  * ScanContext context = new ScanContext(
  *     projectRoot,
  *     List.of(projectRoot),
- *     Map.of(),
+ *     Map.of("maxSchemaLines", 50000),  // Optional configuration
  *     Map.of(),
  *     Map.of()
  * );
@@ -81,8 +98,6 @@ import java.util.*;
  */
 public class GraphQLScanner extends AbstractRegexScanner {
 
-    private final Parser parser = new Parser();
-
     private static final String SCANNER_ID = "graphql-schema";
     private static final String DISPLAY_NAME = "GraphQL Schema Scanner";
     private static final String GRAPHQL_FILE_PATTERN = "**/*.graphql";
@@ -104,9 +119,14 @@ public class GraphQLScanner extends AbstractRegexScanner {
     private static final String COMMA_SEPARATOR = ", ";
     private static final String COLON_SEPARATOR = ": ";
 
-    // File size limits to prevent DoS-style parsing errors (e.g., Saleor's 15k+ token schemas)
-    private static final long MAX_FILE_SIZE_BYTES = 2_000_000; // 2MB max per schema file
-    private static final int MAX_SCHEMA_LINES = 10_000; // ~10k lines max
+    // File size limits to prevent DoS-style parsing errors (e.g., Saleor's 35k+ line schemas)
+    // Default limits - can be overridden via configuration
+    private static final long DEFAULT_MAX_FILE_SIZE_BYTES = 5_000_000; // 5MB max per schema file
+    private static final int DEFAULT_MAX_SCHEMA_LINES = 50_000; // ~50k lines max (increased from 10k for Saleor)
+
+    // Configuration keys for YAML customization
+    private static final String CONFIG_MAX_FILE_SIZE_BYTES = "maxFileSizeBytes";
+    private static final String CONFIG_MAX_SCHEMA_LINES = "maxSchemaLines";
 
     @Override
     public String getId() {
@@ -142,6 +162,13 @@ public class GraphQLScanner extends AbstractRegexScanner {
     public ScanResult scan(ScanContext context) {
         log.info("Scanning GraphQL schemas in: {}", context.rootPath());
 
+        // Read configurable limits from context
+        long maxFileSizeBytes = getMaxFileSizeBytes(context);
+        int maxSchemaLines = getMaxSchemaLines(context);
+
+        log.debug("GraphQL scanner limits: maxFileSize={}MB, maxLines={}",
+            maxFileSizeBytes / 1_048_576, maxSchemaLines);
+
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
         List<DataEntity> dataEntities = new ArrayList<>();
 
@@ -159,10 +186,20 @@ public class GraphQLScanner extends AbstractRegexScanner {
         for (Path schemaFile : schemaFiles) {
             try {
                 // Pre-filter: Skip files that are too large to parse safely
-                if (!shouldScanFile(schemaFile, warnings)) {
+                if (!shouldScanFile(schemaFile, maxFileSizeBytes, maxSchemaLines, warnings)) {
                     continue;
                 }
+
+                // Performance logging
+                long startTime = System.currentTimeMillis();
                 parseSchemaFile(schemaFile, apiEndpoints, dataEntities);
+                long duration = System.currentTimeMillis() - startTime;
+
+                if (duration > 1000) {
+                    log.info("Parsed large GraphQL schema: {} ({} ms)", schemaFile.getFileName(), duration);
+                } else {
+                    log.debug("Parsed GraphQL schema: {} ({} ms)", schemaFile.getFileName(), duration);
+                }
             } catch (Exception e) {
                 log.error("Failed to parse GraphQL schema: {}", schemaFile, e);
                 // Don't fail the entire scan - just skip this file and log a warning
@@ -185,29 +222,60 @@ public class GraphQLScanner extends AbstractRegexScanner {
     }
 
     /**
+     * Gets the maximum file size in bytes from configuration, or default if not configured.
+     *
+     * @param context scan context
+     * @return maximum file size in bytes
+     */
+    private long getMaxFileSizeBytes(ScanContext context) {
+        Object value = context.getConfig(CONFIG_MAX_FILE_SIZE_BYTES);
+        if (value instanceof Number num) {
+            return num.longValue();
+        }
+        return DEFAULT_MAX_FILE_SIZE_BYTES;
+    }
+
+    /**
+     * Gets the maximum schema line count from configuration, or default if not configured.
+     *
+     * @param context scan context
+     * @return maximum schema line count
+     */
+    private int getMaxSchemaLines(ScanContext context) {
+        Object value = context.getConfig(CONFIG_MAX_SCHEMA_LINES);
+        if (value instanceof Number num) {
+            return num.intValue();
+        }
+        return DEFAULT_MAX_SCHEMA_LINES;
+    }
+
+    /**
      * Pre-filter files to skip those that are too large to parse safely.
      *
      * <p>The graphql-java parser has a token limit (15,000 tokens by default) to prevent
-     * DoS attacks. Very large schema files (e.g., Saleor's monolithic schema.graphql)
-     * will exceed this limit and fail to parse.
+     * DoS attacks. Very large schema files (e.g., Saleor's monolithic schema.graphql with 35k+ lines)
+     * may exceed this limit and fail to parse. This method uses configurable limits to
+     * pre-filter files before attempting to parse them.
      *
      * <p><b>Detection Strategy:</b>
      * <ol>
-     *   <li>Check file size - skip files larger than 2MB</li>
-     *   <li>Check line count - skip files with more than 10,000 lines</li>
+     *   <li>Check file size - skip files larger than configured limit (default 5MB)</li>
+     *   <li>Check line count - skip files with more than configured limit (default 50k lines)</li>
      * </ol>
      *
      * @param file path to GraphQL schema file
+     * @param maxFileSizeBytes maximum file size in bytes (configurable)
+     * @param maxSchemaLines maximum line count (configurable)
      * @param warnings list to add warning messages for skipped files
      * @return true if file should be scanned, false if it should be skipped
      */
-    private boolean shouldScanFile(Path file, List<String> warnings) {
+    private boolean shouldScanFile(Path file, long maxFileSizeBytes, int maxSchemaLines, List<String> warnings) {
         try {
             // Check 1: File size
             long fileSize = Files.size(file);
-            if (fileSize > MAX_FILE_SIZE_BYTES) {
+            if (fileSize > maxFileSizeBytes) {
                 String msg = String.format("Skipping large GraphQL schema file: %s (%d KB) - exceeds %d KB limit",
-                    file.getFileName(), fileSize / 1024, MAX_FILE_SIZE_BYTES / 1024);
+                    file.getFileName(), fileSize / 1024, maxFileSizeBytes / 1024);
                 log.warn(msg);
                 warnings.add(msg);
                 return false;
@@ -216,14 +284,16 @@ public class GraphQLScanner extends AbstractRegexScanner {
             // Check 2: Line count (simple heuristic - count newlines)
             String content = readFileContent(file);
             long lineCount = content.lines().count();
-            if (lineCount > MAX_SCHEMA_LINES) {
+            if (lineCount > maxSchemaLines) {
                 String msg = String.format("Skipping large GraphQL schema file: %s (%d lines) - exceeds %d line limit",
-                    file.getFileName(), lineCount, MAX_SCHEMA_LINES);
+                    file.getFileName(), lineCount, maxSchemaLines);
                 log.warn(msg);
                 warnings.add(msg);
                 return false;
             }
 
+            log.debug("GraphQL schema file passed pre-filter checks: {} ({} KB, {} lines)",
+                file.getFileName(), fileSize / 1024, lineCount);
             return true;
         } catch (IOException e) {
             log.debug("Failed to check file size for pre-filtering: {}", file, e);
@@ -234,6 +304,9 @@ public class GraphQLScanner extends AbstractRegexScanner {
 
     /**
      * Parses a single GraphQL schema file using graphql-java Parser and extracts types and operations.
+     *
+     * <p>Uses custom ParserOptions to increase the token limit beyond the default 15,000 tokens
+     * to support large schema files like Saleor's 35k+ line schema.
      *
      * @param schemaFile path to GraphQL schema file
      * @param apiEndpoints list to add discovered API endpoints
@@ -247,8 +320,16 @@ public class GraphQLScanner extends AbstractRegexScanner {
             .replace(GRAPHQL_EXTENSION, "")
             .replace(GQL_EXTENSION, "");
 
-        // Parse GraphQL schema using graphql-java library
-        Document document = parser.parseDocument(content);
+        // Parse GraphQL schema using graphql-java library with increased token limit
+        // Default is 15,000 tokens; we increase to 200,000 to handle large schemas like Saleor (35k+ lines)
+        ParserOptions parserOptions = ParserOptions.newParserOptions()
+            .maxTokens(200_000)
+            .build();
+        ParserEnvironment parserEnvironment = ParserEnvironment.newParserEnvironment()
+            .document(content)
+            .parserOptions(parserOptions)
+            .build();
+        Document document = Parser.parse(parserEnvironment);
 
         // Process all definitions in the document
         for (Definition<?> definition : document.getDefinitions()) {
