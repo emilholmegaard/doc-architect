@@ -9,6 +9,7 @@ com.docarchitect.core.scanner.impl.java.JaxRsApiScanner
 com.docarchitect.core.scanner.impl.java.JpaEntityScanner
 com.docarchitect.core.scanner.impl.java.KafkaScanner
 com.docarchitect.core.scanner.impl.java.RabbitMQScanner
+com.docarchitect.core.scanner.impl.java.JavaHttpClientScanner
 
 # Python Scanners
 com.docarchitect.core.scanner.impl.python.PipPoetryDependencyScanner
