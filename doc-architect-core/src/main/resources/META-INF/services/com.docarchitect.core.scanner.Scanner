@@ -32,6 +32,7 @@ com.docarchitect.core.scanner.impl.javascript.ExpressScanner
 
 # Go Scanners
 com.docarchitect.core.scanner.impl.go.GoModScanner
+com.docarchitect.core.scanner.impl.go.GoHttpRouterScanner
 
 # Ruby Scanners
 com.docarchitect.core.scanner.impl.ruby.BundlerDependencyScanner
