@@ -33,15 +33,18 @@ class DjangoAppScannerTest extends ScannerTestBase {
             ]
             """);
 
-        // Create app directories with __init__.py to mark them as local
+        // Create app directories with __init__.py and models.py to mark them as Django apps
         createDirectory("myapp/users");
         createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/models.py", "");
 
         createDirectory("myapp/products");
         createFile("myapp/products/__init__.py", "");
+        createFile("myapp/products/models.py", "");
 
         createDirectory("myapp/orders");
         createFile("myapp/orders/__init__.py", "");
+        createFile("myapp/orders/models.py", "");
 
         // When: Scanner is executed
         ScanResult result = scanner.scan(context);
@@ -73,9 +76,11 @@ class DjangoAppScannerTest extends ScannerTestBase {
 
         createDirectory("myapp/users");
         createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/models.py", "");
 
         createDirectory("myapp/products");
         createFile("myapp/products/__init__.py", "");
+        createFile("myapp/products/models.py", "");
 
         // When: Scanner is executed
         ScanResult result = scanner.scan(context);
@@ -127,9 +132,11 @@ class DjangoAppScannerTest extends ScannerTestBase {
 
         createDirectory("myapp/users");
         createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/models.py", "");
 
         createDirectory("myapp/products");
         createFile("myapp/products/__init__.py", "");
+        createFile("myapp/products/models.py", "");
 
         // When: Scanner is executed
         ScanResult result = scanner.scan(context);
@@ -151,9 +158,11 @@ class DjangoAppScannerTest extends ScannerTestBase {
 
         createDirectory("users");
         createFile("users/__init__.py", "");
+        createFile("users/models.py", "");
 
         createDirectory("products");
         createFile("products/__init__.py", "");
+        createFile("products/models.py", "");
 
         // When: Scanner is executed
         ScanResult result = scanner.scan(context);
@@ -205,6 +214,7 @@ class DjangoAppScannerTest extends ScannerTestBase {
 
         createDirectory("myapp/users");
         createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/models.py", "");
 
         // When: Scanner is executed
         ScanResult result = scanner.scan(context);
@@ -236,12 +246,15 @@ class DjangoAppScannerTest extends ScannerTestBase {
 
         createDirectory("myapp/users");
         createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/models.py", "");
 
         createDirectory("myapp/products");
         createFile("myapp/products/__init__.py", "");
+        createFile("myapp/products/models.py", "");
 
         createDirectory("myapp/orders");
         createFile("myapp/orders/__init__.py", "");
+        createFile("myapp/orders/models.py", "");
 
         // When: Scanner is executed
         ScanResult result = scanner.scan(context);
@@ -304,5 +317,151 @@ class DjangoAppScannerTest extends ScannerTestBase {
 
         // Then: Should return false
         assertThat(applies).isFalse();
+    }
+
+    @Test
+    void scan_withAppsFile_detectsAsLocalApp() throws IOException {
+        // Given: Django settings.py with app that has apps.py (but no models.py)
+        createFile("myproject/settings.py", """
+            INSTALLED_APPS = [
+                'myapp.users',
+            ]
+            """);
+
+        createDirectory("myapp/users");
+        createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/apps.py", """
+            from django.apps import AppConfig
+
+            class UsersConfig(AppConfig):
+                name = 'myapp.users'
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect as local MODULE (has apps.py)
+        assertThat(result.success()).isTrue();
+        assertThat(result.components()).hasSize(1);
+        assertThat(result.components().get(0).type()).isEqualTo(ComponentType.MODULE);
+    }
+
+    @Test
+    void scan_withVerboseName_extractsDisplayName() throws IOException {
+        // Given: Django settings.py with app that has verbose_name in apps.py
+        createFile("myproject/settings.py", """
+            INSTALLED_APPS = [
+                'saleor.checkout',
+                'saleor.payment',
+            ]
+            """);
+
+        createDirectory("saleor/checkout");
+        createFile("saleor/checkout/__init__.py", "");
+        createFile("saleor/checkout/apps.py", """
+            from django.apps import AppConfig
+
+            class CheckoutConfig(AppConfig):
+                name = 'saleor.checkout'
+                verbose_name = 'Checkout'
+            """);
+
+        createDirectory("saleor/payment");
+        createFile("saleor/payment/__init__.py", "");
+        createFile("saleor/payment/apps.py", """
+            from django.apps import AppConfig
+
+            class PaymentConfig(AppConfig):
+                name = 'saleor.payment'
+                verbose_name = "Payment Processing"
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should extract verbose_name as display name
+        assertThat(result.success()).isTrue();
+        assertThat(result.components()).hasSize(2);
+
+        assertThat(result.components())
+            .extracting(Component::name)
+            .containsExactlyInAnyOrder("Checkout", "Payment Processing");
+    }
+
+    @Test
+    void scan_withoutVerboseName_usesAppName() throws IOException {
+        // Given: Django app with apps.py but no verbose_name
+        createFile("myproject/settings.py", """
+            INSTALLED_APPS = [
+                'myapp.users',
+            ]
+            """);
+
+        createDirectory("myapp/users");
+        createFile("myapp/users/__init__.py", "");
+        createFile("myapp/users/apps.py", """
+            from django.apps import AppConfig
+
+            class UsersConfig(AppConfig):
+                name = 'myapp.users'
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should use last segment of app name as display name
+        assertThat(result.success()).isTrue();
+        assertThat(result.components()).hasSize(1);
+        assertThat(result.components().get(0).name()).isEqualTo("users");
+    }
+
+    @Test
+    void scan_withModelsFile_detectsAsLocalApp() throws IOException {
+        // Given: Django settings.py with app that has models.py (but no apps.py)
+        createFile("myproject/settings.py", """
+            INSTALLED_APPS = [
+                'myapp.products',
+            ]
+            """);
+
+        createDirectory("myapp/products");
+        createFile("myapp/products/__init__.py", "");
+        createFile("myapp/products/models.py", """
+            from django.db import models
+
+            class Product(models.Model):
+                name = models.CharField(max_length=100)
+            """);
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should detect as local MODULE (has models.py)
+        assertThat(result.success()).isTrue();
+        assertThat(result.components()).hasSize(1);
+        assertThat(result.components().get(0).type()).isEqualTo(ComponentType.MODULE);
+        assertThat(result.components().get(0).name()).isEqualTo("products");
+    }
+
+    @Test
+    void scan_withOnlyInitPy_classifiesAsLibrary() throws IOException {
+        // Given: App directory with only __init__.py (no apps.py or models.py)
+        createFile("myproject/settings.py", """
+            INSTALLED_APPS = [
+                'myapp.utils',
+            ]
+            """);
+
+        createDirectory("myapp/utils");
+        createFile("myapp/utils/__init__.py", "");
+        // No apps.py or models.py
+
+        // When: Scanner is executed
+        ScanResult result = scanner.scan(context);
+
+        // Then: Should classify as LIBRARY (not a Django app, just a Python package)
+        assertThat(result.success()).isTrue();
+        assertThat(result.components()).hasSize(1);
+        assertThat(result.components().get(0).type()).isEqualTo(ComponentType.LIBRARY);
     }
 }

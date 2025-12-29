@@ -186,15 +186,16 @@ public class DjangoAppScanner extends AbstractRegexScanner {
                 continue;
             }
 
+            // Try to find the app directory
+            String appPath = findAppDirectory(appName, context);
+
             String componentId = IdGenerator.generate("django-app", appName);
-            String displayName = extractAppDisplayName(appName);
+            String displayName = extractAppDisplayName(appName, context, appPath);
 
             Map<String, String> metadata = new HashMap<>();
             metadata.put("appName", appName);
             metadata.put("settingsFile", context.rootPath().relativize(settingsFile).toString());
 
-            // Try to find the app directory
-            String appPath = findAppDirectory(appName, context);
             if (appPath != null) {
                 metadata.put("appDirectory", appPath);
             }
@@ -241,6 +242,13 @@ public class DjangoAppScanner extends AbstractRegexScanner {
     /**
      * Finds the directory for a Django app.
      *
+     * <p>Verifies directory exists and contains Django app markers:
+     * <ul>
+     *   <li>{@code __init__.py} - Python package marker</li>
+     *   <li>{@code apps.py} - Django app configuration (preferred)</li>
+     *   <li>{@code models.py} - Django models (alternative marker)</li>
+     * </ul>
+     *
      * @param appName app name (e.g., "myapp.users")
      * @param context scan context
      * @return relative path to app directory, or null if not found
@@ -261,9 +269,8 @@ public class DjangoAppScanner extends AbstractRegexScanner {
         for (String possiblePath : possiblePaths) {
             Path appDir = context.rootPath().resolve(possiblePath);
             if (Files.exists(appDir) && Files.isDirectory(appDir)) {
-                // Verify it's a Python package (has __init__.py)
-                Path initFile = appDir.resolve("__init__.py");
-                if (Files.exists(initFile)) {
+                // Verify it's a Django app directory
+                if (isDjangoAppDirectory(appDir)) {
                     return context.rootPath().relativize(appDir).toString();
                 }
             }
@@ -273,16 +280,97 @@ public class DjangoAppScanner extends AbstractRegexScanner {
     }
 
     /**
+     * Checks if directory is a valid Django app directory.
+     *
+     * <p>A directory is considered a Django app if it has:
+     * <ol>
+     *   <li>{@code __init__.py} (Python package marker), AND</li>
+     *   <li>Either {@code apps.py} or {@code models.py} (Django app markers)</li>
+     * </ol>
+     *
+     * @param appDir directory to check
+     * @return true if directory is a Django app
+     */
+    private boolean isDjangoAppDirectory(Path appDir) {
+        Path initFile = appDir.resolve("__init__.py");
+        Path appsFile = appDir.resolve("apps.py");
+        Path modelsFile = appDir.resolve("models.py");
+
+        // Must have __init__.py (Python package)
+        if (!Files.exists(initFile)) {
+            return false;
+        }
+
+        // Must have apps.py or models.py (Django app)
+        return Files.exists(appsFile) || Files.exists(modelsFile);
+    }
+
+    /**
      * Extracts display name from app name.
      *
+     * <p>If the app has an apps.py file with an AppConfig class,
+     * attempts to extract the verbose_name. Otherwise, returns
+     * the last segment of the app name.
+     *
      * @param appName full app name (e.g., "myapp.users")
-     * @return display name (e.g., "users")
+     * @param context scan context
+     * @param appPath relative path to app directory (may be null)
+     * @return display name (e.g., "Users" from verbose_name, or "users" from app name)
      */
-    private String extractAppDisplayName(String appName) {
+    private String extractAppDisplayName(String appName, ScanContext context, String appPath) {
+        // Try to extract verbose_name from apps.py
+        if (appPath != null) {
+            String verboseName = extractVerboseNameFromAppsFile(context, appPath);
+            if (verboseName != null) {
+                return verboseName;
+            }
+        }
+
+        // Fallback: Use last segment of app name
         if (appName.contains(".")) {
             String[] parts = appName.split("\\.");
             return parts[parts.length - 1];
         }
         return appName;
+    }
+
+    /**
+     * Extracts verbose_name from Django apps.py AppConfig class.
+     *
+     * <p>Example apps.py:
+     * <pre>{@code
+     * class CheckoutConfig(AppConfig):
+     *     name = 'saleor.checkout'
+     *     verbose_name = 'Checkout'
+     * }</pre>
+     *
+     * @param context scan context
+     * @param appPath relative path to app directory
+     * @return verbose_name if found, null otherwise
+     */
+    private String extractVerboseNameFromAppsFile(ScanContext context, String appPath) {
+        Path appsFile = context.rootPath().resolve(appPath).resolve("apps.py");
+
+        if (!Files.exists(appsFile)) {
+            return null;
+        }
+
+        try {
+            String content = readFileContent(appsFile);
+
+            // Pattern to match: verbose_name = 'Name' or verbose_name = "Name"
+            Pattern verboseNamePattern = Pattern.compile(
+                "verbose_name\\s*=\\s*['\"]([^'\"]+)['\"]"
+            );
+
+            Matcher matcher = verboseNamePattern.matcher(content);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        } catch (IOException e) {
+            log.debug("Failed to read apps.py for verbose_name: {} - {}", appsFile, e.getMessage());
+        }
+
+        return null;
     }
 }
