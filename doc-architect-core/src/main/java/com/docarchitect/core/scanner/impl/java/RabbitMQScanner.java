@@ -117,7 +117,7 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
             fileName.contains("RabbitMQ") ||
             fileName.contains("Rabbit") ||
             (fileName.contains("Config") && fileName.endsWith(".java"))) {
-            log.trace("Including file by naming convention: {}", fileName);
+            log.debug("Including file by naming convention: {}", fileName);
             return true;
         }
 
@@ -164,7 +164,7 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
                 log.debug("Including file with RabbitMQ patterns: {} (amqpImport={}, rabbitImport={}, annotations={}, classes={})",
                     fileName, hasSpringAmqpImport, hasRabbitMQImport, hasRabbitMQAnnotations, hasRabbitMQClasses);
             } else {
-                log.trace("Skipping file without RabbitMQ patterns: {}", fileName);
+                log.debug("Skipping file without RabbitMQ patterns: {}", fileName);
             }
 
             // For test files, require RabbitMQ patterns
@@ -187,21 +187,36 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
         List<MessageFlow> messageFlows = new ArrayList<>();
         List<Path> javaFiles = context.findFiles(FILE_PATTERN).toList();
 
+        log.debug("Found {} total Java files to examine", javaFiles.size());
+
         if (javaFiles.isEmpty()) {
+            log.debug("No Java files found in: {}", context.rootPath());
             return emptyResult();
         }
 
+        int scannedCount = 0;
+        int skippedCount = 0;
+
         for (Path javaFile : javaFiles) {
             try {
+                int beforeCount = messageFlows.size();
                 parseRabbitMQFlows(javaFile, messageFlows);
+                int afterCount = messageFlows.size();
+
+                if (afterCount > beforeCount) {
+                    scannedCount++;
+                    log.debug("Found {} message flow(s) in: {}", afterCount - beforeCount, javaFile.getFileName());
+                }
             } catch (Exception e) {
                 // Files without RabbitMQ patterns are already filtered by shouldScanFile()
                 // Any remaining parse failures are logged at DEBUG level
                 log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+                skippedCount++;
             }
         }
 
-        log.info("Found {} RabbitMQ message flows", messageFlows.size());
+        log.info("Found {} RabbitMQ message flows (scanned {} files, skipped {} files)",
+                 messageFlows.size(), scannedCount, skippedCount);
 
         return buildSuccessResult(
             List.of(),
