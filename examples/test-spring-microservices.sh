@@ -38,6 +38,7 @@ scanners:
     - spring-components
     - spring-rest-api
     - jpa-entities
+    - mongodb  # PiggyMetrics uses MongoDB for data storage
     - rabbitmq-messaging  # PiggyMetrics uses RabbitMQ for messaging
 
 generators:
@@ -69,6 +70,6 @@ echo ""
 echo "Expected outputs:"
 echo "  - 7+ components (one per service)"
 echo "  - 20+ REST endpoints"
-echo "  - 10+ MongoDB entities"
+echo "  - 10+ MongoDB entities (with @DBRef relationships)"
 echo "  - Service-to-service relationships"
 echo ""
