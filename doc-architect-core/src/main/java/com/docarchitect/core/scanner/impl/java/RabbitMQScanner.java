@@ -11,7 +11,10 @@ import java.util.Set;
 import com.docarchitect.core.model.MessageFlow;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
+import com.docarchitect.core.scanner.base.RegexPatterns;
 import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -57,6 +60,13 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
     private static final String ARRAY_DELIMITER = ",";
     private static final int FIRST_ARGUMENT_INDEX = 0;
     private static final int MIN_ARGUMENTS_FOR_QUEUE = 1;
+
+    // Regex patterns for fallback parsing (compiled once for performance)
+    private static final java.util.regex.Pattern LISTENER_PATTERN =
+        java.util.regex.Pattern.compile("@RabbitListener\\s*\\([^)]*queues\\s*=\\s*[{\"']([^}\"']+)[}\"']");
+
+    private static final java.util.regex.Pattern TEMPLATE_PATTERN =
+        java.util.regex.Pattern.compile("rabbitTemplate\\.(convertAndSend|send)\\s*\\(\\s*[\"']([^\"']+)[\"']");
 
     @Override
     public String getId() {
@@ -185,7 +195,10 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
         log.info("Scanning RabbitMQ message flows in: {}", context.rootPath());
 
         List<MessageFlow> messageFlows = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
+
         List<Path> javaFiles = context.findFiles(FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(javaFiles.size());
 
         log.debug("Found {} total Java files to examine", javaFiles.size());
 
@@ -194,29 +207,32 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
             return emptyResult();
         }
 
-        int scannedCount = 0;
         int skippedCount = 0;
 
         for (Path javaFile : javaFiles) {
-            try {
-                int beforeCount = messageFlows.size();
-                parseRabbitMQFlows(javaFile, messageFlows);
-                int afterCount = messageFlows.size();
-
-                if (afterCount > beforeCount) {
-                    scannedCount++;
-                    log.debug("Found {} message flow(s) in: {}", afterCount - beforeCount, javaFile.getFileName());
-                }
-            } catch (Exception e) {
-                // Files without RabbitMQ patterns are already filtered by shouldScanFile()
-                // Any remaining parse failures are logged at DEBUG level
-                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+            if (!shouldScanFile(javaFile)) {
                 skippedCount++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<MessageFlow> result = parseWithFallback(
+                javaFile,
+                cu -> extractMessageFlowsFromAST(cu),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                messageFlows.addAll(result.getData());
             }
         }
 
-        log.info("Found {} RabbitMQ message flows (scanned {} files, skipped {} files)",
-                 messageFlows.size(), scannedCount, skippedCount);
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} RabbitMQ message flows (success rate: {:.1f}%, overall parse rate: {:.1f}%, skipped {} files)",
+                 messageFlows.size(), statistics.getSuccessRate(), statistics.getOverallParseRate(), skippedCount);
 
         return buildSuccessResult(
             List.of(),
@@ -225,10 +241,94 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
             messageFlows,
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            statistics
         );
     }
 
+    /**
+     * Extracts message flows from a parsed CompilationUnit using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param cu the parsed CompilationUnit
+     * @return list of discovered message flows
+     */
+    private List<MessageFlow> extractMessageFlowsFromAST(CompilationUnit cu) {
+        List<MessageFlow> messageFlows = new ArrayList<>();
+
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
+            String className = classDecl.getNameAsString();
+            String packageName = cu.getPackageDeclaration()
+                .map(pd -> pd.getNameAsString())
+                .orElse("");
+
+            String fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+
+            classDecl.getMethods().forEach(method -> {
+                extractRabbitListenerFlows(method, fullyQualifiedName, messageFlows);
+                extractRabbitTemplateFlows(method, fullyQualifiedName, messageFlows);
+            });
+        });
+
+        return messageFlows;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>@RabbitListener annotations with queues</li>
+     *   <li>RabbitTemplate.convertAndSend() and RabbitTemplate.send() method calls</li>
+     * </ul>
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<MessageFlow> createFallbackStrategy() {
+        return (file, content) -> {
+            List<MessageFlow> flows = new ArrayList<>();
+
+            // Check if file contains RabbitMQ patterns
+            if (!content.contains("RabbitListener") && !content.contains("RabbitTemplate")) {
+                return flows;
+            }
+
+            // Extract class name and package using shared utility
+            String className = RegexPatterns.extractClassName(content, file);
+            String packageName = RegexPatterns.extractPackageName(content);
+            String fullyQualifiedName = RegexPatterns.buildFullyQualifiedName(packageName, className);
+
+            // Extract @RabbitListener flows (consumers) using pre-compiled pattern
+            java.util.regex.Matcher listenerMatcher = LISTENER_PATTERN.matcher(content);
+            while (listenerMatcher.find()) {
+                String queues = listenerMatcher.group(1);
+                for (String queue : queues.split(",")) {
+                    queue = queue.trim().replaceAll("\"", "");
+                    if (!queue.isEmpty()) {
+                        flows.add(new MessageFlow(null, fullyQualifiedName, queue,
+                            DEFAULT_MESSAGE_TYPE, null, TECHNOLOGY));
+                    }
+                }
+            }
+
+            // Extract RabbitTemplate flows (producers) using pre-compiled pattern
+            java.util.regex.Matcher templateMatcher = TEMPLATE_PATTERN.matcher(content);
+            while (templateMatcher.find()) {
+                String queue = templateMatcher.group(2); // Group 2 is the queue name
+                flows.add(new MessageFlow(fullyQualifiedName, null, queue,
+                    DEFAULT_MESSAGE_TYPE, null, TECHNOLOGY));
+            }
+
+            log.debug("Fallback parsing found {} message flows in {}", flows.size(), file.getFileName());
+            return flows;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractMessageFlowsFromAST(CompilationUnit)} instead
+     */
+    @Deprecated
     private void parseRabbitMQFlows(Path javaFile, List<MessageFlow> messageFlows) throws IOException {
         Optional<CompilationUnit> cuOpt = parseJavaFile(javaFile);
         if (cuOpt.isEmpty()) {

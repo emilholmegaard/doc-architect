@@ -3,6 +3,7 @@ package com.docarchitect.core.scanner.base;
 import com.docarchitect.core.scanner.Scanner;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,6 +136,46 @@ public abstract class AbstractScanner implements Scanner {
      * @param dataEntities list of data entities (can be empty)
      * @param relationships list of relationships (can be empty)
      * @param warnings list of warning messages (can be empty)
+     * @param statistics scan statistics (files scanned, parse rates, etc.)
+     * @return successful ScanResult
+     */
+    @SuppressWarnings("unchecked")
+    protected ScanResult buildSuccessResult(
+            List<?> components,
+            List<?> dependencies,
+            List<?> apiEndpoints,
+            List<?> messageFlows,
+            List<?> dataEntities,
+            List<?> relationships,
+            List<String> warnings,
+            ScanStatistics statistics) {
+        return new ScanResult(
+            getId(),
+            true, // success
+            (List) components,
+            (List) dependencies,
+            (List) apiEndpoints,
+            (List) messageFlows,
+            (List) dataEntities,
+            (List) relationships,
+            warnings,
+            List.of(), // No errors for successful results
+            statistics
+        );
+    }
+
+    /**
+     * Creates a successful ScanResult with the given data and empty statistics.
+     *
+     * <p>Use this for backward compatibility when statistics tracking is not implemented.
+     *
+     * @param components list of components (can be empty)
+     * @param dependencies list of dependencies (can be empty)
+     * @param apiEndpoints list of API endpoints (can be empty)
+     * @param messageFlows list of message flows (can be empty)
+     * @param dataEntities list of data entities (can be empty)
+     * @param relationships list of relationships (can be empty)
+     * @param warnings list of warning messages (can be empty)
      * @return successful ScanResult
      */
     @SuppressWarnings("unchecked")
@@ -146,17 +187,15 @@ public abstract class AbstractScanner implements Scanner {
             List<?> dataEntities,
             List<?> relationships,
             List<String> warnings) {
-        return new ScanResult(
-            getId(),
-            true, // success
-            (List) components,
-            (List) dependencies,
-            (List) apiEndpoints,
-            (List) messageFlows,
-            (List) dataEntities,
-            (List) relationships,
+        return buildSuccessResult(
+            components,
+            dependencies,
+            apiEndpoints,
+            messageFlows,
+            dataEntities,
+            relationships,
             warnings,
-            List.of() // No errors for successful results
+            ScanStatistics.empty()
         );
     }
 }

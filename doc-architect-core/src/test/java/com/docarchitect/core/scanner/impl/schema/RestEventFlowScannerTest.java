@@ -13,6 +13,7 @@ import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.model.MessageFlow;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ScannerTestBase;
 
 /**
@@ -83,7 +84,8 @@ class RestEventFlowScannerTest extends ScannerTestBase {
             List.of(),
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            ScanStatistics.empty()
         );
 
         ScanContext contextWithApis = new ScanContext(
@@ -701,7 +703,8 @@ class RestEventFlowScannerTest extends ScannerTestBase {
             List.of(),
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            ScanStatistics.empty()
         );
     }
 }

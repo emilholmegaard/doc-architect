@@ -6,13 +6,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
+import com.docarchitect.core.scanner.base.RegexPatterns;
 import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -85,6 +90,16 @@ public class MongoDbScanner extends AbstractJavaParserScanner {
         "@DBRef"
     );
 
+    // Regex patterns for fallback parsing (compiled once for performance)
+    private static final Pattern DOCUMENT_PATTERN =
+        Pattern.compile("@Document\\s*\\(\\s*collection\\s*=\\s*[\"']([^\"']+)[\"']");
+
+    private static final Pattern FIELD_PATTERN =
+        Pattern.compile("@Field\\s*\\(\\s*[\"']([^\"']+)[\"']");
+
+    private static final Pattern DBREF_PATTERN =
+        Pattern.compile("@DBRef[\\s\\n]+(?:private|public|protected)?\\s+(\\w+(?:<[^>]+>)?)\\s+(\\w+)");
+
     @Override
     public String getId() {
         return SCANNER_ID;
@@ -133,22 +148,46 @@ public class MongoDbScanner extends AbstractJavaParserScanner {
 
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         List<Path> javaFiles = context.findFiles(JAVA_FILE_GLOB).toList();
+        statsBuilder.filesDiscovered(javaFiles.size());
 
         if (javaFiles.isEmpty()) {
             return emptyResult();
         }
 
+        int skippedFiles = 0;
+
         for (Path javaFile : javaFiles) {
-            try {
-                parseMongoDocuments(javaFile, dataEntities, relationships);
-            } catch (IOException e) {
-                log.warn("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+            if (!shouldScanFile(javaFile)) {
+                skippedFiles++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<EntityResult> result = parseWithFallback(
+                javaFile,
+                cu -> extractEntitiesFromAST(cu),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                for (EntityResult entityResult : result.getData()) {
+                    dataEntities.add(entityResult.entity());
+                    relationships.addAll(entityResult.relationships());
+                }
             }
         }
 
-        log.info("Found {} MongoDB documents and {} relationships", dataEntities.size(), relationships.size());
+        log.debug("Pre-filtered {} files (not MongoDB documents)", skippedFiles);
+
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} MongoDB documents and {} relationships (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+            dataEntities.size(), relationships.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
             List.of(),
@@ -157,10 +196,162 @@ public class MongoDbScanner extends AbstractJavaParserScanner {
             List.of(),
             dataEntities,
             relationships,
-            List.of()
+            List.of(),
+            statistics
         );
     }
 
+    /**
+     * Internal record to hold entity and its relationships together.
+     */
+    private record EntityResult(DataEntity entity, List<Relationship> relationships) {}
+
+    /**
+     * Extracts entities from a parsed CompilationUnit using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param cu the parsed CompilationUnit
+     * @return list of entity results (entity + relationships)
+     */
+    private List<EntityResult> extractEntitiesFromAST(CompilationUnit cu) {
+        List<EntityResult> results = new ArrayList<>();
+
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
+            if (!hasAnnotation(classDecl, DOCUMENT_ANNOTATION)) {
+                return;
+            }
+
+            String className = classDecl.getNameAsString();
+            String packageName = getPackageName(cu);
+            String fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+            String collectionName = extractCollectionName(classDecl, className);
+            String description = DOCUMENT_DESCRIPTION_PREFIX + className;
+
+            List<DataEntity.Field> fields = new ArrayList<>();
+            List<Relationship> relationships = new ArrayList<>();
+            String primaryKey = null;
+
+            for (FieldDeclaration fieldDecl : classDecl.getFields()) {
+                // Check for @DBRef relationship
+                if (hasAnnotation(fieldDecl, DBREF_ANNOTATION)) {
+                    extractDbRefRelationship(fieldDecl, fullyQualifiedName, relationships);
+                } else {
+                    // Regular field or embedded document
+                    DataEntity.Field field = extractField(fieldDecl);
+                    if (field != null) {
+                        fields.add(field);
+                        if (hasAnnotation(fieldDecl, ID_ANNOTATION) && primaryKey == null) {
+                            primaryKey = field.name();
+                        }
+                    }
+                }
+            }
+
+            DataEntity entity = new DataEntity(
+                fullyQualifiedName,
+                collectionName,
+                DATA_ENTITY_TYPE_COLLECTION,
+                fields,
+                primaryKey,
+                description
+            );
+
+            results.add(new EntityResult(entity, relationships));
+            log.debug("Found MongoDB document: {} -> collection: {}", fullyQualifiedName, collectionName);
+        });
+
+        return results;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>@Document annotations with collection names</li>
+     *   <li>Basic field information</li>
+     *   <li>@DBRef relationships (simplified)</li>
+     * </ul>
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<EntityResult> createFallbackStrategy() {
+        return (file, content) -> {
+            List<EntityResult> results = new ArrayList<>();
+
+            // Check if file contains MongoDB document annotations
+            if (!content.contains("@Document")) {
+                return results;
+            }
+
+            // Extract class name and package using shared utility
+            String className = RegexPatterns.extractClassName(content, file);
+            String packageName = RegexPatterns.extractPackageName(content);
+            String fullyQualifiedName = RegexPatterns.buildFullyQualifiedName(packageName, className);
+
+            // Extract collection name using pattern
+            String collectionName = className; // Default
+            Matcher collectionMatcher = DOCUMENT_PATTERN.matcher(content);
+            if (collectionMatcher.find()) {
+                collectionName = collectionMatcher.group(1);
+            } else {
+                collectionName = toSnakeCase(className);
+            }
+
+            // Extract basic fields using shared field pattern
+            List<DataEntity.Field> fields = new ArrayList<>();
+            Matcher fieldMatcher = RegexPatterns.FIELD_PATTERN.matcher(content);
+            while (fieldMatcher.find()) {
+                String fieldType = fieldMatcher.group(1);
+                String fieldName = fieldMatcher.group(2);
+
+                // Skip fields that look like relationships
+                if (!fieldType.startsWith("List<") && !fieldType.startsWith("Set<") &&
+                    !fieldType.startsWith("Collection<")) {
+                    fields.add(new DataEntity.Field(fieldName, fieldType, true, null));
+                }
+            }
+
+            // Extract @DBRef relationships (simplified)
+            List<Relationship> relationships = new ArrayList<>();
+            Matcher dbrefMatcher = DBREF_PATTERN.matcher(content);
+            while (dbrefMatcher.find()) {
+                String targetType = dbrefMatcher.group(1);
+                // Extract target entity type (handle collections)
+                String targetEntity = targetType
+                    .replaceAll(LIST_TYPE_PATTERN, "$1")
+                    .replaceAll(SET_TYPE_PATTERN, "$1")
+                    .replaceAll(COLLECTION_TYPE_PATTERN, "$1");
+
+                relationships.add(new Relationship(
+                    fullyQualifiedName,
+                    targetEntity,
+                    RelationshipType.DEPENDS_ON,
+                    DBREF_RELATIONSHIP_DESCRIPTION,
+                    RELATIONSHIP_TECHNOLOGY
+                ));
+            }
+
+            DataEntity entity = new DataEntity(
+                fullyQualifiedName,
+                collectionName,
+                DATA_ENTITY_TYPE_COLLECTION,
+                fields,
+                null, // primary key unknown in fallback
+                DOCUMENT_DESCRIPTION_PREFIX + className
+            );
+
+            results.add(new EntityResult(entity, relationships));
+            log.debug("Fallback parsing found entity: {} -> {}", fullyQualifiedName, collectionName);
+            return results;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractEntitiesFromAST(CompilationUnit)} instead
+     */
+    @Deprecated
     private void parseMongoDocuments(Path javaFile, List<DataEntity> dataEntities, List<Relationship> relationships) throws IOException {
         Optional<CompilationUnit> cuOpt = parseJavaFile(javaFile);
         if (cuOpt.isEmpty()) {

@@ -5,6 +5,7 @@ import com.docarchitect.core.model.MessageFlow;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.Scanner;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.util.Technologies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -211,7 +212,8 @@ public class RestEventFlowScanner implements Scanner {
             List.of(), // No new data entities
             List.of(), // No new relationships
             warnings,
-            List.of()
+            List.of(), // No errors
+            ScanStatistics.empty() // No statistics tracking yet
         );
     }
 

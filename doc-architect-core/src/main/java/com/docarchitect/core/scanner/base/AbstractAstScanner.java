@@ -1,5 +1,6 @@
 package com.docarchitect.core.scanner.base;
 
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParser;
 
 import java.io.IOException;
@@ -13,6 +14,13 @@ import java.util.List;
  * <p>This class extends {@link AbstractScanner} and adds support for language-specific
  * AST parsers. Concrete scanners can use the {@link AstParser} interface to parse
  * source files with proper syntax understanding instead of fragile regex patterns.
+ *
+ * <p><b>Three-Tier Parsing Strategy:</b></p>
+ * <ol>
+ *   <li><b>Tier 1 (HIGH confidence):</b> AST-based parsing via language-specific parsers</li>
+ *   <li><b>Tier 2 (MEDIUM confidence):</b> Regex-based fallback parsing</li>
+ *   <li><b>Tier 3 (LOW confidence):</b> Graceful degradation with statistics tracking</li>
+ * </ol>
  *
  * <p><b>Benefits of AST Parsing:</b></p>
  * <ul>
@@ -41,17 +49,41 @@ import java.util.List;
  *     @Override
  *     public ScanResult scan(ScanContext context) {
  *         List<Path> pythonFiles = context.findFiles("**\/*.py").toList();
+ *         ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
+ *         statsBuilder.filesDiscovered(pythonFiles.size());
+ *
  *         List<DataEntity> entities = new ArrayList<>();
  *
  *         for (Path file : pythonFiles) {
- *             List<PythonAst.PythonClass> classes = parseAstFile(file);
- *             for (PythonAst.PythonClass cls : classes) {
- *                 // Process class AST node
- *                 entities.add(convertToDataEntity(cls));
+ *             if (!shouldScanFile(file)) {
+ *                 continue;
+ *             }
+ *
+ *             statsBuilder.incrementFilesScanned();
+ *
+ *             // Use three-tier parsing with fallback
+ *             FileParseResult<DataEntity> result = parseWithFallback(
+ *                 file,
+ *                 astNodes -> convertAstNodesToEntities(astNodes),
+ *                 createFallbackStrategy(),
+ *                 statsBuilder
+ *             );
+ *
+ *             if (result.isSuccess()) {
+ *                 entities.addAll(result.getData());
  *             }
  *         }
  *
- *         return buildSuccessResult(entities, ...);
+ *         return buildSuccessResult(entities, ..., statsBuilder.build());
+ *     }
+ *
+ *     private FallbackParsingStrategy<DataEntity> createFallbackStrategy() {
+ *         return (file, content) -> {
+ *             // Regex-based extraction when AST parsing fails
+ *             List<DataEntity> results = new ArrayList<>();
+ *             // ... regex logic ...
+ *             return results;
+ *         };
  *     }
  * }
  * }</pre>
@@ -211,5 +243,127 @@ public abstract class AbstractAstScanner<T> extends AbstractScanner {
      */
     protected String getParserLanguage() {
         return astParser.getLanguage();
+    }
+
+    /**
+     * Parses a file using three-tier strategy: AST → Regex Fallback → Graceful Degradation.
+     *
+     * <p><b>Three-Tier Parsing Strategy:</b></p>
+     * <ol>
+     *   <li><b>Tier 1 (HIGH confidence):</b> Parse file using AST parser, then apply extractor function</li>
+     *   <li><b>Tier 2 (MEDIUM confidence):</b> If AST parsing fails, use regex-based fallback strategy</li>
+     *   <li><b>Tier 3 (LOW confidence):</b> If both fail, return empty result with statistics tracking</li>
+     * </ol>
+     *
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * FileParseResult<DataEntity> result = parseWithFallback(
+     *     file,
+     *     astNodes -> extractEntitiesFromAST(astNodes),
+     *     createFallbackStrategy(),
+     *     statsBuilder
+     * );
+     *
+     * if (result.isSuccess()) {
+     *     entities.addAll(result.getData());
+     * }
+     * }</pre>
+     *
+     * @param <R> the result type (e.g., ApiEndpoint, DataEntity, MessageFlow)
+     * @param file the file to parse
+     * @param astExtractor function to extract results from parsed AST nodes
+     * @param fallbackStrategy regex-based fallback strategy (Tier 2)
+     * @param statsBuilder statistics builder for tracking parse success/failure
+     * @return parse result containing extracted data or empty list on failure
+     */
+    protected <R> FileParseResult<R> parseWithFallback(
+            Path file,
+            AstExtractor<T, R> astExtractor,
+            FallbackParsingStrategy<R> fallbackStrategy,
+            ScanStatistics.Builder statsBuilder) {
+
+        // Tier 1: Try AST parsing (HIGH confidence)
+        try {
+            List<T> astNodes = parseAstFile(file);
+            if (!astNodes.isEmpty()) {
+                List<R> results = astExtractor.extract(astNodes);
+                statsBuilder.incrementFilesParsedSuccessfully();
+                return FileParseResult.success(results);
+            }
+            // AST parsing succeeded but found no nodes - may not be the right file
+            // Fall through to Tier 2
+        } catch (Exception e) {
+            log.debug("AST parsing failed for {}: {}", file.getFileName(), e.getMessage());
+            // Fall through to Tier 2
+        }
+
+        // Tier 2: Try regex fallback (MEDIUM confidence)
+        try {
+            String content = readFileContent(file);
+            List<R> results = fallbackStrategy.parse(file, content);
+            if (!results.isEmpty()) {
+                statsBuilder.incrementFilesParsedWithFallback();
+                return FileParseResult.success(results);
+            }
+            // Fallback succeeded but found no matches - not an error
+            statsBuilder.incrementFilesParsedWithFallback();
+            return FileParseResult.success(new ArrayList<>());
+        } catch (IOException e) {
+            log.warn("Failed to read file for fallback parsing: {} - {}", file, e.getMessage());
+            statsBuilder.incrementFilesFailed();
+            return FileParseResult.failure();
+        } catch (Exception e) {
+            log.warn("Fallback parsing failed for {}: {}", file.getFileName(), e.getMessage());
+            statsBuilder.incrementFilesFailed();
+            return FileParseResult.failure();
+        }
+    }
+
+    /**
+     * Functional interface for extracting results from parsed AST nodes.
+     *
+     * @param <T> AST node type
+     * @param <R> result type
+     */
+    @FunctionalInterface
+    protected interface AstExtractor<T, R> {
+        /**
+         * Extracts results from AST nodes.
+         *
+         * @param astNodes parsed AST nodes
+         * @return extracted results
+         */
+        List<R> extract(List<T> astNodes);
+    }
+
+    /**
+     * Result wrapper for file parsing operations.
+     *
+     * @param <R> the result type
+     */
+    protected static class FileParseResult<R> {
+        private final boolean success;
+        private final List<R> data;
+
+        private FileParseResult(boolean success, List<R> data) {
+            this.success = success;
+            this.data = data != null ? data : new ArrayList<>();
+        }
+
+        public static <R> FileParseResult<R> success(List<R> data) {
+            return new FileParseResult<>(true, data);
+        }
+
+        public static <R> FileParseResult<R> failure() {
+            return new FileParseResult<>(false, new ArrayList<>());
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public List<R> getData() {
+            return data;
+        }
     }
 }

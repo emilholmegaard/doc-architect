@@ -5,9 +5,11 @@ import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.DotNetAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.Technologies;
 
 import java.io.IOException;
@@ -15,7 +17,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Scanner for Entity Framework (EF Core) database entities in C# source files.
@@ -177,8 +178,10 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
         List<Relationship> relationships = new ArrayList<>();
         Set<String> entityNames = new HashSet<>();
         Map<String, String> baseClassMap = new HashMap<>(); // Maps entity name to base class name
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         List<Path> csFiles = context.findFiles(CS_FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(csFiles.size());
 
         if (csFiles.isEmpty()) {
             return emptyResult();
@@ -202,7 +205,7 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
             }
         }
 
-        // Third pass: Build inheritance map for all classes
+        // Third pass: Build inheritance map for all classes (using AST)
         for (Path csFile : csFiles) {
             try {
                 buildInheritanceMap(csFile, baseClassMap);
@@ -222,17 +225,33 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
 
         log.debug("Discovered {} potential entity types", entityNames.size());
 
-        // Final pass: Parse entity classes
+        // Final pass: Parse entity classes with three-tier fallback
         for (Path csFile : csFiles) {
-            try {
-                parseEntityClasses(csFile, entityNames, dataEntities, relationships);
-            } catch (Exception e) {
-                log.warn("Failed to parse entity file: {} - {}", csFile, e.getMessage());
+            if (!shouldScanFile(csFile)) {
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<EntityResult> result = parseWithFallback(
+                csFile,
+                classes -> extractEntitiesFromAST(classes, entityNames),
+                createFallbackStrategy(entityNames),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                for (EntityResult entityResult : result.getData()) {
+                    dataEntities.add(entityResult.entity());
+                    relationships.addAll(entityResult.relationships());
+                }
             }
         }
 
-        log.info("Found {} Entity Framework entities and {} relationships",
-                dataEntities.size(), relationships.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Entity Framework entities and {} relationships (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+                dataEntities.size(), relationships.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
             List.of(),
@@ -241,8 +260,144 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
             List.of(),
             dataEntities,
             relationships,
-            List.of()
+            List.of(),
+            statistics
         );
+    }
+
+    /**
+     * Internal record to hold entity and its relationships together.
+     */
+    private record EntityResult(DataEntity entity, List<Relationship> relationships) {}
+
+    /**
+     * Extracts entities from parsed AST classes using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param classes the parsed C# classes
+     * @param entityNames set of known entity names
+     * @return list of entity results (entity + relationships)
+     */
+    private List<EntityResult> extractEntitiesFromAST(List<DotNetAst.CSharpClass> classes, Set<String> entityNames) {
+        List<EntityResult> results = new ArrayList<>();
+        Set<String> processedEntities = new HashSet<>();
+
+        for (DotNetAst.CSharpClass csharpClass : classes) {
+            String className = csharpClass.name();
+
+            // Only process if this is a known entity
+            if (!entityNames.contains(className)) {
+                continue;
+            }
+
+            // Skip if already processed (avoid duplicates from multiple files)
+            if (processedEntities.contains(className)) {
+                continue;
+            }
+            processedEntities.add(className);
+
+            // Extract properties and detect primary key
+            List<DataEntity.Field> fields = extractEntityFieldsFromAst(csharpClass, entityNames);
+            String primaryKey = findPrimaryKeyFromProperties(csharpClass);
+
+            // Extract relationships
+            List<Relationship> relationships = new ArrayList<>();
+            extractNavigationRelationshipsFromAst(csharpClass, entityNames, relationships);
+
+            // Create DataEntity (even if no fields, as it might have inherited fields)
+            String tableName = toPlural(className);
+
+            DataEntity entity = new DataEntity(
+                className,
+                tableName,
+                ENTITY_TYPE,
+                fields,
+                primaryKey,
+                "Entity Framework Entity: " + className
+            );
+
+            results.add(new EntityResult(entity, relationships));
+            log.debug("Found Entity Framework entity: {} -> table: {} with {} fields and PK: {}",
+                className, tableName, fields.size(), primaryKey != null ? primaryKey : "none");
+        }
+
+        return results;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * @param entityNames set of known entity names
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<EntityResult> createFallbackStrategy(Set<String> entityNames) {
+        return (file, content) -> {
+            List<EntityResult> results = new ArrayList<>();
+
+            // Extract class name from content
+            Matcher classMatcher = CLASS_PATTERN.matcher(content);
+            if (!classMatcher.find()) {
+                return results;
+            }
+
+            String className = classMatcher.group(1);
+
+            // Only process if this is a known entity
+            if (!entityNames.contains(className)) {
+                return results;
+            }
+
+            // Extract properties using regex
+            List<DataEntity.Field> fields = new ArrayList<>();
+            List<Relationship> relationships = new ArrayList<>();
+
+            Matcher propertyMatcher = PROPERTY_PATTERN.matcher(content);
+            while (propertyMatcher.find()) {
+                String type = propertyMatcher.group(1);
+                String name = propertyMatcher.group(2);
+
+                // Skip navigation properties
+                if (type.startsWith(ICOLLECTION_TYPE) || type.startsWith(LIST_TYPE) || entityNames.contains(type)) {
+                    // This is a navigation property - create relationship
+                    if (type.startsWith(ICOLLECTION_TYPE) || type.startsWith(LIST_TYPE)) {
+                        String targetEntity = extractGenericType(type);
+                        if (targetEntity != null && entityNames.contains(targetEntity)) {
+                            addRelationship(className, targetEntity, ONE_TO_MANY_DESCRIPTION, relationships);
+                        }
+                    } else if (entityNames.contains(type)) {
+                        addRelationship(className, type, MANY_TO_ONE_DESCRIPTION, relationships);
+                    }
+                } else {
+                    // Regular field
+                    String sqlType = mapCSharpTypeToSql(type);
+                    boolean nullable = type.contains("?");
+                    fields.add(new DataEntity.Field(name, sqlType, nullable, null));
+                }
+            }
+
+            // Try to find primary key
+            String primaryKey = null;
+            if (content.matches("(?s).*\\bpublic\\s+int\\s+Id\\s*\\{.*")) {
+                primaryKey = "Id";
+            } else if (content.matches("(?s).*\\bpublic\\s+int\\s+" + className + "Id\\s*\\{.*")) {
+                primaryKey = className + "Id";
+            }
+
+            String tableName = toPlural(className);
+            DataEntity entity = new DataEntity(
+                className,
+                tableName,
+                ENTITY_TYPE,
+                fields,
+                primaryKey,
+                "Entity Framework Entity: " + className
+            );
+
+            results.add(new EntityResult(entity, relationships));
+            log.debug("Fallback parsing found entity: {} -> {}", className, tableName);
+            return results;
+        };
     }
 
     /**
@@ -369,7 +524,10 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
 
     /**
      * Parses entity classes and extracts properties and relationships.
+     *
+     * @deprecated Use {@link #extractEntitiesFromAST(List, Set)} instead
      */
+    @Deprecated
     private void parseEntityClasses(Path file, Set<String> entityNames,
                                     List<DataEntity> dataEntities, List<Relationship> relationships) throws IOException {
         // Use AST parser to parse C# file
