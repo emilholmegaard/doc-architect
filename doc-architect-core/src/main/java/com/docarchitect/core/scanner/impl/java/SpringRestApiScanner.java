@@ -6,13 +6,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
+import com.docarchitect.core.scanner.base.RegexPatterns;
 import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -94,6 +99,14 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
     private static final Set<String> MAPPING_ANNOTATIONS = Set.of(
         REQUEST_MAPPING, GET_MAPPING, POST_MAPPING, PUT_MAPPING, PATCH_MAPPING, DELETE_MAPPING);
     private static final Set<String> PARAMETER_ANNOTATIONS = Set.of("PathVariable", "RequestParam", "RequestBody", "RequestHeader");
+
+    // Regex patterns for fallback parsing (compiled once for performance)
+    private static final Pattern BASE_PATH_PATTERN = Pattern.compile("@RequestMapping\\s*\\(\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern GET_MAPPING_PATTERN = Pattern.compile("@GetMapping\\s*\\(\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern POST_MAPPING_PATTERN = Pattern.compile("@PostMapping\\s*\\(\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern PUT_MAPPING_PATTERN = Pattern.compile("@PutMapping\\s*\\(\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern DELETE_MAPPING_PATTERN = Pattern.compile("@DeleteMapping\\s*\\(\\s*[\"']([^\"']+)[\"']");
+    private static final Pattern PATCH_MAPPING_PATTERN = Pattern.compile("@PatchMapping\\s*\\(\\s*[\"']([^\"']+)[\"']");
 
     @Override
     public String getId() {
@@ -212,16 +225,17 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
         List<Component> components = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         // Find all Java files
         List<Path> javaFiles = context.findFiles(JAVA_FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(javaFiles.size());
 
         if (javaFiles.isEmpty()) {
             log.warn("No Java files found in project");
             return emptyResult();
         }
 
-        int parsedFiles = 0;
         int skippedFiles = 0;
         for (Path javaFile : javaFiles) {
             // Pre-filter files before attempting to parse
@@ -230,21 +244,26 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
                 continue;
             }
 
-            try {
-                parseSpringController(javaFile, apiEndpoints, components);
-                parsedFiles++;
-            } catch (Exception e) {
-                // Files without Spring MVC patterns are already filtered by shouldScanFile()
-                // Any remaining parse failures are logged at DEBUG level
-                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
-                // Continue processing other files instead of failing completely
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<ApiEndpoint> result = parseWithFallback(
+                javaFile,
+                cu -> extractEndpointsFromAST(cu),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                apiEndpoints.addAll(result.getData());
             }
         }
 
         log.debug("Pre-filtered {} files (not Spring MVC controllers)", skippedFiles);
 
-        log.info("Found {} REST API endpoints across {} Java files (parsed {}/{})",
-            apiEndpoints.size(), javaFiles.size(), parsedFiles, javaFiles.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} REST API endpoints (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+            apiEndpoints.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
             components,
@@ -253,18 +272,149 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
             List.of(), // No message flows
             List.of(), // No data entities
             List.of(), // No relationships
-            List.of()  // No warnings
+            List.of(), // No warnings
+            statistics
         );
     }
 
     /**
+     * Extracts API endpoints from a parsed CompilationUnit using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param cu the parsed CompilationUnit
+     * @return list of discovered API endpoints
+     */
+    private List<ApiEndpoint> extractEndpointsFromAST(CompilationUnit cu) {
+        List<ApiEndpoint> endpoints = new ArrayList<>();
+
+        // Find all classes
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
+            // Check if class is a controller
+            boolean isController = classDecl.getAnnotations().stream()
+                .anyMatch(ann -> CONTROLLER_ANNOTATIONS.contains(ann.getNameAsString()));
+
+            if (!isController) {
+                return; // Skip non-controller classes
+            }
+
+            String className = classDecl.getNameAsString();
+            String packageName = cu.getPackageDeclaration()
+                .map(pd -> pd.getNameAsString())
+                .orElse("");
+
+            String fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+
+            // Extract base path from class-level @RequestMapping
+            String basePath = extractPathFromAnnotation(
+                classDecl.getAnnotations().stream()
+                    .filter(ann -> REQUEST_MAPPING.equals(ann.getNameAsString()))
+                    .findFirst()
+                    .orElse(null)
+            );
+
+            log.debug("Found Spring controller: {} with base path: {}", fullyQualifiedName, basePath);
+
+            // Find all request mapping methods
+            classDecl.getMethods().forEach(method -> {
+                extractEndpointFromMethod(method, fullyQualifiedName, basePath, endpoints);
+            });
+        });
+
+        return endpoints;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>@RestController or @Controller annotations</li>
+     *   <li>@GetMapping, @PostMapping, @PutMapping, @DeleteMapping, @PatchMapping annotations</li>
+     *   <li>Path values from annotation parameters</li>
+     * </ul>
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<ApiEndpoint> createFallbackStrategy() {
+        return (file, content) -> {
+            List<ApiEndpoint> endpoints = new ArrayList<>();
+
+            // Check if file contains controller annotations
+            if (!content.contains("@RestController") && !content.contains("@Controller")) {
+                return endpoints; // Not a controller file
+            }
+
+            // Extract class name and package using shared utility
+            String className = RegexPatterns.extractClassName(content, file);
+            String packageName = RegexPatterns.extractPackageName(content);
+            String fullyQualifiedName = RegexPatterns.buildFullyQualifiedName(packageName, className);
+
+            // Extract base path from class-level @RequestMapping
+            String basePath = extractBasePathFromContent(content);
+
+            // Extract endpoints for each HTTP method using pre-compiled patterns
+            endpoints.addAll(extractEndpointsWithPattern(GET_MAPPING_PATTERN, "GET", basePath, fullyQualifiedName, content));
+            endpoints.addAll(extractEndpointsWithPattern(POST_MAPPING_PATTERN, "POST", basePath, fullyQualifiedName, content));
+            endpoints.addAll(extractEndpointsWithPattern(PUT_MAPPING_PATTERN, "PUT", basePath, fullyQualifiedName, content));
+            endpoints.addAll(extractEndpointsWithPattern(DELETE_MAPPING_PATTERN, "DELETE", basePath, fullyQualifiedName, content));
+            endpoints.addAll(extractEndpointsWithPattern(PATCH_MAPPING_PATTERN, "PATCH", basePath, fullyQualifiedName, content));
+
+            log.debug("Fallback parsing found {} endpoints in {}", endpoints.size(), file.getFileName());
+            return endpoints;
+        };
+    }
+
+    /**
+     * Extracts endpoints using a regex pattern for a specific HTTP method.
+     */
+    private List<ApiEndpoint> extractEndpointsWithPattern(Pattern pattern, String httpMethod,
+                                                          String basePath, String componentId, String content) {
+        List<ApiEndpoint> endpoints = new ArrayList<>();
+        Matcher matcher = pattern.matcher(content);
+
+        while (matcher.find()) {
+            String path = matcher.group(1);
+            String fullPath = combinePaths(basePath, path);
+
+            ApiEndpoint endpoint = new ApiEndpoint(
+                componentId,
+                ApiType.REST,
+                fullPath,
+                httpMethod,
+                componentId + ".<unknown>", // method name unknown in fallback
+                null, // request schema unknown
+                null, // response schema unknown
+                null  // authentication unknown
+            );
+
+            endpoints.add(endpoint);
+        }
+
+        return endpoints;
+    }
+
+    /**
+     * Extracts base path from class-level @RequestMapping annotation.
+     */
+    private String extractBasePathFromContent(String content) {
+        Matcher matcher = BASE_PATH_PATTERN.matcher(content);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return "";
+    }
+
+    /**
      * Parses a single Java file and extracts REST API endpoints.
+     * @deprecated Use {@link #extractEndpointsFromAST(CompilationUnit)} instead
      *
      * @param javaFile path to Java file
      * @param apiEndpoints list to add discovered API endpoints
      * @param components list to add discovered components
      * @throws IOException if file cannot be read
      */
+    @Deprecated
     private void parseSpringController(Path javaFile, List<ApiEndpoint> apiEndpoints, List<Component> components) throws IOException {
         // Parse Java source using JavaParser
         var compilationUnit = parseJavaFile(javaFile);

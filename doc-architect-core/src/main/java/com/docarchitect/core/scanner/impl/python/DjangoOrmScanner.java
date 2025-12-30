@@ -11,9 +11,11 @@ import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.PythonAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.Technologies;
 
 /**
@@ -202,24 +204,47 @@ public class DjangoOrmScanner extends AbstractAstScanner<PythonAst.PythonClass> 
 
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         List<Path> modelFiles = new ArrayList<>();
         context.findFiles(PATTERN_MODELS_PY).forEach(modelFiles::add);
         context.findFiles(PATTERN_MODELS_SUFFIX).forEach(modelFiles::add);
 
+        statsBuilder.filesDiscovered(modelFiles.size());
+
         if (modelFiles.isEmpty()) {
             return emptyResult();
         }
 
+        int skippedFiles = 0;
+
         for (Path modelFile : modelFiles) {
-            try {
-                parsePythonFile(modelFile, dataEntities, relationships);
-            } catch (Exception e) {
-                log.warn("Failed to parse Django models file: {} - {}", modelFile, e.getMessage());
+            if (!shouldScanFile(modelFile)) {
+                skippedFiles++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<EntityResult> result = parseWithFallback(
+                modelFile,
+                classes -> extractEntitiesFromAST(classes),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                for (EntityResult entityResult : result.getData()) {
+                    dataEntities.add(entityResult.entity());
+                    relationships.addAll(entityResult.relationships());
+                }
             }
         }
 
-        log.info("Found {} Django models and {} relationships", dataEntities.size(), relationships.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Django models and {} relationships (success rate: {:.1f}%, overall parse rate: {:.1f}%, skipped {} files)",
+                dataEntities.size(), relationships.size(), statistics.getSuccessRate(), statistics.getOverallParseRate(), skippedFiles);
 
         return buildSuccessResult(
             List.of(),           // No components
@@ -228,10 +253,176 @@ public class DjangoOrmScanner extends AbstractAstScanner<PythonAst.PythonClass> 
             List.of(),           // No message flows
             dataEntities,        // Data entities
             relationships,       // Relationships
-            List.of()            // No warnings
+            List.of(),           // No warnings
+            statistics
         );
     }
 
+    /**
+     * Internal record to hold entity and its relationships together.
+     */
+    private record EntityResult(DataEntity entity, List<Relationship> relationships) {}
+
+    /**
+     * Extracts entities from parsed AST classes using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param classes the parsed Python classes
+     * @return list of entity results (entity + relationships)
+     */
+    private List<EntityResult> extractEntitiesFromAST(List<PythonAst.PythonClass> classes) {
+        List<EntityResult> results = new ArrayList<>();
+
+        for (PythonAst.PythonClass pythonClass : classes) {
+            // Skip non-Django models
+            if (!pythonClass.inheritsFrom(BASE_CLASS_MODELS_MODEL) &&
+                !pythonClass.inheritsFrom(BASE_CLASS_MODEL)) {
+                continue;
+            }
+
+            // Extract table name
+            String tableName = extractTableName(pythonClass);
+
+            // Extract fields and relationships
+            List<DataEntity.Field> fields = new ArrayList<>();
+            List<Relationship> relationships = new ArrayList<>();
+            String primaryKey = null;
+
+            for (PythonAst.Field field : pythonClass.fields()) {
+                if (field.name().equals(META_CLASS_NAME) || field.name().startsWith("_")) {
+                    continue;
+                }
+
+                // Check if this is a relationship field
+                if (RELATIONSHIP_FIELDS.stream().anyMatch(rel -> field.type().contains(rel))) {
+                    // Extract relationship
+                    Relationship rel = extractRelationship(pythonClass.name(), field);
+                    if (rel != null) {
+                        relationships.add(rel);
+                        log.debug("Found Django relationship: {} --[{}]--> {}",
+                            pythonClass.name(), field.type(), rel.targetId());
+                    }
+                } else {
+                    // Regular field
+                    String sqlType = mapDjangoFieldToSql(field.type());
+                    boolean nullable = isNullableField(field.value());
+                    boolean isPrimaryKey = isPrimaryKeyField(field.value());
+
+                    DataEntity.Field dataField = new DataEntity.Field(
+                        field.name(),
+                        sqlType,
+                        nullable,
+                        null
+                    );
+
+                    fields.add(dataField);
+
+                    if (isPrimaryKey && primaryKey == null) {
+                        primaryKey = field.name();
+                    }
+
+                    log.debug("Found Django field: {}.{} ({})", pythonClass.name(), field.name(), sqlType);
+                }
+            }
+
+            // Django models always have an implicit 'id' primary key if not specified
+            if (primaryKey == null) {
+                primaryKey = DEFAULT_PRIMARY_KEY;
+                DataEntity.Field idField = new DataEntity.Field(
+                    DEFAULT_PRIMARY_KEY,
+                    FIELD_AUTO,
+                    false,
+                    null
+                );
+                fields.add(0, idField);
+            }
+
+            // Create DataEntity
+            if (!fields.isEmpty()) {
+                DataEntity entity = new DataEntity(
+                    pythonClass.name(),
+                    tableName,
+                    ENTITY_TYPE_TABLE,
+                    fields,
+                    primaryKey,
+                    "Django Model: " + pythonClass.name()
+                );
+
+                results.add(new EntityResult(entity, relationships));
+                log.debug("Found Django model: {} -> table: {}", pythonClass.name(), tableName);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<EntityResult> createFallbackStrategy() {
+        return (file, content) -> {
+            List<EntityResult> results = new ArrayList<>();
+
+            // Check if file contains Django patterns
+            if (!content.contains("class ") || !content.contains("models.")) {
+                return results;
+            }
+
+            // Simple regex-based extraction for basic Django models
+            java.util.regex.Pattern classPattern = java.util.regex.Pattern.compile(
+                "class\\s+(\\w+)\\s*\\([^)]*models\\.Model[^)]*\\):"
+            );
+            java.util.regex.Matcher classMatcher = classPattern.matcher(content);
+
+            while (classMatcher.find()) {
+                String className = classMatcher.group(1);
+                String tableName = toSnakeCase(className);
+
+                // Extract simple fields using regex
+                List<DataEntity.Field> fields = new ArrayList<>();
+
+                // Add default id field
+                fields.add(new DataEntity.Field(DEFAULT_PRIMARY_KEY, FIELD_AUTO, false, null));
+
+                // Simple field pattern: field_name = models.SomeField(...)
+                java.util.regex.Pattern fieldPattern = java.util.regex.Pattern.compile(
+                    "(\\w+)\\s*=\\s*models\\.(\\w+Field)\\("
+                );
+                java.util.regex.Matcher fieldMatcher = fieldPattern.matcher(content);
+                while (fieldMatcher.find()) {
+                    String fieldName = fieldMatcher.group(1);
+                    String fieldType = fieldMatcher.group(2);
+                    if (!fieldName.startsWith("_")) {
+                        String sqlType = mapDjangoFieldToSql(fieldType);
+                        fields.add(new DataEntity.Field(fieldName, sqlType, true, null));
+                    }
+                }
+
+                if (!fields.isEmpty()) {
+                    DataEntity entity = new DataEntity(
+                        className,
+                        tableName,
+                        ENTITY_TYPE_TABLE,
+                        fields,
+                        DEFAULT_PRIMARY_KEY,
+                        "Django Model: " + className
+                    );
+                    results.add(new EntityResult(entity, List.of()));
+                    log.debug("Fallback parsing found entity: {} -> {}", className, tableName);
+                }
+            }
+
+            return results;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractEntitiesFromAST(List)} instead
+     */
+    @Deprecated
     private void parsePythonFile(Path file, List<DataEntity> dataEntities,
                                  List<Relationship> relationships) {
         List<PythonAst.PythonClass> classes = parseAstFile(file);

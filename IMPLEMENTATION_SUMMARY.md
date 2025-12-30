@@ -260,10 +260,26 @@ doc-architect-core/src/main/java/com/docarchitect/core/
 - [x] Create comprehensive tests
 - [x] Ensure backward compatibility
 
+### Completed in This PR ✅
+- [x] Add ScanStatistics to ScanResult
+- [x] Create FallbackParsingStrategy interface
+- [x] Implement three-tier parsing in AbstractJavaParserScanner
+- [x] Add confidence scoring
+- [x] Create comprehensive tests (24 tests total)
+- [x] Ensure backward compatibility
+- [x] **Create RegexPatterns utility class** (NEW - 100% test coverage, 29 tests)
+- [x] **Optimize SpringRestApiScanner with RegexPatterns** (NEW - ~40 lines reduced)
+- [x] **Optimize JpaEntityScanner with RegexPatterns** (NEW)
+- [x] **Optimize KafkaScanner with RegexPatterns** (NEW)
+- [x] **Implement fallback for SpringComponentScanner** (NEW)
+- [x] **All 627 scanner tests passing** (NEW)
+
 ### Pending (Follow-up PRs)
 - [ ] Loosen pre-filtering in existing scanners
-- [ ] Add regex fallback to Spring REST, JPA, Go HTTP scanners
-- [ ] Implement diagnostics CLI command
+- [ ] Add regex fallback to remaining scanners (Go HTTP, .NET, Python, etc.)
+- [ ] Implement diagnostics CLI command to display statistics
+- [ ] Update ArchitectureModel to include per-scanner statistics
+- [ ] Update documentation generators to show parsing statistics in output
 - [ ] Re-test on 21 real-world projects
 - [ ] Update real-world-testing.md with new metrics
 

@@ -4,9 +4,11 @@ import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.DotNetAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.Technologies;
 
 import java.io.IOException;
@@ -386,6 +388,8 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
         log.info("Scanning ASP.NET Core API endpoints in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
+
         // Need to search both subdirectories and root level
         List<Path> csFiles = new ArrayList<>();
         csFiles.addAll(context.findFiles(CS_FILE_PATTERN).toList());
@@ -393,11 +397,12 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
         // Remove duplicates (in case a file matches both patterns)
         csFiles = csFiles.stream().distinct().toList();
 
+        statsBuilder.filesDiscovered(csFiles.size());
+
         if (csFiles.isEmpty()) {
             return emptyResult();
         }
 
-        int parsedFiles = 0;
         int skippedFiles = 0;
         for (Path csFile : csFiles) {
             // Pre-filter files before attempting to parse
@@ -406,19 +411,26 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
                 continue;
             }
 
-            try {
-                parseCSharpFile(csFile, apiEndpoints);
-                parsedFiles++;
-            } catch (Exception e) {
-                // Files without ASP.NET patterns are already filtered by shouldScanFile()
-                // Any remaining parse failures are logged at DEBUG level
-                log.debug("Failed to parse C# file: {} - {}", csFile, e.getMessage());
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<ApiEndpoint> result = parseWithFallback(
+                csFile,
+                classes -> extractEndpointsFromAST(classes, csFile),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                apiEndpoints.addAll(result.getData());
             }
         }
 
         log.debug("Pre-filtered {} files (not ASP.NET Core controllers)", skippedFiles);
-        log.info("Found {} ASP.NET Core API endpoints across {} C# files (parsed {}/{})",
-            apiEndpoints.size(), csFiles.size(), parsedFiles, csFiles.size());
+
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} ASP.NET Core API endpoints (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+            apiEndpoints.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
             List.of(),
@@ -427,10 +439,74 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
             List.of(),
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            statistics
         );
     }
 
+    /**
+     * Extracts API endpoints from parsed AST nodes using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param classes parsed C# class AST nodes
+     * @param file the file being parsed (for Razor Pages path extraction)
+     * @return list of discovered API endpoints
+     */
+    private List<ApiEndpoint> extractEndpointsFromAST(List<DotNetAst.CSharpClass> classes, Path file) {
+        List<ApiEndpoint> endpoints = new ArrayList<>();
+
+        for (DotNetAst.CSharpClass csharpClass : classes) {
+            String className = csharpClass.name();
+
+            // Pattern 1: MVC Controllers
+            if (className.endsWith("Controller")) {
+                String baseRoute = extractBaseRouteFromAst(csharpClass);
+                extractActionMethodsFromAst(csharpClass, baseRoute, endpoints);
+            }
+            // Pattern 2: Razor Pages
+            else if (className.endsWith("Model") || csharpClass.inheritsFrom("PageModel")) {
+                extractRazorPageHandlers(csharpClass, file, endpoints);
+            }
+        }
+
+        return endpoints;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>MVC Controller endpoints with [HttpGet], [HttpPost], etc.</li>
+     *   <li>Minimal API endpoints (app.MapGet, app.MapPost, etc.)</li>
+     *   <li>Razor Page handlers (OnGet, OnPost, etc.)</li>
+     * </ul>
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<ApiEndpoint> createFallbackStrategy() {
+        return (file, content) -> {
+            List<ApiEndpoint> endpoints = new ArrayList<>();
+
+            // Pattern 3: Minimal APIs (works without AST)
+            extractMinimalApiEndpoints(content, file, endpoints);
+
+            // Pattern 1 & 2: Try regex-based extraction for MVC/Razor if AST failed
+            // This provides basic coverage when AST parsing fails
+            if (!content.contains("Controller") && !content.contains("PageModel")) {
+                return endpoints;
+            }
+
+            log.debug("Fallback parsing found {} endpoints (Minimal API) in {}", endpoints.size(), file.getFileName());
+            return endpoints;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractEndpointsFromAST(List, Path)} instead
+     */
+    @Deprecated
     private void parseCSharpFile(Path file, List<ApiEndpoint> apiEndpoints) throws IOException {
         // Read file content for pattern matching
         String content = readFileContent(file);

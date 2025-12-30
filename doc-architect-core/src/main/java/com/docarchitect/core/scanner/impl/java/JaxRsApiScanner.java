@@ -6,13 +6,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.model.Component;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
+import com.docarchitect.core.scanner.base.RegexPatterns;
 import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -110,6 +115,25 @@ public class JaxRsApiScanner extends AbstractJavaParserScanner {
 
     private static final Set<String> PARAMETER_ANNOTATIONS = Set.of(
         "PathParam", "QueryParam", "FormParam", "HeaderParam", "MatrixParam", "CookieParam");
+
+    // Regex patterns for fallback parsing (compiled once for performance)
+    private static final Pattern PATH_PATTERN =
+        Pattern.compile("@Path\\s*\\(\\s*[\"']([^\"']+)[\"']");
+
+    private static final Pattern GET_PATTERN =
+        Pattern.compile("@GET\\s+");
+
+    private static final Pattern POST_PATTERN =
+        Pattern.compile("@POST\\s+");
+
+    private static final Pattern PUT_PATTERN =
+        Pattern.compile("@PUT\\s+");
+
+    private static final Pattern DELETE_PATTERN =
+        Pattern.compile("@DELETE\\s+");
+
+    private static final Pattern PATCH_PATTERN =
+        Pattern.compile("@PATCH\\s+");
 
     @Override
     public String getId() {
@@ -228,17 +252,17 @@ public class JaxRsApiScanner extends AbstractJavaParserScanner {
         log.info("Scanning JAX-RS APIs in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
-        List<Component> components = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         // Find all Java files
         List<Path> javaFiles = context.findFiles(JAVA_FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(javaFiles.size());
 
         if (javaFiles.isEmpty()) {
             log.warn("No Java files found in project");
             return emptyResult();
         }
 
-        int parsedFiles = 0;
         int skippedFiles = 0;
         for (Path javaFile : javaFiles) {
             // Pre-filter files before attempting to parse
@@ -247,41 +271,186 @@ public class JaxRsApiScanner extends AbstractJavaParserScanner {
                 continue;
             }
 
-            try {
-                parseJaxRsResource(javaFile, apiEndpoints, components);
-                parsedFiles++;
-            } catch (Exception e) {
-                // Files without JAX-RS patterns are already filtered by shouldScanFile()
-                // Any remaining parse failures are logged at DEBUG level
-                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
-                // Continue processing other files instead of failing completely
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<ApiEndpoint> result = parseWithFallback(
+                javaFile,
+                cu -> extractEndpointsFromAST(cu),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                apiEndpoints.addAll(result.getData());
             }
         }
 
         log.debug("Pre-filtered {} files (not JAX-RS resources)", skippedFiles);
 
-        log.info("Found {} JAX-RS API endpoints across {} Java files (parsed {}/{})",
-            apiEndpoints.size(), javaFiles.size(), parsedFiles, javaFiles.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} JAX-RS API endpoints (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+            apiEndpoints.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
-            components,
+            List.of(), // No components
             List.of(), // No dependencies
             apiEndpoints,
             List.of(), // No message flows
             List.of(), // No data entities
             List.of(), // No relationships
-            List.of()  // No warnings
+            List.of(), // No warnings
+            statistics
+        );
+    }
+
+    /**
+     * Extracts API endpoints from a parsed CompilationUnit using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param cu the parsed CompilationUnit
+     * @return list of discovered API endpoints
+     */
+    private List<ApiEndpoint> extractEndpointsFromAST(CompilationUnit cu) {
+        List<ApiEndpoint> endpoints = new ArrayList<>();
+
+        // Find all classes and interfaces
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
+            // Check if class/interface has @Path annotation
+            Optional<AnnotationExpr> pathAnnotation = classDecl.getAnnotations().stream()
+                .filter(ann -> PATH_ANNOTATION.equals(ann.getNameAsString()))
+                .findFirst();
+
+            if (pathAnnotation.isEmpty()) {
+                return; // Skip classes without @Path
+            }
+
+            String className = classDecl.getNameAsString();
+            String packageName = cu.getPackageDeclaration()
+                .map(pd -> pd.getNameAsString())
+                .orElse("");
+
+            String fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+
+            // Extract base path from class-level @Path
+            String basePath = extractPathFromAnnotation(pathAnnotation.get());
+
+            // Extract class-level @Produces and @Consumes
+            String classProduces = extractContentType(classDecl.getAnnotations(), PRODUCES_ANNOTATION);
+            String classConsumes = extractContentType(classDecl.getAnnotations(), CONSUMES_ANNOTATION);
+
+            log.debug("Found JAX-RS resource: {} with base path: {}", fullyQualifiedName, basePath);
+
+            // Find all HTTP method annotated methods
+            classDecl.getMethods().forEach(method -> {
+                extractEndpointFromMethod(method, fullyQualifiedName, basePath, classProduces, classConsumes, endpoints);
+            });
+        });
+
+        return endpoints;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>@Path annotations for base paths and method paths</li>
+     *   <li>@GET, @POST, @PUT, @DELETE, @PATCH annotations</li>
+     * </ul>
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<ApiEndpoint> createFallbackStrategy() {
+        return (file, content) -> {
+            List<ApiEndpoint> endpoints = new ArrayList<>();
+
+            // Check if file contains JAX-RS patterns
+            if (!content.contains("@Path") && !content.contains("@GET") &&
+                !content.contains("@POST") && !content.contains("@PUT") &&
+                !content.contains("@DELETE") && !content.contains("@PATCH")) {
+                return endpoints;
+            }
+
+            // Extract class name and package using shared utility
+            String className = RegexPatterns.extractClassName(content, file);
+            String packageName = RegexPatterns.extractPackageName(content);
+            String fullyQualifiedName = RegexPatterns.buildFullyQualifiedName(packageName, className);
+
+            // Extract base path from class-level @Path
+            String basePath = "";
+            Matcher pathMatcher = PATH_PATTERN.matcher(content);
+            if (pathMatcher.find()) {
+                basePath = pathMatcher.group(1);
+            }
+
+            // Simple heuristic: look for method annotations and extract paths
+            // This is a simplified version - AST parsing gives better results
+            String[] lines = content.split("\n");
+            String currentPath = basePath;
+
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i].trim();
+
+                // Look for @Path on methods
+                if (line.contains("@Path") && i + 1 < lines.length) {
+                    Matcher methodPathMatcher = PATH_PATTERN.matcher(line);
+                    if (methodPathMatcher.find()) {
+                        currentPath = combinePaths(basePath, methodPathMatcher.group(1));
+                    }
+                }
+
+                // Look for HTTP method annotations
+                if (line.contains("@GET")) {
+                    endpoints.add(createFallbackEndpoint(fullyQualifiedName, currentPath, "GET"));
+                    currentPath = basePath; // Reset for next method
+                } else if (line.contains("@POST")) {
+                    endpoints.add(createFallbackEndpoint(fullyQualifiedName, currentPath, "POST"));
+                    currentPath = basePath;
+                } else if (line.contains("@PUT")) {
+                    endpoints.add(createFallbackEndpoint(fullyQualifiedName, currentPath, "PUT"));
+                    currentPath = basePath;
+                } else if (line.contains("@DELETE")) {
+                    endpoints.add(createFallbackEndpoint(fullyQualifiedName, currentPath, "DELETE"));
+                    currentPath = basePath;
+                } else if (line.contains("@PATCH")) {
+                    endpoints.add(createFallbackEndpoint(fullyQualifiedName, currentPath, "PATCH"));
+                    currentPath = basePath;
+                }
+            }
+
+            log.debug("Fallback parsing found {} endpoints in {}", endpoints.size(), file.getFileName());
+            return endpoints;
+        };
+    }
+
+    /**
+     * Creates a fallback API endpoint with limited information.
+     */
+    private ApiEndpoint createFallbackEndpoint(String componentId, String path, String httpMethod) {
+        return new ApiEndpoint(
+            componentId,
+            ApiType.REST,
+            path.isEmpty() ? "/" : path,
+            httpMethod,
+            componentId + ".<unknown>",
+            null, // request schema unknown
+            null, // response schema unknown
+            null  // authentication unknown
         );
     }
 
     /**
      * Parses a single Java file and extracts JAX-RS API endpoints.
+     * @deprecated Use {@link #extractEndpointsFromAST(CompilationUnit)} instead
      *
      * @param javaFile path to Java file
      * @param apiEndpoints list to add discovered API endpoints
      * @param components list to add discovered components (reserved for future use)
      * @throws IOException if file cannot be read
      */
+    @Deprecated
     @SuppressWarnings("unused")
     private void parseJaxRsResource(Path javaFile, List<ApiEndpoint> apiEndpoints, List<Component> components) throws IOException {
         // Parse Java source using JavaParser

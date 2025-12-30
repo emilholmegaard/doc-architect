@@ -13,9 +13,11 @@ import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.PythonAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.Technologies;
 
 /**
@@ -181,22 +183,44 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
 
         List<DataEntity> dataEntities = new ArrayList<>();
         List<Relationship> relationships = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         List<Path> pythonFiles = context.findFiles(PYTHON_FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(pythonFiles.size());
 
         if (pythonFiles.isEmpty()) {
             return emptyResult();
         }
 
+        int skippedFiles = 0;
+
         for (Path pythonFile : pythonFiles) {
-            try {
-                parsePythonFile(pythonFile, dataEntities, relationships);
-            } catch (Exception e) {
-                log.warn("Failed to parse Python file: {} - {}", pythonFile, e.getMessage());
+            if (!shouldScanFile(pythonFile)) {
+                skippedFiles++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<EntityResult> result = parseWithFallback(
+                pythonFile,
+                classes -> extractEntitiesFromAST(pythonFile, classes),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                for (EntityResult entityResult : result.getData()) {
+                    dataEntities.add(entityResult.entity());
+                    relationships.addAll(entityResult.relationships());
+                }
             }
         }
 
-        log.info("Found {} SQLAlchemy entities and {} relationships", dataEntities.size(), relationships.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} SQLAlchemy entities and {} relationships (success rate: {:.1f}%, overall parse rate: {:.1f}%, skipped {} files)",
+                dataEntities.size(), relationships.size(), statistics.getSuccessRate(), statistics.getOverallParseRate(), skippedFiles);
 
         return buildSuccessResult(
             List.of(),           // No components
@@ -205,10 +229,204 @@ public class SqlAlchemyScanner extends AbstractAstScanner<PythonAst.PythonClass>
             List.of(),           // No message flows
             dataEntities,        // Data entities
             relationships,       // Relationships
-            List.of()            // No warnings
+            List.of(),           // No warnings
+            statistics
         );
     }
 
+    /**
+     * Internal record to hold entity and its relationships together.
+     */
+    private record EntityResult(DataEntity entity, List<Relationship> relationships) {}
+
+    /**
+     * Extracts entities from parsed AST classes using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param file the Python file being parsed
+     * @param classes the parsed Python classes
+     * @return list of entity results (entity + relationships)
+     */
+    private List<EntityResult> extractEntitiesFromAST(Path file, List<PythonAst.PythonClass> classes) {
+        List<EntityResult> results = new ArrayList<>();
+
+        // Read file content for __tablename__ extraction (AST parser skips dunder fields)
+        String fileContent = null;
+        try {
+            fileContent = readFileContent(file);
+        } catch (IOException e) {
+            log.warn("Failed to read file content for tablename extraction: {} - {}", file, e.getMessage());
+        }
+
+        for (PythonAst.PythonClass pythonClass : classes) {
+            // Determine if this class represents a database table
+            if (!isDatabaseTable(pythonClass, fileContent)) {
+                continue;
+            }
+
+            // Extract table name from __tablename__ field in file content
+            String tableName = extractTableName(pythonClass, fileContent);
+
+            // Extract fields and relationships
+            List<DataEntity.Field> fields = new ArrayList<>();
+            List<Relationship> relationships = new ArrayList<>();
+            String primaryKey = null;
+
+            // Only process fields that are actually defined in THIS class, not inherited
+            List<PythonAst.Field> classFields = getFieldsDefinedInClass(pythonClass, fileContent);
+            log.debug("Class {} has {} fields defined", pythonClass.name(), classFields.size());
+
+            for (PythonAst.Field field : classFields) {
+                try {
+                    log.debug("Processing field: {}.{}", pythonClass.name(), field.name());
+                    // Skip dunder fields and private fields
+                    if (field.name().equals(TABLENAME_FIELD_NAME) || field.name().startsWith("_")) {
+                        continue;
+                    }
+
+                    // Check if this is a relationship field (Relationship() or relationship())
+                    boolean isRelationship = field.value() != null &&
+                        (field.value().contains(RELATIONSHIP_FUNCTION_NAME + "(") ||
+                         field.value().contains("Relationship("));
+
+                    if (isRelationship) {
+                        // Extract relationship
+                        Relationship rel = extractRelationship(pythonClass.name(), field);
+                        if (rel != null) {
+                            relationships.add(rel);
+                            log.debug("Found SQLAlchemy relationship: {} -> {}", pythonClass.name(), rel.targetId());
+                        }
+                    } else {
+                        // Regular column field
+                        String sqlType = extractColumnType(field);
+                        boolean nullable = isNullable(field.value());
+                        boolean isPrimaryKey = isPrimaryKey(field.value());
+
+                        // Check for foreign key in Field(foreign_key="...")
+                        String foreignKeyRef = extractForeignKey(field.value());
+                        log.debug("Field {}.{}: value='{}', foreignKeyRef='{}'",
+                            pythonClass.name(), field.name(), field.value(), foreignKeyRef);
+                        if (foreignKeyRef != null) {
+                            // Create relationship for foreign key
+                            String targetEntity = extractTargetEntityFromForeignKey(foreignKeyRef);
+                            log.debug("Extracted target entity from FK '{}': '{}'", foreignKeyRef, targetEntity);
+                            if (targetEntity != null) {
+                                Relationship fkRel = new Relationship(
+                                    pythonClass.name(),
+                                    targetEntity,
+                                    RelationshipType.DEPENDS_ON,
+                                    "Foreign key reference",
+                                    SQLALCHEMY_TECHNOLOGY
+                                );
+                                relationships.add(fkRel);
+                                log.debug("Found foreign key: {} -> {}", pythonClass.name(), targetEntity);
+                            }
+                        }
+
+                        DataEntity.Field dataField = new DataEntity.Field(
+                            field.name(),
+                            sqlType,
+                            nullable,
+                            null
+                        );
+
+                        fields.add(dataField);
+
+                        if (isPrimaryKey && primaryKey == null) {
+                            primaryKey = field.name();
+                        }
+
+                        log.debug("Found SQLAlchemy field: {}.{} ({})", pythonClass.name(), field.name(), sqlType);
+                    }
+                } catch (Exception e) {
+                    log.warn("Error processing field {}.{}: {}", pythonClass.name(), field.name(), e.getMessage());
+                }
+            }
+
+            // Create DataEntity
+            if (!fields.isEmpty()) {
+                DataEntity entity = new DataEntity(
+                    pythonClass.name(),
+                    tableName,
+                    TABLE_TYPE,
+                    fields,
+                    primaryKey,
+                    SQLALCHEMY_MODEL_PREFIX + pythonClass.name()
+                );
+
+                results.add(new EntityResult(entity, relationships));
+                log.debug("Found SQLAlchemy entity: {} -> table: {}", pythonClass.name(), tableName);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<EntityResult> createFallbackStrategy() {
+        return (file, content) -> {
+            List<EntityResult> results = new ArrayList<>();
+
+            // Check if file contains SQLAlchemy patterns
+            if (!content.contains("class ") ||
+                (!content.contains("Column(") && !content.contains("mapped_column("))) {
+                return results;
+            }
+
+            // Simple regex-based extraction for basic SQLAlchemy models
+            Pattern classPattern = Pattern.compile("class\\s+(\\w+)\\s*\\([^)]*Base[^)]*\\):");
+            Matcher classMatcher = classPattern.matcher(content);
+
+            while (classMatcher.find()) {
+                String className = classMatcher.group(1);
+
+                // Extract table name
+                String tableName = className;
+                Matcher tablenameMatcher = TABLENAME_PATTERN.matcher(content);
+                if (tablenameMatcher.find()) {
+                    tableName = tablenameMatcher.group(1);
+                } else {
+                    tableName = toSnakeCase(className);
+                }
+
+                // Extract simple fields using regex
+                List<DataEntity.Field> fields = new ArrayList<>();
+                Pattern fieldPattern = Pattern.compile("(\\w+)\\s*=\\s*Column\\(");
+                Matcher fieldMatcher = fieldPattern.matcher(content);
+                while (fieldMatcher.find()) {
+                    String fieldName = fieldMatcher.group(1);
+                    if (!fieldName.startsWith("_")) {
+                        fields.add(new DataEntity.Field(fieldName, "Unknown", true, null));
+                    }
+                }
+
+                if (!fields.isEmpty()) {
+                    DataEntity entity = new DataEntity(
+                        className,
+                        tableName,
+                        TABLE_TYPE,
+                        fields,
+                        null,
+                        SQLALCHEMY_MODEL_PREFIX + className
+                    );
+                    results.add(new EntityResult(entity, List.of()));
+                    log.debug("Fallback parsing found entity: {} -> {}", className, tableName);
+                }
+            }
+
+            return results;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractEntitiesFromAST(Path, List)} instead
+     */
+    @Deprecated
     private void parsePythonFile(Path file, List<DataEntity> dataEntities,
                                  List<Relationship> relationships) {
         List<PythonAst.PythonClass> classes = parseAstFile(file);

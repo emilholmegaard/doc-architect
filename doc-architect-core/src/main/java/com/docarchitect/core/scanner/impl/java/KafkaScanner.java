@@ -7,11 +7,16 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.MessageFlow;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
+import com.docarchitect.core.scanner.base.RegexPatterns;
 import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -54,6 +59,16 @@ public class KafkaScanner extends AbstractJavaParserScanner {
     private static final String ARRAY_DELIMITER = ",";
     private static final int FIRST_ARGUMENT_INDEX = 0;
     private static final int MIN_ARGUMENTS_FOR_TOPIC = 1;
+
+    // Regex patterns for fallback parsing (compiled once for performance)
+    private static final Pattern LISTENER_PATTERN =
+        Pattern.compile("@KafkaListener\\s*\\([^)]*topics\\s*=\\s*[{\"']([^}\"']+)[}\"']");
+
+    private static final Pattern SEND_TO_PATTERN =
+        Pattern.compile("@SendTo\\s*\\(\\s*[\"']([^\"']+)[\"']");
+
+    private static final Pattern TEMPLATE_PATTERN =
+        Pattern.compile("kafkaTemplate\\.send\\s*\\(\\s*[\"']([^\"']+)[\"']");
 
     @Override
     public String getId() {
@@ -161,7 +176,10 @@ public class KafkaScanner extends AbstractJavaParserScanner {
         log.info("Scanning Kafka message flows in: {}", context.rootPath());
 
         List<MessageFlow> messageFlows = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
+
         List<Path> javaFiles = context.findFiles(FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(javaFiles.size());
 
         log.debug("Found {} total Java files to examine", javaFiles.size());
 
@@ -170,29 +188,32 @@ public class KafkaScanner extends AbstractJavaParserScanner {
             return emptyResult();
         }
 
-        int scannedCount = 0;
         int skippedCount = 0;
 
         for (Path javaFile : javaFiles) {
-            try {
-                int beforeCount = messageFlows.size();
-                parseKafkaFlows(javaFile, messageFlows);
-                int afterCount = messageFlows.size();
-
-                if (afterCount > beforeCount) {
-                    scannedCount++;
-                    log.debug("Found {} message flow(s) in: {}", afterCount - beforeCount, javaFile.getFileName());
-                }
-            } catch (Exception e) {
-                // Files without Kafka patterns are already filtered by shouldScanFile()
-                // Any remaining parse failures are logged at DEBUG level
-                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+            if (!shouldScanFile(javaFile)) {
                 skippedCount++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<MessageFlow> result = parseWithFallback(
+                javaFile,
+                cu -> extractMessageFlowsFromAST(cu),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                messageFlows.addAll(result.getData());
             }
         }
 
-        log.info("Found {} Kafka message flows (scanned {} files, skipped {} files)",
-                 messageFlows.size(), scannedCount, skippedCount);
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Kafka message flows (success rate: {:.1f}%, overall parse rate: {:.1f}%, skipped {} files)",
+                 messageFlows.size(), statistics.getSuccessRate(), statistics.getOverallParseRate(), skippedCount);
 
         return buildSuccessResult(
             List.of(),
@@ -201,10 +222,105 @@ public class KafkaScanner extends AbstractJavaParserScanner {
             messageFlows,
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            statistics
         );
     }
 
+    /**
+     * Extracts message flows from a parsed CompilationUnit using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param cu the parsed CompilationUnit
+     * @return list of discovered message flows
+     */
+    private List<MessageFlow> extractMessageFlowsFromAST(CompilationUnit cu) {
+        List<MessageFlow> messageFlows = new ArrayList<>();
+
+        cu.findAll(ClassOrInterfaceDeclaration.class).forEach(classDecl -> {
+            String className = classDecl.getNameAsString();
+            String packageName = cu.getPackageDeclaration()
+                .map(pd -> pd.getNameAsString())
+                .orElse("");
+
+            String fullyQualifiedName = packageName.isEmpty() ? className : packageName + "." + className;
+
+            classDecl.getMethods().forEach(method -> {
+                extractKafkaListenerFlows(method, fullyQualifiedName, messageFlows);
+                extractSendToFlows(method, fullyQualifiedName, messageFlows);
+                extractKafkaTemplateFlows(method, fullyQualifiedName, messageFlows);
+            });
+        });
+
+        return messageFlows;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>@KafkaListener annotations with topics</li>
+     *   <li>@SendTo annotations</li>
+     *   <li>KafkaTemplate.send() method calls</li>
+     * </ul>
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<MessageFlow> createFallbackStrategy() {
+        return (file, content) -> {
+            List<MessageFlow> flows = new ArrayList<>();
+
+            // Check if file contains Kafka patterns
+            if (!content.contains("KafkaListener") && !content.contains("SendTo") &&
+                !content.contains("KafkaTemplate")) {
+                return flows;
+            }
+
+            // Extract class name and package using shared utility
+            String className = RegexPatterns.extractClassName(content, file);
+            String packageName = RegexPatterns.extractPackageName(content);
+            String fullyQualifiedName = RegexPatterns.buildFullyQualifiedName(packageName, className);
+
+            // Extract @KafkaListener flows (consumers) using pre-compiled pattern
+            Matcher listenerMatcher = LISTENER_PATTERN.matcher(content);
+            while (listenerMatcher.find()) {
+                String topics = listenerMatcher.group(1);
+                for (String topic : topics.split(",")) {
+                    topic = topic.trim().replaceAll("\"", "");
+                    if (!topic.isEmpty()) {
+                        flows.add(new MessageFlow(null, fullyQualifiedName, topic,
+                            DEFAULT_MESSAGE_TYPE, null, TECHNOLOGY));
+                    }
+                }
+            }
+
+            // Extract @SendTo flows (producers) using pre-compiled pattern
+            Matcher sendToMatcher = SEND_TO_PATTERN.matcher(content);
+            while (sendToMatcher.find()) {
+                String topic = sendToMatcher.group(1);
+                flows.add(new MessageFlow(fullyQualifiedName, null, topic,
+                    DEFAULT_MESSAGE_TYPE, null, TECHNOLOGY));
+            }
+
+            // Extract KafkaTemplate.send() flows (producers) using pre-compiled pattern
+            Matcher templateMatcher = TEMPLATE_PATTERN.matcher(content);
+            while (templateMatcher.find()) {
+                String topic = templateMatcher.group(1);
+                flows.add(new MessageFlow(fullyQualifiedName, null, topic,
+                    DEFAULT_MESSAGE_TYPE, null, TECHNOLOGY));
+            }
+
+            log.debug("Fallback parsing found {} message flows in {}", flows.size(), file.getFileName());
+            return flows;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractMessageFlowsFromAST(CompilationUnit)} instead
+     */
+    @Deprecated
     private void parseKafkaFlows(Path javaFile, List<MessageFlow> messageFlows) throws IOException {
         Optional<CompilationUnit> cuOpt = parseJavaFile(javaFile);
         if (cuOpt.isEmpty()) {

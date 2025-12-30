@@ -4,7 +4,10 @@ import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
+import com.docarchitect.core.scanner.base.RegexPatterns;
 import com.docarchitect.core.util.IdGenerator;
 import com.docarchitect.core.util.Technologies;
 import com.github.javaparser.ast.CompilationUnit;
@@ -90,6 +93,19 @@ public class JavaHttpClientScanner extends AbstractJavaParserScanner {
     private static final Pattern SERVICE_NAME_PATTERN = Pattern.compile(
         "[a-zA-Z0-9-_]+",
         Pattern.CASE_INSENSITIVE
+    );
+
+    // Regex patterns for fallback parsing (compiled once for performance)
+    private static final Pattern FEIGN_CLIENT_PATTERN = Pattern.compile(
+        "@FeignClient\\s*\\(\\s*(?:name|value)\\s*=\\s*[\"']([^\"']+)[\"']"
+    );
+
+    private static final Pattern REST_TEMPLATE_PATTERN = Pattern.compile(
+        "restTemplate\\.(?:getForObject|postForObject|exchange|put|delete)\\s*\\(\\s*[\"']([^\"']+)[\"']"
+    );
+
+    private static final Pattern WEB_CLIENT_PATTERN = Pattern.compile(
+        "webClient\\.(?:get|post|put|delete)\\(\\)\\.uri\\s*\\(\\s*[\"']([^\"']+)[\"']"
     );
 
     @Override
@@ -194,16 +210,17 @@ public class JavaHttpClientScanner extends AbstractJavaParserScanner {
 
         List<Relationship> relationships = new ArrayList<>();
         Set<String> processedRelationships = new HashSet<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         // Find all Java files
         List<Path> javaFiles = context.findFiles(JAVA_FILE_PATTERN).toList();
+        statsBuilder.filesDiscovered(javaFiles.size());
 
         if (javaFiles.isEmpty()) {
             log.warn("No Java files found in project");
             return emptyResult();
         }
 
-        int parsedFiles = 0;
         int skippedFiles = 0;
 
         for (Path javaFile : javaFiles) {
@@ -213,17 +230,26 @@ public class JavaHttpClientScanner extends AbstractJavaParserScanner {
                 continue;
             }
 
-            try {
-                extractHttpClientRelationships(javaFile, relationships, processedRelationships, context);
-                parsedFiles++;
-            } catch (Exception e) {
-                log.debug("Failed to parse Java file: {} - {}", javaFile, e.getMessage());
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<Relationship> result = parseWithFallback(
+                javaFile,
+                cu -> extractRelationshipsFromAST(cu, processedRelationships),
+                createFallbackStrategy(processedRelationships),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                relationships.addAll(result.getData());
             }
         }
 
         log.debug("Pre-filtered {} files (not HTTP client code)", skippedFiles);
-        log.info("Found {} HTTP client relationships across {} Java files (parsed {}/{})",
-            relationships.size(), javaFiles.size(), parsedFiles, javaFiles.size());
+
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} HTTP client relationships (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+            relationships.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
             List.of(), // No components
@@ -232,12 +258,124 @@ public class JavaHttpClientScanner extends AbstractJavaParserScanner {
             List.of(), // No message flows
             List.of(), // No data entities
             relationships,
-            List.of()  // No warnings
+            List.of(), // No warnings
+            statistics
         );
     }
 
     /**
+     * Extracts relationships from a parsed CompilationUnit using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param cu the parsed CompilationUnit
+     * @param processedRelationships set of already processed relationship keys
+     * @return list of discovered relationships
+     */
+    private List<Relationship> extractRelationshipsFromAST(CompilationUnit cu, Set<String> processedRelationships) {
+        List<Relationship> relationships = new ArrayList<>();
+
+        // Extract source component ID from package/class name
+        String packageName = getPackageName(cu);
+        String sourceComponentId = packageName.isEmpty() ? "default" : packageName.split("\\.")[0];
+
+        // Find Feign client relationships
+        extractFeignClientRelationships(cu, sourceComponentId, relationships, processedRelationships);
+
+        // Find RestTemplate and WebClient relationships
+        extractRestTemplateRelationships(cu, sourceComponentId, relationships, processedRelationships);
+        extractWebClientRelationships(cu, sourceComponentId, relationships, processedRelationships);
+
+        return relationships;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * <p>The fallback strategy uses regex patterns to extract:
+     * <ul>
+     *   <li>@FeignClient annotations with service names</li>
+     *   <li>RestTemplate method calls with URLs</li>
+     *   <li>WebClient method calls with URLs</li>
+     * </ul>
+     *
+     * @param processedRelationships set of already processed relationship keys
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<Relationship> createFallbackStrategy(Set<String> processedRelationships) {
+        return (file, content) -> {
+            List<Relationship> relationships = new ArrayList<>();
+
+            // Check if file contains HTTP client patterns
+            if (!content.contains("FeignClient") && !content.contains("RestTemplate") &&
+                !content.contains("WebClient") && !content.contains("http://") &&
+                !content.contains("https://")) {
+                return relationships;
+            }
+
+            // Extract package using shared utility
+            String packageName = RegexPatterns.extractPackageName(content);
+            String sourceComponentId = packageName.isEmpty() ? "default" : packageName.split("\\.")[0];
+
+            // Extract FeignClient relationships
+            Matcher feignMatcher = FEIGN_CLIENT_PATTERN.matcher(content);
+            while (feignMatcher.find()) {
+                String serviceName = feignMatcher.group(1);
+                String targetComponentId = IdGenerator.generate(serviceName);
+                addRelationship(
+                    sourceComponentId,
+                    targetComponentId,
+                    "Feign client call to " + serviceName,
+                    "HTTP/Feign",
+                    relationships,
+                    processedRelationships
+                );
+            }
+
+            // Extract RestTemplate relationships
+            Matcher restTemplateMatcher = REST_TEMPLATE_PATTERN.matcher(content);
+            while (restTemplateMatcher.find()) {
+                String url = restTemplateMatcher.group(1);
+                String targetService = extractServiceNameFromUrl(url);
+                if (targetService != null && !targetService.isEmpty()) {
+                    String targetComponentId = IdGenerator.generate(targetService);
+                    addRelationship(
+                        sourceComponentId,
+                        targetComponentId,
+                        "RestTemplate call to " + targetService,
+                        "HTTP/RestTemplate",
+                        relationships,
+                        processedRelationships
+                    );
+                }
+            }
+
+            // Extract WebClient relationships
+            Matcher webClientMatcher = WEB_CLIENT_PATTERN.matcher(content);
+            while (webClientMatcher.find()) {
+                String url = webClientMatcher.group(1);
+                String targetService = extractServiceNameFromUrl(url);
+                if (targetService != null && !targetService.isEmpty()) {
+                    String targetComponentId = IdGenerator.generate(targetService);
+                    addRelationship(
+                        sourceComponentId,
+                        targetComponentId,
+                        "WebClient call to " + targetService,
+                        "HTTP/WebClient",
+                        relationships,
+                        processedRelationships
+                    );
+                }
+            }
+
+            log.debug("Fallback parsing found {} relationships in {}", relationships.size(), file.getFileName());
+            return relationships;
+        };
+    }
+
+    /**
      * Extracts HTTP client relationships from a single Java file.
+     * @deprecated Use {@link #extractRelationshipsFromAST(CompilationUnit, Set)} instead
      *
      * @param javaFile path to Java file
      * @param relationships list to add discovered relationships
@@ -245,6 +383,7 @@ public class JavaHttpClientScanner extends AbstractJavaParserScanner {
      * @param context scan context
      * @throws IOException if file cannot be read
      */
+    @Deprecated
     private void extractHttpClientRelationships(
             Path javaFile,
             List<Relationship> relationships,

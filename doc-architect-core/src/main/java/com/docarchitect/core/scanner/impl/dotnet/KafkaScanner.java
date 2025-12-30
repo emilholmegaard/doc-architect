@@ -9,9 +9,11 @@ import java.util.Set;
 import com.docarchitect.core.model.MessageFlow;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.DotNetAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.Technologies;
 
 /**
@@ -135,27 +137,45 @@ public class KafkaScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
         log.info("Scanning Kafka message flows in .NET project: {}", context.rootPath());
 
         List<MessageFlow> messageFlows = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         // Find C# files at both root and nested levels
         List<Path> csFiles = new ArrayList<>();
         context.findFiles(FILE_PATTERN_ROOT).forEach(csFiles::add);
         context.findFiles(FILE_PATTERN_NESTED).forEach(csFiles::add);
 
+        statsBuilder.filesDiscovered(csFiles.size());
+
         if (csFiles.isEmpty()) {
             return emptyResult();
         }
 
+        int skippedFiles = 0;
+
         for (Path csFile : csFiles) {
-            try {
-                parseKafkaFlows(csFile, messageFlows);
-            } catch (Exception e) {
-                // Files without Kafka patterns are already filtered by shouldScanFile()
-                // Any remaining parse failures are logged at DEBUG level
-                log.debug("Failed to parse C# file: {} - {}", csFile, e.getMessage());
+            if (!shouldScanFile(csFile)) {
+                skippedFiles++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<MessageFlow> result = parseWithFallback(
+                csFile,
+                classes -> extractMessageFlowsFromAST(csFile, classes),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                messageFlows.addAll(result.getData());
             }
         }
 
-        log.info("Found {} Kafka message flows", messageFlows.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Kafka message flows (success rate: {:.1f}%, overall parse rate: {:.1f}%, skipped {} files)",
+                messageFlows.size(), statistics.getSuccessRate(), statistics.getOverallParseRate(), skippedFiles);
 
         return buildSuccessResult(
             List.of(),
@@ -164,10 +184,161 @@ public class KafkaScanner extends AbstractAstScanner<DotNetAst.CSharpClass> {
             messageFlows,
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            statistics
         );
     }
 
+    /**
+     * Extracts message flows from parsed AST classes using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param csFile the C# file being parsed
+     * @param classes the parsed C# classes
+     * @return list of discovered message flows
+     */
+    private List<MessageFlow> extractMessageFlowsFromAST(Path csFile, List<DotNetAst.CSharpClass> classes) {
+        List<MessageFlow> messageFlows = new ArrayList<>();
+
+        try {
+            String fileContent = readFileContent(csFile);
+            String namespace = extractNamespace(fileContent);
+
+            for (DotNetAst.CSharpClass cls : classes) {
+                // Build fully qualified class name
+                String className;
+                if (namespace != null && !namespace.isEmpty()) {
+                    className = namespace + "." + cls.name();
+                } else if (!cls.namespace().isEmpty()) {
+                    className = cls.namespace() + "." + cls.name();
+                } else {
+                    className = cls.name();
+                }
+
+                // Extract consumers from method attributes
+                extractConsumersFromAttributes(cls, className, messageFlows);
+
+                // Extract consumers/producers from field/property types (AST properties)
+                extractFromProperties(cls, className, messageFlows);
+
+                // Extract from private fields using regex (since AST doesn't capture private fields)
+                extractFromFields(fileContent, className, messageFlows);
+
+                // Extract from method calls (ProduceAsync, Consume)
+                extractFromMethodCalls(fileContent, className, messageFlows);
+            }
+        } catch (IOException e) {
+            log.debug("Failed to read file content for AST extraction: {}", csFile);
+        }
+
+        return messageFlows;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<MessageFlow> createFallbackStrategy() {
+        return (file, content) -> {
+            List<MessageFlow> flows = new ArrayList<>();
+
+            // Check if file contains Kafka patterns
+            if (!content.contains("IConsumer<") && !content.contains("IProducer<") &&
+                !content.contains("ProduceAsync") && !content.contains(".Consume(")) {
+                return flows;
+            }
+
+            // Extract class name from content
+            java.util.regex.Pattern classPattern = java.util.regex.Pattern.compile(
+                "(?:public\\s+)?class\\s+(\\w+)"
+            );
+            java.util.regex.Matcher classMatcher = classPattern.matcher(content);
+            if (!classMatcher.find()) {
+                return flows;
+            }
+
+            String className = classMatcher.group(1);
+            String namespace = extractNamespace(content);
+            if (namespace != null && !namespace.isEmpty()) {
+                className = namespace + "." + className;
+            }
+
+            // Extract ProduceAsync calls using regex
+            java.util.regex.Pattern produceAsyncPattern = java.util.regex.Pattern.compile(
+                "ProduceAsync\\s*\\(\\s*\"([^\"]+)\""
+            );
+            java.util.regex.Matcher produceAsyncMatcher = produceAsyncPattern.matcher(content);
+            while (produceAsyncMatcher.find()) {
+                String topic = produceAsyncMatcher.group(1);
+                flows.add(new MessageFlow(
+                    className,
+                    UNKNOWN_SUBSCRIBER,
+                    topic,
+                    DEFAULT_MESSAGE_TYPE,
+                    null,
+                    TECHNOLOGY
+                ));
+            }
+
+            // Extract Consume calls using regex
+            java.util.regex.Pattern consumePattern = java.util.regex.Pattern.compile(
+                "Consume\\s*\\(\\s*\"([^\"]+)\""
+            );
+            java.util.regex.Matcher consumeMatcher = consumePattern.matcher(content);
+            while (consumeMatcher.find()) {
+                String topic = consumeMatcher.group(1);
+                flows.add(new MessageFlow(
+                    UNKNOWN_PUBLISHER,
+                    className,
+                    topic,
+                    DEFAULT_MESSAGE_TYPE,
+                    null,
+                    TECHNOLOGY
+                ));
+            }
+
+            // Extract IConsumer/IProducer fields
+            java.util.regex.Pattern consumerPattern = java.util.regex.Pattern.compile(
+                "(?:private|public)\\s+IConsumer<[^>]+>\\s+(\\w+)"
+            );
+            java.util.regex.Matcher consumerMatcher = consumerPattern.matcher(content);
+            if (consumerMatcher.find()) {
+                flows.add(new MessageFlow(
+                    UNKNOWN_PUBLISHER,
+                    className,
+                    DEFAULT_TOPIC,
+                    DEFAULT_MESSAGE_TYPE,
+                    null,
+                    TECHNOLOGY
+                ));
+            }
+
+            java.util.regex.Pattern producerPattern = java.util.regex.Pattern.compile(
+                "(?:private|public)\\s+IProducer<[^>]+>\\s+(\\w+)"
+            );
+            java.util.regex.Matcher producerMatcher = producerPattern.matcher(content);
+            if (producerMatcher.find()) {
+                flows.add(new MessageFlow(
+                    className,
+                    UNKNOWN_SUBSCRIBER,
+                    DEFAULT_TOPIC,
+                    DEFAULT_MESSAGE_TYPE,
+                    null,
+                    TECHNOLOGY
+                ));
+            }
+
+            log.debug("Fallback parsing found {} message flows in {}", flows.size(), file.getFileName());
+            return flows;
+        };
+    }
+
+    /**
+     * @deprecated Use {@link #extractMessageFlowsFromAST(Path, List)} instead
+     */
+    @Deprecated
     private void parseKafkaFlows(Path csFile, List<MessageFlow> messageFlows) throws IOException {
         List<DotNetAst.CSharpClass> classes = parseAstFile(csFile);
         String fileContent = readFileContent(csFile);

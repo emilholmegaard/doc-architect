@@ -10,9 +10,11 @@ import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.JavaScriptAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.Technologies;
 
 /**
@@ -121,6 +123,7 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
         log.info("Scanning Express.js API endpoints in: {}", context.rootPath());
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         // Find all JavaScript and TypeScript files
         List<Path> jsFiles = context.findFiles(JS_GLOB).toList();
@@ -129,24 +132,36 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
         allFiles.addAll(jsFiles);
         allFiles.addAll(tsFiles);
 
+        statsBuilder.filesDiscovered(allFiles.size());
+
         if (allFiles.isEmpty()) {
             log.warn("No JavaScript or TypeScript files found in project");
             return emptyResult();
         }
 
-        int parsedFiles = 0;
         for (Path file : allFiles) {
-            try {
-                parseJavaScriptFile(file, apiEndpoints);
-                parsedFiles++;
-            } catch (Exception e) {
-                log.warn("Failed to parse file: {} - {}", file, e.getMessage());
-                // Continue processing other files instead of failing completely
+            if (!shouldScanFile(file)) {
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<ApiEndpoint> result = parseWithFallback(
+                file,
+                routes -> extractEndpointsFromAST(file, routes),
+                createFallbackStrategy(),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                apiEndpoints.addAll(result.getData());
             }
         }
 
-        log.info("Found {} Express.js API endpoints across {} files (parsed {}/{})",
-            apiEndpoints.size(), allFiles.size(), parsedFiles, allFiles.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Express.js API endpoints (success rate: {:.1f}%, overall parse rate: {:.1f}%)",
+            apiEndpoints.size(), statistics.getSuccessRate(), statistics.getOverallParseRate());
 
         return buildSuccessResult(
             List.of(), // No components
@@ -155,8 +170,92 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
             List.of(), // No message flows
             List.of(), // No data entities
             List.of(), // No relationships
-            List.of()  // No warnings
+            List.of(), // No warnings
+            statistics
         );
+    }
+
+    /**
+     * Extracts endpoints from parsed AST routes using AST analysis.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
+     *
+     * @param file the JavaScript/TypeScript file being parsed
+     * @param routes the parsed Express routes
+     * @return list of discovered API endpoints
+     */
+    private List<ApiEndpoint> extractEndpointsFromAST(Path file, List<JavaScriptAst.ExpressRoute> routes) {
+        List<ApiEndpoint> endpoints = new ArrayList<>();
+        String componentId = extractModuleName(file);
+
+        for (JavaScriptAst.ExpressRoute route : routes) {
+            String httpMethod = route.httpMethod().toUpperCase();
+            String path = route.path();
+            String routerName = route.routerName();
+
+            // Create API endpoint
+            ApiEndpoint endpoint = new ApiEndpoint(
+                componentId,
+                ApiType.REST,
+                path,
+                httpMethod,
+                componentId + "." + routerName + "." + route.httpMethod(),
+                null, // Request schema not extracted
+                null, // Response schema not extracted
+                null  // Authentication not detected
+            );
+
+            endpoints.add(endpoint);
+            log.debug("Found Express.js endpoint: {} {} in {}", httpMethod, path, file.getFileName());
+        }
+
+        return endpoints;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<ApiEndpoint> createFallbackStrategy() {
+        return (file, content) -> {
+            List<ApiEndpoint> endpoints = new ArrayList<>();
+
+            // Check if file contains Express patterns
+            if (!content.contains("app.") && !content.contains("router.")) {
+                return endpoints;
+            }
+
+            String componentId = extractModuleName(file);
+
+            // Simple regex-based extraction for Express routes
+            // Pattern: app.get('/path', ...) or router.post('/path', ...)
+            java.util.regex.Pattern routePattern = java.util.regex.Pattern.compile(
+                "(?:app|router)\\.(get|post|put|delete|patch)\\s*\\(\\s*['\"`]([^'\"` ]+)['\"`]"
+            );
+            java.util.regex.Matcher matcher = routePattern.matcher(content);
+
+            while (matcher.find()) {
+                String httpMethod = matcher.group(1).toUpperCase();
+                String path = matcher.group(2);
+
+                ApiEndpoint endpoint = new ApiEndpoint(
+                    componentId,
+                    ApiType.REST,
+                    path,
+                    httpMethod,
+                    componentId + ".router." + httpMethod.toLowerCase(),
+                    null,
+                    null,
+                    null
+                );
+
+                endpoints.add(endpoint);
+                log.debug("Fallback parsing found endpoint: {} {} in {}", httpMethod, path, file.getFileName());
+            }
+
+            return endpoints;
+        };
     }
 
     /**
@@ -165,7 +264,9 @@ public class ExpressScanner extends AbstractAstScanner<JavaScriptAst.ExpressRout
      * @param file path to JS/TS file
      * @param apiEndpoints list to add discovered API endpoints
      * @throws IOException if file cannot be read
+     * @deprecated Use {@link #extractEndpointsFromAST(Path, List)} instead
      */
+    @Deprecated
     private void parseJavaScriptFile(Path file, List<ApiEndpoint> apiEndpoints) throws IOException {
         String componentId = extractModuleName(file);
 
