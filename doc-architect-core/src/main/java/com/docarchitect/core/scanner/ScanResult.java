@@ -17,6 +17,7 @@ import java.util.Objects;
  * @param relationships discovered relationships
  * @param warnings non-fatal issues encountered during scanning
  * @param errors fatal errors that prevented complete scanning
+ * @param statistics parsing statistics (files scanned, success rates, errors)
  */
 public record ScanResult(
     String scannerId,
@@ -28,7 +29,8 @@ public record ScanResult(
     List<DataEntity> dataEntities,
     List<Relationship> relationships,
     List<String> warnings,
-    List<String> errors
+    List<String> errors,
+    ScanStatistics statistics
 ) {
     /**
      * Compact constructor with validation.
@@ -59,6 +61,9 @@ public record ScanResult(
         if (errors == null) {
             errors = List.of();
         }
+        if (statistics == null) {
+            statistics = ScanStatistics.empty();
+        }
     }
 
     /**
@@ -78,7 +83,8 @@ public record ScanResult(
             List.of(),
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            ScanStatistics.empty()
         );
     }
 
@@ -100,7 +106,8 @@ public record ScanResult(
             List.of(),
             List.of(),
             List.of(),
-            errors
+            errors,
+            ScanStatistics.empty()
         );
     }
 

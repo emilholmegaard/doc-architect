@@ -1,5 +1,7 @@
 package com.docarchitect.core.scanner.base;
 
+import com.docarchitect.core.scanner.ConfidenceLevel;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
 import com.github.javaparser.ast.CompilationUnit;
@@ -113,7 +115,7 @@ public abstract class AbstractJavaParserScanner extends AbstractScanner {
 
         // Layer 2: Parse with error handling
         String content = readFileContent(file);
-        ParseResult<CompilationUnit> result = javaParser.parse(content);
+        com.github.javaparser.ParseResult<CompilationUnit> result = javaParser.parse(content);
 
         if (result.isSuccessful() && result.getResult().isPresent()) {
             return result.getResult();
@@ -121,6 +123,148 @@ public abstract class AbstractJavaParserScanner extends AbstractScanner {
             log.debug("Failed to parse Java file: {}", file);
             result.getProblems().forEach(problem -> log.debug("  - {}", problem));
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Result of parsing a Java file, including metadata for statistics tracking.
+     *
+     * @param <T> type of extracted data (e.g., ApiEndpoint, DataEntity)
+     */
+    protected static class FileParseResult<T> {
+        private final List<T> data;
+        private final ConfidenceLevel confidence;
+        private final boolean success;
+        private final String errorType;
+        private final String errorDetail;
+
+        private FileParseResult(List<T> data, ConfidenceLevel confidence, boolean success,
+                           String errorType, String errorDetail) {
+            this.data = data != null ? data : List.of();
+            this.confidence = confidence;
+            this.success = success;
+            this.errorType = errorType;
+            this.errorDetail = errorDetail;
+        }
+
+        public static <T> FileParseResult<T> success(List<T> data, ConfidenceLevel confidence) {
+            return new FileParseResult<>(data, confidence, true, null, null);
+        }
+
+        public static <T> FileParseResult<T> failure(String errorType, String errorDetail) {
+            return new FileParseResult<>(List.of(), null, false, errorType, errorDetail);
+        }
+
+        public List<T> getData() {
+            return data;
+        }
+
+        public ConfidenceLevel getConfidence() {
+            return confidence;
+        }
+
+        public boolean isSuccess() {
+            return success;
+        }
+
+        public String getErrorType() {
+            return errorType;
+        }
+
+        public String getErrorDetail() {
+            return errorDetail;
+        }
+    }
+
+    /**
+     * Parses a Java file with fallback strategy support.
+     *
+     * <p>This method implements a three-tier parsing approach:
+     * <ol>
+     *   <li><b>Tier 1:</b> Full AST parsing via JavaParser (HIGH confidence)</li>
+     *   <li><b>Tier 2:</b> Regex-based fallback parsing (MEDIUM confidence)</li>
+     *   <li><b>Tier 3:</b> Return empty with error tracking (statistics only)</li>
+     * </ol>
+     *
+     * <p><b>Statistics Tracking:</b></p>
+     * <p>This method populates the statistics builder with:
+     * <ul>
+     *   <li>Success/fallback/failure counts</li>
+     *   <li>Error types and details</li>
+     *   <li>Confidence levels for results</li>
+     * </ul>
+     *
+     * <p><b>Usage Example:</b></p>
+     * <pre>{@code
+     * ScanStatistics.Builder stats = new ScanStatistics.Builder();
+     * List<ApiEndpoint> allEndpoints = new ArrayList<>();
+     *
+     * for (Path file : javaFiles) {
+     *     FileParseResult<ApiEndpoint> result = parseWithFallback(
+     *         file,
+     *         this::extractEndpointsFromAST,      // Tier 1: AST extraction
+     *         this::extractEndpointsWithRegex,    // Tier 2: Regex fallback
+     *         stats
+     *     );
+     *     allEndpoints.addAll(result.getData());
+     * }
+     * }</pre>
+     *
+     * @param <T> type of data extracted from file
+     * @param file path to Java file
+     * @param astExtractor function to extract data from CompilationUnit (Tier 1)
+     * @param fallbackStrategy fallback parser for when AST fails (Tier 2)
+     * @param statsBuilder statistics builder to track parse metrics
+     * @return parse result with data, confidence level, and error info
+     */
+    protected <T> FileParseResult<T> parseWithFallback(
+            Path file,
+            java.util.function.Function<CompilationUnit, List<T>> astExtractor,
+            FallbackParsingStrategy<T> fallbackStrategy,
+            ScanStatistics.Builder statsBuilder) {
+
+        statsBuilder.incrementFilesScanned();
+
+        try {
+            // Tier 1: Try full AST parsing
+            Optional<CompilationUnit> cuOpt = parseJavaFile(file);
+
+            if (cuOpt.isPresent()) {
+                // AST parsing succeeded
+                List<T> data = astExtractor.apply(cuOpt.get());
+                statsBuilder.incrementFilesParsedSuccessfully();
+                return FileParseResult.success(data, ConfidenceLevel.HIGH);
+            }
+
+            // Tier 2: AST failed, try fallback (regex)
+            log.debug("AST parsing failed for {}, attempting fallback", file);
+            String content = readFileContent(file);
+            List<T> fallbackData = fallbackStrategy.parse(file, content);
+
+            if (!fallbackData.isEmpty()) {
+                statsBuilder.incrementFilesParsedWithFallback();
+                return FileParseResult.success(fallbackData, ConfidenceLevel.MEDIUM);
+            }
+
+            // Tier 3: Both methods failed
+            statsBuilder.incrementFilesFailed();
+            String errorMsg = file.getFileName() + ": AST parsing failed, no fallback data extracted";
+            statsBuilder.addError("AST parsing failure", errorMsg);
+            return FileParseResult.failure("AST parsing failure", errorMsg);
+
+        } catch (IOException e) {
+            // File read error
+            statsBuilder.incrementFilesFailed();
+            String errorMsg = file.getFileName() + ": " + e.getMessage();
+            statsBuilder.addError("File read error", errorMsg);
+            return FileParseResult.failure("File read error", errorMsg);
+        } catch (Exception e) {
+            // Unexpected error
+            statsBuilder.incrementFilesFailed();
+            String errorMsg = file.getFileName() + ": " + e.getClass().getSimpleName() + " - " + e.getMessage();
+            statsBuilder.addError("Unexpected error", errorMsg);
+            log.warn("Unexpected error parsing file {}: {}", file, e.getMessage(), e);
+            return FileParseResult.failure("Unexpected error", errorMsg);
         }
     }
 

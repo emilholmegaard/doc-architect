@@ -5,6 +5,7 @@ import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.model.Dependency;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.ScannerTestBase;
 import org.junit.jupiter.api.Test;
 
@@ -285,7 +286,8 @@ class SpringComponentScannerTest extends ScannerTestBase {
             List.of(),
             List.of(),
             List.of(),
-            List.of()
+            List.of(),
+            ScanStatistics.empty()
         );
 
         return new ScanContext(
