@@ -9,8 +9,10 @@ com.docarchitect.core.scanner.impl.java.JaxRsApiScanner
 com.docarchitect.core.scanner.impl.java.JpaEntityScanner
 com.docarchitect.core.scanner.impl.java.MongoDbScanner
 com.docarchitect.core.scanner.impl.java.KafkaScanner
+com.docarchitect.core.scanner.impl.java.KafkaStreamsScanner
 com.docarchitect.core.scanner.impl.java.RabbitMQScanner
 com.docarchitect.core.scanner.impl.java.JavaHttpClientScanner
+com.docarchitect.core.scanner.impl.java.GrpcServiceScanner
 
 # Python Scanners
 com.docarchitect.core.scanner.impl.python.PipPoetryDependencyScanner
@@ -20,6 +22,7 @@ com.docarchitect.core.scanner.impl.python.FlaskScanner
 com.docarchitect.core.scanner.impl.python.SqlAlchemyScanner
 com.docarchitect.core.scanner.impl.python.DjangoOrmScanner
 com.docarchitect.core.scanner.impl.python.CeleryScanner
+com.docarchitect.core.scanner.impl.python.FaustScanner
 
 # .NET Scanners
 com.docarchitect.core.scanner.impl.dotnet.NuGetDependencyScanner
@@ -27,6 +30,8 @@ com.docarchitect.core.scanner.impl.dotnet.SolutionFileScanner
 com.docarchitect.core.scanner.impl.dotnet.AspNetCoreApiScanner
 com.docarchitect.core.scanner.impl.dotnet.EntityFrameworkScanner
 com.docarchitect.core.scanner.impl.dotnet.KafkaScanner
+com.docarchitect.core.scanner.impl.dotnet.StreamizKafkaScanner
+com.docarchitect.core.scanner.impl.dotnet.GrpcServiceScanner
 
 # JavaScript/Node.js Scanners
 com.docarchitect.core.scanner.impl.javascript.NpmDependencyScanner
@@ -36,6 +41,7 @@ com.docarchitect.core.scanner.impl.javascript.ExpressScanner
 com.docarchitect.core.scanner.impl.go.GoModScanner
 com.docarchitect.core.scanner.impl.go.GoHttpRouterScanner
 com.docarchitect.core.scanner.impl.go.GoStructScanner
+com.docarchitect.core.scanner.impl.go.GrpcServiceScanner
 
 # Ruby Scanners
 com.docarchitect.core.scanner.impl.ruby.BundlerDependencyScanner
