@@ -6,24 +6,35 @@ import com.docarchitect.core.model.Component;
 import com.docarchitect.core.model.ComponentType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
-import com.docarchitect.core.scanner.base.AbstractRegexScanner;
-import com.docarchitect.core.scanner.impl.ruby.util.RubyAstParser;
+import com.docarchitect.core.scanner.ScanStatistics;
+import com.docarchitect.core.scanner.ast.AstParserFactory;
+import com.docarchitect.core.scanner.ast.RubyAst;
+import com.docarchitect.core.scanner.base.AbstractAstScanner;
+import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.util.IdGenerator;
 import com.docarchitect.core.util.Technologies;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Scanner for Rails API endpoints in Ruby controller files.
  *
  * <p>This scanner extracts REST API endpoints from Rails controller classes
  * by parsing Ruby files using ANTLR-based AST parsing with regex fallback.
+ *
+ * <p><b>Three-Tier Parsing Strategy:</b></p>
+ * <ol>
+ *   <li><b>Tier 1 (HIGH confidence):</b> ANTLR-based AST parsing</li>
+ *   <li><b>Tier 2 (MEDIUM confidence):</b> Regex-based fallback parsing</li>
+ *   <li><b>Tier 3 (LOW confidence):</b> Graceful degradation with statistics</li>
+ * </ol>
  *
  * <p><b>Supported Patterns:</b></p>
  * <ul>
@@ -59,11 +70,11 @@ import java.util.Set;
  * end
  * }</pre>
  *
- * @see RubyAstParser
+ * @see AbstractAstScanner
  * @see ApiEndpoint
  * @since 1.0.0
  */
-public class RailsApiScanner extends AbstractRegexScanner {
+public class RailsApiScanner extends AbstractAstScanner<RubyAst.RubyClass> {
 
     private static final String SCANNER_ID = "rails-api";
     private static final String SCANNER_DISPLAY_NAME = "Rails API Scanner";
@@ -71,7 +82,6 @@ public class RailsApiScanner extends AbstractRegexScanner {
     private static final String PATTERN_ALL_RUBY = "**/*.rb";
 
     private static final String CONTROLLER_SUFFIX = "Controller";
-    private static final String CONTROLLER_FILE_SUFFIX = "_controller.rb";
 
     // RESTful action to HTTP method mapping
     private static final Map<String, String> ACTION_TO_HTTP_METHOD = Map.of(
@@ -94,6 +104,17 @@ public class RailsApiScanner extends AbstractRegexScanner {
         "update", "/:id",
         "destroy", "/:id"
     );
+
+    // Regex patterns for fallback parsing
+    private static final Pattern CLASS_PATTERN =
+        Pattern.compile("class\\s+(\\w+(?:::\\w+)*)\\s*<\\s*(\\w+(?:::\\w+)*)");
+
+    private static final Pattern METHOD_PATTERN =
+        Pattern.compile("def\\s+(\\w+)(?:\\s*\\(([^)]*)\\))?");
+
+    public RailsApiScanner() {
+        super(AstParserFactory.getRubyParser());
+    }
 
     @Override
     public String getId() {
@@ -128,30 +149,60 @@ public class RailsApiScanner extends AbstractRegexScanner {
     }
 
     @Override
+    protected boolean shouldScanFile(Path file) {
+        String fileName = file.getFileName().toString();
+        return fileName.endsWith("_controller.rb");
+    }
+
+    @Override
     public ScanResult scan(ScanContext context) {
         log.info("Scanning Rails API endpoints in: {}", context.rootPath());
 
         List<Component> components = new ArrayList<>();
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
+        Path rootPath = context.rootPath();
 
         // Find controller files
         List<Path> controllerFiles = context.findFiles(PATTERN_RUBY_CONTROLLERS).toList();
+        statsBuilder.filesDiscovered(controllerFiles.size());
 
         if (controllerFiles.isEmpty()) {
             log.debug("No Rails controller files found");
             return emptyResult();
         }
 
-        // Parse each controller
+        int skippedFiles = 0;
+
+        // Parse each controller with three-tier fallback
         for (Path controllerFile : controllerFiles) {
-            try {
-                parseController(controllerFile, context.rootPath(), components, apiEndpoints);
-            } catch (Exception e) {
-                log.warn("Failed to parse controller file: {} - {}", controllerFile, e.getMessage());
+            if (!shouldScanFile(controllerFile)) {
+                skippedFiles++;
+                continue;
+            }
+
+            statsBuilder.incrementFilesScanned();
+
+            // Use three-tier parsing with fallback
+            FileParseResult<ControllerData> result = parseWithFallback(
+                controllerFile,
+                classes -> extractControllerDataFromAST(classes, controllerFile, rootPath),
+                createFallbackStrategy(rootPath),
+                statsBuilder
+            );
+
+            if (result.isSuccess()) {
+                for (ControllerData data : result.getData()) {
+                    components.add(data.component);
+                    apiEndpoints.addAll(data.endpoints);
+                }
             }
         }
 
-        log.info("Found {} Rails components and {} API endpoints", components.size(), apiEndpoints.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Rails components and {} API endpoints (success rate: {:.1f}%, overall parse rate: {:.1f}%, skipped {} files)",
+                 components.size(), apiEndpoints.size(), statistics.getSuccessRate(),
+                 statistics.getOverallParseRate(), skippedFiles);
 
         return buildSuccessResult(
             components,
@@ -160,29 +211,30 @@ public class RailsApiScanner extends AbstractRegexScanner {
             List.of(),           // No message flows
             List.of(),           // No data entities
             List.of(),           // No relationships
-            List.of()            // No warnings
+            List.of(),           // No warnings
+            statistics
         );
     }
 
     /**
-     * Parse a Rails controller file and extract components and API endpoints.
+     * Extracts controller data from parsed AST classes.
+     * This is the Tier 1 (HIGH confidence) parsing strategy.
      *
-     * @param file controller file path
-     * @param rootPath project root path
-     * @param components output list for components
-     * @param apiEndpoints output list for API endpoints
+     * @param classes parsed Ruby classes
+     * @param file source file
+     * @param rootPath project root
+     * @return list of controller data
      */
-    private void parseController(
+    private List<ControllerData> extractControllerDataFromAST(
+        List<RubyAst.RubyClass> classes,
         Path file,
-        Path rootPath,
-        List<Component> components,
-        List<ApiEndpoint> apiEndpoints
-    ) throws IOException {
-        List<RubyAstParser.RubyClass> classes = RubyAstParser.parseFile(file);
+        Path rootPath
+    ) {
+        List<ControllerData> results = new ArrayList<>();
 
-        for (RubyAstParser.RubyClass rubyClass : classes) {
+        for (RubyAst.RubyClass rubyClass : classes) {
             // Only process controller classes
-            if (!rubyClass.name.endsWith(CONTROLLER_SUFFIX)) {
+            if (!rubyClass.name().endsWith(CONTROLLER_SUFFIX)) {
                 continue;
             }
 
@@ -192,26 +244,117 @@ public class RailsApiScanner extends AbstractRegexScanner {
 
             // Create component for this controller
             Component component = createControllerComponent(rubyClass, file, rootPath);
-            components.add(component);
 
             // Extract API endpoints from controller methods
-            String resourcePath = extractResourcePath(rubyClass.name);
+            String resourcePath = extractResourcePath(rubyClass.name());
+            List<ApiEndpoint> endpoints = new ArrayList<>();
 
-            for (RubyAstParser.RubyMethod method : rubyClass.methods) {
+            for (RubyAst.Method method : rubyClass.methods()) {
                 ApiEndpoint endpoint = createApiEndpoint(
-                    method,
+                    method.name(),
                     resourcePath,
-                    component.id(),
-                    file,
-                    rootPath
+                    component.id()
                 );
 
                 if (endpoint != null) {
-                    apiEndpoints.add(endpoint);
+                    endpoints.add(endpoint);
                     log.debug("Found Rails endpoint: {} {}", endpoint.method(), endpoint.path());
                 }
             }
+
+            results.add(new ControllerData(component, endpoints));
         }
+
+        return results;
+    }
+
+    /**
+     * Creates a regex-based fallback parsing strategy for when AST parsing fails.
+     * This is the Tier 2 (MEDIUM confidence) parsing strategy.
+     *
+     * @param rootPath project root path
+     * @return fallback parsing strategy
+     */
+    private FallbackParsingStrategy<ControllerData> createFallbackStrategy(Path rootPath) {
+        return (file, content) -> {
+            List<ControllerData> results = new ArrayList<>();
+
+            if (!content.contains("Controller")) {
+                return results;
+            }
+
+            // Extract class definition
+            Matcher classMatcher = CLASS_PATTERN.matcher(content);
+            if (!classMatcher.find()) {
+                return results;
+            }
+
+            String className = classMatcher.group(1);
+            String superclass = classMatcher.group(2);
+
+            // Only process controller classes
+            if (!className.endsWith(CONTROLLER_SUFFIX)) {
+                return results;
+            }
+
+            if (!superclass.contains("ApplicationController") &&
+                !superclass.contains("ActionController")) {
+                return results;
+            }
+
+            // Create component
+            String componentId = IdGenerator.generate(className);
+            String relativePath = rootPath.relativize(file).toString();
+
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("file", relativePath);
+            metadata.put("language", Technologies.RUBY);
+            metadata.put("framework", "Rails");
+            metadata.put("superclass", superclass);
+            metadata.put("parsing", "regex-fallback");
+
+            Component component = new Component(
+                componentId,
+                className,
+                ComponentType.SERVICE,
+                null,
+                Technologies.RUBY,
+                relativePath,
+                metadata
+            );
+
+            // Extract methods
+            String resourcePath = extractResourcePath(className);
+            List<ApiEndpoint> endpoints = new ArrayList<>();
+
+            Matcher methodMatcher = METHOD_PATTERN.matcher(content);
+            while (methodMatcher.find()) {
+                String methodName = methodMatcher.group(1);
+
+                // Skip private/protected markers and non-action methods
+                if (methodName.equals("private") || methodName.equals("protected") ||
+                    methodName.equals("public") || methodName.startsWith("_")) {
+                    continue;
+                }
+
+                ApiEndpoint endpoint = createApiEndpoint(
+                    methodName,
+                    resourcePath,
+                    componentId
+                );
+
+                if (endpoint != null) {
+                    endpoints.add(endpoint);
+                }
+            }
+
+            if (!endpoints.isEmpty()) {
+                results.add(new ControllerData(component, endpoints));
+                log.debug("Fallback parsing found {} endpoints in {}", endpoints.size(), file.getFileName());
+            }
+
+            return results;
+        };
     }
 
     /**
@@ -220,13 +363,14 @@ public class RailsApiScanner extends AbstractRegexScanner {
      * @param rubyClass parsed Ruby class
      * @return true if class inherits from ApplicationController or ActionController
      */
-    private boolean isRailsController(RubyAstParser.RubyClass rubyClass) {
-        if (rubyClass.superclass == null || rubyClass.superclass.isEmpty()) {
+    private boolean isRailsController(RubyAst.RubyClass rubyClass) {
+        String superclass = rubyClass.superclass();
+        if (superclass == null || superclass.isEmpty()) {
             return false;
         }
 
-        return rubyClass.superclass.contains("ApplicationController") ||
-               rubyClass.superclass.contains("ActionController");
+        return superclass.contains("ApplicationController") ||
+               superclass.contains("ActionController");
     }
 
     /**
@@ -238,27 +382,27 @@ public class RailsApiScanner extends AbstractRegexScanner {
      * @return Component instance
      */
     private Component createControllerComponent(
-        RubyAstParser.RubyClass rubyClass,
+        RubyAst.RubyClass rubyClass,
         Path file,
         Path rootPath
     ) {
-        String componentId = IdGenerator.generate(rubyClass.name);
+        String componentId = IdGenerator.generate(rubyClass.name());
         String relativePath = rootPath.relativize(file).toString();
 
         Map<String, String> metadata = new HashMap<>();
         metadata.put("file", relativePath);
         metadata.put("language", Technologies.RUBY);
         metadata.put("framework", "Rails");
-        metadata.put("superclass", rubyClass.superclass);
-        metadata.put("line", String.valueOf(rubyClass.lineNumber));
+        metadata.put("superclass", rubyClass.superclass());
+        metadata.put("line", String.valueOf(rubyClass.lineNumber()));
 
-        if (!rubyClass.beforeActions.isEmpty()) {
-            metadata.put("before_actions", String.join(", ", rubyClass.beforeActions));
+        if (!rubyClass.beforeActions().isEmpty()) {
+            metadata.put("before_actions", String.join(", ", rubyClass.beforeActions()));
         }
 
         return new Component(
             componentId,
-            rubyClass.name,
+            rubyClass.name(),
             ComponentType.SERVICE,
             null,  // description
             Technologies.RUBY,
@@ -309,27 +453,23 @@ public class RailsApiScanner extends AbstractRegexScanner {
     /**
      * Create an ApiEndpoint from a controller method.
      *
-     * @param method Ruby method definition
+     * @param methodName Ruby method name
      * @param resourcePath base resource path (e.g., "/users")
      * @param componentId owning component ID
-     * @param file source file
-     * @param rootPath project root
      * @return ApiEndpoint or null if not a valid endpoint
      */
     private ApiEndpoint createApiEndpoint(
-        RubyAstParser.RubyMethod method,
+        String methodName,
         String resourcePath,
-        String componentId,
-        Path file,
-        Path rootPath
+        String componentId
     ) {
-        String httpMethod = determineHttpMethod(method.name);
-        String pathSuffix = determinePathSuffix(method.name);
+        String httpMethod = determineHttpMethod(methodName);
+        String pathSuffix = determinePathSuffix(methodName);
 
         if (httpMethod == null) {
             // Not a recognized action - treat as custom endpoint with GET
             httpMethod = "GET";
-            pathSuffix = "/" + method.name;
+            pathSuffix = "/" + methodName;
         }
 
         String fullPath = resourcePath + pathSuffix;
@@ -364,5 +504,18 @@ public class RailsApiScanner extends AbstractRegexScanner {
      */
     private String determinePathSuffix(String actionName) {
         return ACTION_TO_PATH_SUFFIX.getOrDefault(actionName, "/" + actionName);
+    }
+
+    /**
+     * Container for controller parsing results.
+     */
+    private static class ControllerData {
+        final Component component;
+        final List<ApiEndpoint> endpoints;
+
+        ControllerData(Component component, List<ApiEndpoint> endpoints) {
+            this.component = component;
+            this.endpoints = endpoints;
+        }
     }
 }

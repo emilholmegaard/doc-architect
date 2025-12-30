@@ -4,13 +4,13 @@ import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScanStatistics;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
 import com.docarchitect.core.util.Technologies;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,14 +24,11 @@ import java.util.regex.Pattern;
  * <p>This scanner parses Rails routing DSL using regex patterns to extract REST API endpoint
  * information. Rails routes define the HTTP endpoints available in a Rails application.
  *
- * <p><b>Parsing Strategy:</b>
+ * <p><b>Three-Tier Parsing Strategy:</b></p>
  * <ol>
- *   <li>Locate config/routes.rb files using pattern matching</li>
- *   <li>Extract HTTP routes from Rails routing DSL patterns</li>
- *   <li>Handle resourceful routes (resources/resource) that generate multiple endpoints</li>
- *   <li>Handle namespace and scope blocks with path prefixes</li>
- *   <li>Handle custom route definitions (get, post, put, patch, delete)</li>
- *   <li>Create ApiEndpoint records for each discovered endpoint</li>
+ *   <li><b>Tier 1:</b> Not applicable (routes.rb uses DSL, not class-based structure)</li>
+ *   <li><b>Tier 2 (HIGH confidence):</b> Regex-based parsing with statistics tracking</li>
+ *   <li><b>Tier 3 (LOW confidence):</b> Graceful degradation with error tracking</li>
  * </ol>
  *
  * <p><b>Supported Patterns:</b>
@@ -217,24 +214,35 @@ public class RailsRouteScanner extends AbstractRegexScanner {
 
         List<ApiEndpoint> apiEndpoints = new ArrayList<>();
         Set<Path> routeFiles = new LinkedHashSet<>();
+        ScanStatistics.Builder statsBuilder = new ScanStatistics.Builder();
 
         ROUTES_FILE_PATTERNS.forEach(pattern -> context.findFiles(pattern).forEach(routeFiles::add));
+        statsBuilder.filesDiscovered(routeFiles.size());
 
         if (routeFiles.isEmpty()) {
             log.warn("No Rails route files found in project");
             return emptyResult();
         }
 
+        int successfulParsed = 0;
+        int failedParsed = 0;
+
         for (Path routeFile : routeFiles) {
+            statsBuilder.incrementFilesScanned();
             try {
                 parseRouteFile(routeFile, apiEndpoints);
+                successfulParsed++;
             } catch (Exception e) {
-                log.error("Failed to parse Rails route file: {}", routeFile, e);
+                log.warn("Failed to parse Rails route file: {} - {}", routeFile, e.getMessage());
+                failedParsed++;
                 // Continue processing other files instead of failing completely
             }
         }
 
-        log.info("Found {} Rails routes across {} route files", apiEndpoints.size(), routeFiles.size());
+        ScanStatistics statistics = statsBuilder.build();
+        log.info("Found {} Rails routes across {} route files (success rate: {:.1f}%, parsed {} successfully, {} failed)",
+                 apiEndpoints.size(), routeFiles.size(), statistics.getSuccessRate(),
+                 successfulParsed, failedParsed);
 
         return buildSuccessResult(
             List.of(), // No components
@@ -243,7 +251,8 @@ public class RailsRouteScanner extends AbstractRegexScanner {
             List.of(), // No message flows
             List.of(), // No data entities
             List.of(), // No relationships
-            List.of()  // No warnings
+            List.of(), // No warnings
+            statistics
         );
     }
 
