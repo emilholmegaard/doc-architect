@@ -88,7 +88,7 @@ class SokratesGeneratorTest {
     void generate_withEmptyModel_generatesValidJson() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -110,7 +110,7 @@ class SokratesGeneratorTest {
     void generate_withUnknownVersion_omitsVersionField() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "unknown", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -124,7 +124,7 @@ class SokratesGeneratorTest {
     void generate_withNoComponents_createsDefaultComponent() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -144,7 +144,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -163,7 +163,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -182,7 +182,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -201,7 +201,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -225,7 +225,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service, library), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -248,7 +248,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -268,7 +268,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(database), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -288,7 +288,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(gateway), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -308,7 +308,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -383,7 +383,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -403,7 +403,7 @@ class SokratesGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -433,7 +433,7 @@ class SokratesGeneratorTest {
     private ArchitectureModel createSimpleModel() {
         return new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
     }
 }

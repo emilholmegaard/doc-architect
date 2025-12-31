@@ -95,7 +95,7 @@ class MermaidGeneratorTest {
     void generate_c4Context_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_CONTEXT, config);
@@ -121,7 +121,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(rel), List.of(), List.of(), List.of()
+            List.of(rel), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_CONTEXT, config);
@@ -141,7 +141,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_CONTAINER, config);
@@ -162,7 +162,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -177,7 +177,7 @@ class MermaidGeneratorTest {
     void generate_dependencyGraph_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.DEPENDENCY_GRAPH, config);
@@ -201,7 +201,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(dep),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.DEPENDENCY_GRAPH, config);
@@ -217,7 +217,7 @@ class MermaidGeneratorTest {
     void generate_erDiagram_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.ER_DIAGRAM, config);
@@ -239,7 +239,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of(entity)
+            List.of(), List.of(), List.of(), List.of(entity), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.ER_DIAGRAM, config);
@@ -270,7 +270,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of(entity)
+            List.of(), List.of(), List.of(), List.of(entity), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.ER_DIAGRAM, config);
@@ -304,7 +304,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of(entity)
+            List.of(), List.of(), List.of(), List.of(entity), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.ER_DIAGRAM, config);
@@ -324,7 +324,7 @@ class MermaidGeneratorTest {
     void generate_messageFlow_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.MESSAGE_FLOW, config);
@@ -353,7 +353,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(publisher, subscriber), List.of(),
-            List.of(), List.of(), List.of(flow), List.of()
+            List.of(), List.of(), List.of(flow), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.MESSAGE_FLOW, config);
@@ -369,7 +369,7 @@ class MermaidGeneratorTest {
     void generate_sequence_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.SEQUENCE, config);
@@ -393,7 +393,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(endpoint), List.of(), List.of()
+            List.of(), List.of(endpoint), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.SEQUENCE, config);
@@ -414,7 +414,7 @@ class MermaidGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_CONTEXT, config);
@@ -432,7 +432,7 @@ class MermaidGeneratorTest {
     private ArchitectureModel createSimpleModel() {
         return new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
     }
 }

@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import com.docarchitect.core.model.MessageFlow;
+import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScannerTestBase;
 import com.docarchitect.core.util.Technologies;
@@ -46,9 +48,29 @@ class CeleryScannerTest extends ScannerTestBase {
 
     @Test
     void appliesTo_withPythonFiles_returnsTrue() throws IOException {
+        // Given: Project with Python files and Celery dependency
         createFile("app/test.py", "# test");
 
-        assertThat(scanner.appliesTo(context)).isTrue();
+        // Create mock dependency scan result with Celery
+        ScanResult depResult = new ScanResult(
+            "pip-dependencies",
+            true,
+            List.of(),  // components
+            List.of(new com.docarchitect.core.model.Dependency("test-component", "celery", "celery", "5.3.0", "runtime", true)),  // dependencies
+            List.of(),  // apiEndpoints
+            List.of(),  // messageFlows
+            List.of(),  // dataEntities
+            List.of(),  // relationships
+            List.of(),  // warnings
+            List.of(),  // errors
+            com.docarchitect.core.scanner.ScanStatistics.empty()  // statistics
+        );
+
+        Map<String, ScanResult> previousResults = Map.of("pip-dependencies", depResult);
+        ScanContext contextWithDeps = new ScanContext(tempDir, List.of(tempDir), Map.of(), Map.of(), previousResults);
+
+        // When/Then: appliesTo should return true
+        assertThat(scanner.appliesTo(contextWithDeps)).isTrue();
     }
 
     @Test

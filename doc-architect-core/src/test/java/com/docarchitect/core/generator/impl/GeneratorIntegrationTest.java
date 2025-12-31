@@ -349,7 +349,9 @@ class GeneratorIntegrationTest {
             relationships,
             apiEndpoints,
             messageFlows,
-            dataEntities
+            dataEntities,
+            null,
+            null
         );
     }
 

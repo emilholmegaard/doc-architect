@@ -11,8 +11,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.MessageFlow;
+import com.docarchitect.core.scanner.ApplicabilityStrategies;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScannerApplicabilityStrategy;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
 import com.docarchitect.core.util.Technologies;
 
@@ -159,8 +161,8 @@ public class CeleryScanner extends AbstractRegexScanner {
     }
 
     @Override
-    public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, PATTERN_PYTHON_FILES);
+    public ScannerApplicabilityStrategy getApplicabilityStrategy() {
+        return ApplicabilityStrategies.hasPythonFiles().and(ApplicabilityStrategies.hasCelery());
     }
 
     @Override

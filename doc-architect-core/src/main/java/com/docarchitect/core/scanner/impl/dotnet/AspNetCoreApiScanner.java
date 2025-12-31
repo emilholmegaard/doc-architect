@@ -2,9 +2,11 @@ package com.docarchitect.core.scanner.impl.dotnet;
 
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
+import com.docarchitect.core.scanner.ApplicabilityStrategies;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScanStatistics;
+import com.docarchitect.core.scanner.ScannerApplicabilityStrategy;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.DotNetAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
@@ -259,8 +261,8 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
     }
 
     @Override
-    public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, CONTROLLER_FILE_PATTERN, CS_FILE_PATTERN, CS_FILE_PATTERN_ROOT);
+    public ScannerApplicabilityStrategy getApplicabilityStrategy() {
+        return ApplicabilityStrategies.hasCSharpFiles().and(ApplicabilityStrategies.hasAspNetCore());
     }
 
     /**

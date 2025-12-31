@@ -3,12 +3,15 @@ package com.docarchitect.core.scanner.impl.java;
 import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
+import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScannerTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -301,11 +304,29 @@ class JpaEntityScannerTest extends ScannerTestBase {
 
     @Test
     void appliesTo_withJavaFiles_returnsTrue() throws IOException {
-        // Given: Project with Java files
+        // Given: Project with Java files and JPA dependency
         createFile("src/main/java/com/example/Test.java", "public class Test {}");
 
+        // Create mock dependency scan result with JPA/Hibernate
+        ScanResult depResult = new ScanResult(
+            "maven-dependencies",
+            true,
+            List.of(),  // components
+            List.of(new com.docarchitect.core.model.Dependency("test-component", "org.hibernate", "hibernate-core", "6.0.0", "compile", true)),  // dependencies
+            List.of(),  // apiEndpoints
+            List.of(),  // messageFlows
+            List.of(),  // dataEntities
+            List.of(),  // relationships
+            List.of(),  // warnings
+            List.of(),  // errors
+            com.docarchitect.core.scanner.ScanStatistics.empty()  // statistics
+        );
+
+        Map<String, ScanResult> previousResults = Map.of("maven-dependencies", depResult);
+        ScanContext contextWithDeps = new ScanContext(tempDir, List.of(tempDir), Map.of(), Map.of(), previousResults);
+
         // When: appliesTo is checked
-        boolean applies = scanner.appliesTo(context);
+        boolean applies = scanner.appliesTo(contextWithDeps);
 
         // Then: Should return true
         assertThat(applies).isTrue();

@@ -3,9 +3,11 @@ package com.docarchitect.core.scanner.impl.dotnet;
 import com.docarchitect.core.model.DataEntity;
 import com.docarchitect.core.model.Relationship;
 import com.docarchitect.core.model.RelationshipType;
+import com.docarchitect.core.scanner.ApplicabilityStrategies;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScanStatistics;
+import com.docarchitect.core.scanner.ScannerApplicabilityStrategy;
 import com.docarchitect.core.scanner.ast.AstParserFactory;
 import com.docarchitect.core.scanner.ast.DotNetAst;
 import com.docarchitect.core.scanner.base.AbstractAstScanner;
@@ -166,8 +168,8 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
     }
 
     @Override
-    public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, DBCONTEXT_FILE_PATTERN, CS_FILE_PATTERN);
+    public ScannerApplicabilityStrategy getApplicabilityStrategy() {
+        return ApplicabilityStrategies.hasCSharpFiles().and(ApplicabilityStrategies.hasEntityFramework());
     }
 
     @Override
