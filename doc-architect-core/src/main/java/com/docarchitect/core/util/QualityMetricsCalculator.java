@@ -37,7 +37,8 @@ public final class QualityMetricsCalculator {
         // Calculate file statistics
         int totalFilesInProject = estimateTotalFiles(context);
         int filesAnalyzed = calculateFilesAnalyzed(scanResults);
-        int filesSkipped = totalFilesInProject - filesAnalyzed;
+        // Ensure filesSkipped is non-negative (analyzedfiles can exceed total due to scanner overlap)
+        int filesSkipped = Math.max(0, totalFilesInProject - filesAnalyzed);
 
         // Calculate coverage by component
         Map<String, ArchitectureComponentMetrics> coverageByComponent =
