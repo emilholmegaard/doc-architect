@@ -37,9 +37,9 @@ repositories:
 
 scanners:
   enabled:
-    - python-dependencies
-    - python-kafka-messaging
-    - python-components
+    - pip-poetry-dependencies
+    - faust-streaming
+    - django-apps
 
 generators:
   default: mermaid

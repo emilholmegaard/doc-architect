@@ -38,7 +38,8 @@ repositories:
 scanners:
   enabled:
     - nuget-dependencies
-    - dotnet-components
+    - dotnet-solution
+    - streamiz-kafka
     - dotnet-kafka-messaging
 
 generators:
