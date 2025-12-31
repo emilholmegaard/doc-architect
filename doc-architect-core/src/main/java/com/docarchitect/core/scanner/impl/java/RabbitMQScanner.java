@@ -9,9 +9,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import com.docarchitect.core.model.MessageFlow;
+import com.docarchitect.core.scanner.ApplicabilityStrategies;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScanStatistics;
+import com.docarchitect.core.scanner.ScannerApplicabilityStrategy;
 import com.docarchitect.core.scanner.base.AbstractJavaParserScanner;
 import com.docarchitect.core.scanner.base.FallbackParsingStrategy;
 import com.docarchitect.core.scanner.base.RegexPatterns;
@@ -94,8 +96,8 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
     }
 
     @Override
-    public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, FILE_PATTERN);
+    public ScannerApplicabilityStrategy getApplicabilityStrategy() {
+        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasRabbitMQ());
     }
 
     /**

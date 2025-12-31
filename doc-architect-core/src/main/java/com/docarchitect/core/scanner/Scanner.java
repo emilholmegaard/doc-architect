@@ -73,10 +73,41 @@ public interface Scanner {
     int getPriority();
 
     /**
+     * Get the applicability strategy for this scanner.
+     *
+     * <p>The strategy determines whether this scanner should run on a given project.
+     * Scanners should override this method to provide a declarative strategy
+     * using {@link ApplicabilityStrategies}.</p>
+     *
+     * <p><b>Example:</b></p>
+     * <pre>{@code
+     * @Override
+     * public ScannerApplicabilityStrategy getApplicabilityStrategy() {
+     *     return ApplicabilityStrategies.hasJavaFiles()
+     *         .and(ApplicabilityStrategies.hasSpringFramework());
+     * }
+     * }</pre>
+     *
+     * <p>The default implementation returns {@code null}, which means the scanner
+     * relies on its own {@link #appliesTo(ScanContext)} implementation.</p>
+     *
+     * @return the applicability strategy, or {@code null} to use appliesTo() instead
+     * @see ApplicabilityStrategies
+     * @since 1.0.0
+     */
+    default ScannerApplicabilityStrategy getApplicabilityStrategy() {
+        // Default: no strategy, use appliesTo() implementation
+        return null;
+    }
+
+    /**
      * Checks if this scanner should run for the given context.
      *
      * <p>This method is called before {@link #scan(ScanContext)} to determine if the
      * scanner is applicable. Use this to check for required files or previous scan results.
+     *
+     * <p><b>Note:</b> New scanners should override {@link #getApplicabilityStrategy()}
+     * instead of this method for better composability and reusability.</p>
      *
      * @param context scan context containing project information
      * @return true if scanner should execute, false otherwise

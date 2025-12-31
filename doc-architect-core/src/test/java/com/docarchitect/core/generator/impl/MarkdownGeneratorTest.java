@@ -91,7 +91,7 @@ class MarkdownGeneratorTest {
     void generateIndex_withEmptyModel_generatesBasicIndex() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         String index = generator.generateIndex(model);
@@ -128,7 +128,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(dep),
-            List.of(), List.of(endpoint), List.of(flow), List.of(entity)
+            List.of(), List.of(endpoint), List.of(flow), List.of(entity), null, null
         );
 
         String index = generator.generateIndex(model);
@@ -150,7 +150,7 @@ class MarkdownGeneratorTest {
     void generate_apiCatalog_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.API_CATALOG, config);
@@ -181,7 +181,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(endpoint1, endpoint2), List.of(), List.of()
+            List.of(), List.of(endpoint1, endpoint2), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.API_CATALOG, config);
@@ -201,7 +201,7 @@ class MarkdownGeneratorTest {
     void generate_dependencyMatrix_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.DEPENDENCY_GRAPH, config);
@@ -229,7 +229,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(dep1, dep2),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.DEPENDENCY_GRAPH, config);
@@ -249,7 +249,7 @@ class MarkdownGeneratorTest {
     void generate_componentCatalog_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -279,7 +279,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service1, service2, database), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -302,7 +302,7 @@ class MarkdownGeneratorTest {
     void generateDataCatalog_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         String catalog = generator.generateDataCatalog(model);
@@ -329,7 +329,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of(entity)
+            List.of(), List.of(), List.of(), List.of(entity), null, null
         );
 
         String catalog = generator.generateDataCatalog(model);
@@ -351,7 +351,7 @@ class MarkdownGeneratorTest {
     void generateMessageFlowCatalog_withEmptyModel_generatesPlaceholder() {
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         String catalog = generator.generateMessageFlowCatalog(model);
@@ -383,7 +383,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(publisher, subscriber), List.of(),
-            List.of(), List.of(), List.of(flow1, flow2), List.of()
+            List.of(), List.of(), List.of(flow1, flow2), List.of(), null, null
         );
 
         String catalog = generator.generateMessageFlowCatalog(model);
@@ -406,7 +406,7 @@ class MarkdownGeneratorTest {
 
         ArchitectureModel model = new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(service), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
 
         GeneratedDiagram diagram = generator.generate(model, DiagramType.C4_COMPONENT, config);
@@ -422,7 +422,7 @@ class MarkdownGeneratorTest {
     private ArchitectureModel createSimpleModel() {
         return new ArchitectureModel(
             "TestProject", "1.0", List.of(), List.of(), List.of(),
-            List.of(), List.of(), List.of(), List.of()
+            List.of(), List.of(), List.of(), List.of(), null, null
         );
     }
 }

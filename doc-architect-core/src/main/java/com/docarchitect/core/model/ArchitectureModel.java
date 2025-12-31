@@ -1,6 +1,9 @@
 package com.docarchitect.core.model;
 
+import com.docarchitect.core.scanner.ScanStatistics;
+
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -19,6 +22,8 @@ import java.util.Objects;
  * @param apiEndpoints API endpoints exposed by components
  * @param messageFlows message flows between components
  * @param dataEntities data entities (tables, collections, etc.)
+ * @param qualityReport overall scan quality metrics
+ * @param scannerStatistics per-scanner execution statistics
  */
 public record ArchitectureModel(
     String projectName,
@@ -29,7 +34,9 @@ public record ArchitectureModel(
     List<Relationship> relationships,
     List<ApiEndpoint> apiEndpoints,
     List<MessageFlow> messageFlows,
-    List<DataEntity> dataEntities
+    List<DataEntity> dataEntities,
+    ScanQualityReport qualityReport,
+    Map<String, ScanStatistics> scannerStatistics
 ) {
     /**
      * Compact constructor with validation.
@@ -60,5 +67,6 @@ public record ArchitectureModel(
         if (dataEntities == null) {
             dataEntities = List.of();
         }
+        // qualityReport and scannerStatistics can be null for backward compatibility
     }
 }

@@ -10,8 +10,10 @@ import java.util.regex.Pattern;
 
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
+import com.docarchitect.core.scanner.ApplicabilityStrategies;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
+import com.docarchitect.core.scanner.ScannerApplicabilityStrategy;
 import com.docarchitect.core.scanner.base.AbstractRegexScanner;
 import com.docarchitect.core.util.Technologies;
 
@@ -155,8 +157,8 @@ public class FlaskScanner extends AbstractRegexScanner {
     }
 
     @Override
-    public boolean appliesTo(ScanContext context) {
-        return hasAnyFiles(context, PYTHON_FILE_PATTERN);
+    public ScannerApplicabilityStrategy getApplicabilityStrategy() {
+        return ApplicabilityStrategies.hasPythonFiles().and(ApplicabilityStrategies.hasFlask());
     }
 
     @Override

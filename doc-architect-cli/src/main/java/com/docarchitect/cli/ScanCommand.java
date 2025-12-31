@@ -108,7 +108,8 @@ public class ScanCommand implements Callable<Integer> {
             System.out.println("✓ Executed " + scanResults.size() + " scanners");
 
             // Step 3: Aggregate results into ArchitectureModel
-            ArchitectureModel model = aggregateResults(scanResults);
+            ScanContext finalContext = createScanContext(scanResults);
+            ArchitectureModel model = aggregateResults(scanResults, finalContext);
             printModelSummary(model);
 
             if (dryRun) {
@@ -186,6 +187,13 @@ public class ScanCommand implements Callable<Integer> {
     /**
      * Executes scanners that are enabled and apply to the project.
      *
+     * <p>Supports three scanner selection modes:</p>
+     * <ul>
+     *   <li><b>AUTO</b> - All scanners run, self-filtering via applicability strategies (zero config)</li>
+     *   <li><b>GROUPS</b> - Filter by technology groups, then self-filter via applicability</li>
+     *   <li><b>EXPLICIT</b> - Explicitly list scanner IDs (legacy mode)</li>
+     * </ul>
+     *
      * @param scanners discovered scanners
      * @param config project configuration
      * @return scan results by scanner ID
@@ -193,24 +201,36 @@ public class ScanCommand implements Callable<Integer> {
     private Map<String, ScanResult> executeScanners(List<Scanner> scanners, ProjectConfig config) {
         log.debug("Executing scanners on project: {}", projectPath);
 
-        // Validate config and warn about unknown scanner IDs
-        validateScannerConfig(scanners, config);
+        // Determine scanner selection mode
+        ProjectConfig.ScannerMode mode = config.scanners() != null
+            ? config.scanners().getEffectiveMode()
+            : ProjectConfig.ScannerMode.AUTO;
+
+        log.info("Scanner selection mode: {}", mode);
+        System.out.println("Scanner mode: " + mode);
+
+        // Validate config and warn about unknown scanner IDs (EXPLICIT mode only)
+        if (mode == ProjectConfig.ScannerMode.EXPLICIT) {
+            validateScannerConfig(scanners, config);
+        }
 
         Map<String, ScanResult> results = new LinkedHashMap<>();
         ScanContext context = createScanContext(results);
 
-        int skippedCount = 0;
+        int disabledByConfigCount = 0;
         int notApplicableCount = 0;
 
         for (Scanner scanner : scanners) {
             try {
-                // Check if scanner is enabled in config
-                if (config.scanners() != null && !config.scanners().isEnabled(scanner.getId())) {
-                    log.debug("Scanner {} is disabled in configuration", scanner.getId());
-                    skippedCount++;
+                // Step 1: Check if scanner passes mode-based filtering
+                boolean enabledByMode = isScannerEnabledByMode(scanner.getId(), mode, config);
+                if (!enabledByMode) {
+                    log.debug("Scanner {} disabled by {} mode", scanner.getId(), mode);
+                    disabledByConfigCount++;
                     continue;
                 }
 
+                // Step 2: Check if scanner applies to this project (applicability strategy)
                 if (scanner.appliesTo(context)) {
                     log.info("Running scanner: {} ({})", scanner.getDisplayName(), scanner.getId());
                     System.out.println("  → " + scanner.getDisplayName());
@@ -227,7 +247,7 @@ public class ScanCommand implements Callable<Integer> {
                             result.dataEntities().size());
                     }
                 } else {
-                    log.debug("Scanner {} does not apply to this project", scanner.getId());
+                    log.debug("Scanner {} does not apply to this project (applicability check)", scanner.getId());
                     notApplicableCount++;
                 }
             } catch (Exception e) {
@@ -236,16 +256,20 @@ public class ScanCommand implements Callable<Integer> {
             }
         }
 
-        log.debug("Scanner execution summary: {} executed, {} disabled, {} not applicable",
-            results.size(), skippedCount, notApplicableCount);
+        log.info("Scanner execution summary: {} executed, {} disabled by config, {} not applicable",
+            results.size(), disabledByConfigCount, notApplicableCount);
 
         // Warn if no scanners executed
         if (results.isEmpty()) {
             System.err.println();
             System.err.println("⚠ WARNING: 0 scanners executed!");
             System.err.println("  Possible causes:");
-            System.err.println("  - Scanner IDs in config don't match available scanners");
-            System.err.println("  - No files match scanner patterns");
+            if (mode == ProjectConfig.ScannerMode.EXPLICIT) {
+                System.err.println("  - Scanner IDs in config don't match available scanners");
+            } else if (mode == ProjectConfig.ScannerMode.GROUPS) {
+                System.err.println("  - No scanners match the configured groups");
+            }
+            System.err.println("  - No files match scanner patterns (applicability check)");
             System.err.println("  - All scanners failed");
             System.err.println();
             System.err.println("  Available scanner IDs:");
@@ -254,6 +278,36 @@ public class ScanCommand implements Callable<Integer> {
         }
 
         return results;
+    }
+
+    /**
+     * Checks if a scanner is enabled based on the current mode.
+     *
+     * @param scannerId scanner ID to check
+     * @param mode scanner selection mode
+     * @param config project configuration
+     * @return true if scanner passes mode-based filtering
+     */
+    private boolean isScannerEnabledByMode(String scannerId, ProjectConfig.ScannerMode mode, ProjectConfig config) {
+        return switch (mode) {
+            case AUTO -> true;  // All scanners enabled, self-filter via applicability
+
+            case GROUPS -> {
+                // Check if scanner is in any of the configured groups
+                List<String> groups = config.scanners() != null && config.scanners().groups() != null
+                    ? config.scanners().groups()
+                    : List.of();
+                yield groups.isEmpty() || com.docarchitect.core.config.ScannerGroups.isInGroups(scannerId, groups);
+            }
+
+            case EXPLICIT -> {
+                // Check if scanner is in the enabled list (backward compatible)
+                if (config.scanners() == null) {
+                    yield true;  // No config = all enabled
+                }
+                yield config.scanners().isEnabled(scannerId);
+            }
+        };
     }
 
     /**
@@ -303,7 +357,7 @@ public class ScanCommand implements Callable<Integer> {
     /**
      * Aggregates all scan results into a unified ArchitectureModel.
      */
-    private ArchitectureModel aggregateResults(Map<String, ScanResult> scanResults) {
+    private ArchitectureModel aggregateResults(Map<String, ScanResult> scanResults, ScanContext context) {
         log.debug("Aggregating scan results into ArchitectureModel");
 
         List<Component> allComponents = new ArrayList<>();
@@ -332,6 +386,18 @@ public class ScanCommand implements Callable<Integer> {
         allDataEntities = deduplicateByKey(allDataEntities, e -> e.componentId() + ":" + e.name());
         allRelationships = deduplicateByKey(allRelationships, r -> r.sourceId() + ":" + r.targetId() + ":" + r.type());
 
+        // Calculate quality metrics
+        com.docarchitect.core.model.ScanQualityReport qualityReport =
+            com.docarchitect.core.util.QualityMetricsCalculator.calculateQualityReport(scanResults, context);
+
+        // Collect per-scanner statistics
+        Map<String, com.docarchitect.core.scanner.ScanStatistics> scannerStats = scanResults.entrySet().stream()
+            .filter(e -> e.getValue().statistics() != null)
+            .collect(java.util.stream.Collectors.toMap(
+                Map.Entry::getKey,
+                e -> e.getValue().statistics()
+            ));
+
         return new ArchitectureModel(
             projectPath.getFileName() != null ? projectPath.getFileName().toString() : "project",
             "1.0.0",
@@ -341,7 +407,9 @@ public class ScanCommand implements Callable<Integer> {
             allRelationships,
             allApiEndpoints,
             allMessageFlows,
-            allDataEntities
+            allDataEntities,
+            qualityReport,
+            scannerStats
         );
     }
 
@@ -438,12 +506,105 @@ public class ScanCommand implements Callable<Integer> {
     }
 
     /**
-     * Generates index.md content.
+     * Appends quality metrics section to the markdown content.
+     */
+    private void appendQualityMetrics(StringBuilder sb, ArchitectureModel model) {
+        var report = model.qualityReport();
+
+        sb.append("## 📊 Scan Quality Report\n\n");
+
+        // Overall coverage
+        sb.append("### Overall Coverage\n\n");
+        sb.append(String.format("- ✅ **%d / %d files analyzed** (%.1f%%)\n",
+            report.filesAnalyzed(),
+            report.totalFilesInProject(),
+            report.getCoveragePercentage()));
+
+        if (report.filesSkipped() > 0) {
+            sb.append(String.format("- ⚠️  **%d files skipped** (%.1f%%)\n",
+                report.filesSkipped(),
+                (double) report.filesSkipped() / report.totalFilesInProject() * 100));
+        }
+        sb.append("\n");
+
+        // Coverage by component
+        if (!report.coverageByComponent().isEmpty()) {
+            sb.append("### Coverage by Architecture Component\n\n");
+            sb.append("| Component | Expected | Scanned | Coverage |\n");
+            sb.append("|-----------|----------|---------|----------|\n");
+
+            report.coverageByComponent().forEach((type, metrics) -> {
+                String status = metrics.isHighCoverage() ? "✅" :
+                               (metrics.isLowCoverage() ? "⚠️" : "");
+                sb.append(String.format("| %s | %d | %d | %.0f%% %s |\n",
+                    metrics.componentType(),
+                    metrics.expectedFiles(),
+                    metrics.scannedFiles(),
+                    metrics.coveragePercentage(),
+                    status));
+            });
+            sb.append("\n");
+        }
+
+        // Confidence levels
+        if (report.getTotalFindings() > 0) {
+            sb.append("### Confidence Levels\n\n");
+            int total = report.getTotalFindings();
+
+            if (report.getHighConfidenceFindings() > 0) {
+                double pct = (double) report.getHighConfidenceFindings() / total * 100;
+                sb.append(String.format("- **HIGH (AST-based):** %d findings (%.0f%%)\n",
+                    report.getHighConfidenceFindings(), pct));
+            }
+            if (report.getMediumConfidenceFindings() > 0) {
+                double pct = (double) report.getMediumConfidenceFindings() / total * 100;
+                sb.append(String.format("- **MEDIUM (Regex-based):** %d findings (%.0f%%)\n",
+                    report.getMediumConfidenceFindings(), pct));
+            }
+            if (report.getLowConfidenceFindings() > 0) {
+                double pct = (double) report.getLowConfidenceFindings() / total * 100;
+                sb.append(String.format("- **LOW (Heuristic):** %d findings (%.0f%%)\n",
+                    report.getLowConfidenceFindings(), pct));
+            }
+            sb.append("\n");
+        }
+
+        // Quality gaps
+        if (report.hasGaps()) {
+            sb.append("### ⚠️ Known Gaps\n\n");
+
+            var errors = report.getGapsBySeverity(com.docarchitect.core.model.GapSeverity.ERROR);
+            var warnings = report.getGapsBySeverity(com.docarchitect.core.model.GapSeverity.WARNING);
+            var infos = report.getGapsBySeverity(com.docarchitect.core.model.GapSeverity.INFO);
+
+            if (!errors.isEmpty()) {
+                errors.forEach(gap ->
+                    sb.append(String.format("- ❌ **%s:** %s\n", gap.scannerId(), gap.message())));
+            }
+            if (!warnings.isEmpty()) {
+                warnings.forEach(gap ->
+                    sb.append(String.format("- ⚠️  **%s:** %s\n", gap.scannerId(), gap.message())));
+            }
+            if (!infos.isEmpty()) {
+                infos.forEach(gap ->
+                    sb.append(String.format("- ℹ️  **%s:** %s\n", gap.scannerId(), gap.message())));
+            }
+            sb.append("\n");
+        }
+    }
+
+    /**
+     * Generates index.md content with quality metrics.
      */
     private String generateIndexContent(ArchitectureModel model) {
         StringBuilder sb = new StringBuilder();
         sb.append("# ").append(model.projectName()).append(" - Architecture Documentation\n\n");
         sb.append("**Version:** ").append(model.projectVersion()).append("\n\n");
+
+        // Add quality metrics section if available
+        if (model.qualityReport() != null) {
+            appendQualityMetrics(sb, model);
+        }
 
         sb.append("## Overview\n\n");
         sb.append("This documentation was automatically generated by DocArchitect.\n\n");

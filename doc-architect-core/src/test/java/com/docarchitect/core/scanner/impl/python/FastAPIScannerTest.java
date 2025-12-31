@@ -2,12 +2,15 @@ package com.docarchitect.core.scanner.impl.python;
 
 import com.docarchitect.core.model.ApiEndpoint;
 import com.docarchitect.core.model.ApiType;
+import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScannerTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
@@ -243,11 +246,29 @@ class FastAPIScannerTest extends ScannerTestBase {
 
     @Test
     void appliesTo_withPythonFiles_returnsTrue() throws IOException {
-        // Given: Project with Python files
+        // Given: Project with Python files and FastAPI dependency
         createFile("app/test.py", "print('hello')");
 
+        // Create mock dependency scan result with FastAPI
+        ScanResult depResult = new ScanResult(
+            "pip-dependencies",
+            true,
+            List.of(),  // components
+            List.of(new com.docarchitect.core.model.Dependency("test-component", "fastapi", "fastapi", "0.100.0", "runtime", true)),  // dependencies
+            List.of(),  // apiEndpoints
+            List.of(),  // messageFlows
+            List.of(),  // dataEntities
+            List.of(),  // relationships
+            List.of(),  // warnings
+            List.of(),  // errors
+            com.docarchitect.core.scanner.ScanStatistics.empty()  // statistics
+        );
+
+        Map<String, ScanResult> previousResults = Map.of("pip-dependencies", depResult);
+        ScanContext contextWithDeps = new ScanContext(tempDir, List.of(tempDir), Map.of(), Map.of(), previousResults);
+
         // When: appliesTo is checked
-        boolean applies = scanner.appliesTo(context);
+        boolean applies = scanner.appliesTo(contextWithDeps);
 
         // Then: Should return true
         assertThat(applies).isTrue();

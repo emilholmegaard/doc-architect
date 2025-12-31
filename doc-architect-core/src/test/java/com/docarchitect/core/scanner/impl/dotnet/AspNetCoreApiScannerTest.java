@@ -1,12 +1,15 @@
 package com.docarchitect.core.scanner.impl.dotnet;
 
 import com.docarchitect.core.model.ApiEndpoint;
+import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScannerTestBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -104,11 +107,29 @@ public class ProductController
 
     @Test
     void appliesTo_withCSharpFiles_returnsTrue() throws IOException {
-        // Given: Project with C# files
+        // Given: Project with C# files and ASP.NET Core dependency
         createFile("Controllers/Test.cs", "public class Test { }");
 
+        // Create mock dependency scan result with ASP.NET Core
+        ScanResult depResult = new ScanResult(
+            "nuget-dependencies",
+            true,
+            List.of(),  // components
+            List.of(new com.docarchitect.core.model.Dependency("test-component", "Microsoft.AspNetCore", "Microsoft.AspNetCore.Mvc", "8.0.0", "compile", true)),  // dependencies
+            List.of(),  // apiEndpoints
+            List.of(),  // messageFlows
+            List.of(),  // dataEntities
+            List.of(),  // relationships
+            List.of(),  // warnings
+            List.of(),  // errors
+            com.docarchitect.core.scanner.ScanStatistics.empty()  // statistics
+        );
+
+        Map<String, ScanResult> previousResults = Map.of("nuget-dependencies", depResult);
+        ScanContext contextWithDeps = new ScanContext(tempDir, List.of(tempDir), Map.of(), Map.of(), previousResults);
+
         // When: appliesTo is checked
-        boolean applies = scanner.appliesTo(context);
+        boolean applies = scanner.appliesTo(contextWithDeps);
 
         // Then: Should return true
         assertThat(applies).isTrue();

@@ -4,6 +4,7 @@ import com.docarchitect.core.scanner.Scanner;
 import com.docarchitect.core.scanner.ScanContext;
 import com.docarchitect.core.scanner.ScanResult;
 import com.docarchitect.core.scanner.ScanStatistics;
+import com.docarchitect.core.scanner.ScannerApplicabilityStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,7 +77,26 @@ public abstract class AbstractScanner implements Scanner {
         return Files.readAllLines(file);
     }
 
-    // ==================== appliesTo() Helper ====================
+    // ==================== Applicability ====================
+
+    /**
+     * Default implementation of appliesTo() that delegates to the applicability strategy.
+     *
+     * <p>Scanners that override {@link #getApplicabilityStrategy()} will automatically
+     * benefit from this implementation.</p>
+     *
+     * @param context scan context
+     * @return true if scanner should run
+     */
+    @Override
+    public boolean appliesTo(ScanContext context) {
+        ScannerApplicabilityStrategy strategy = getApplicabilityStrategy();
+        if (strategy != null) {
+            return strategy.test(context);
+        }
+        // Fallback: check if any supported file patterns exist
+        return hasAnyFiles(context, getSupportedFilePatterns().toArray(new String[0]));
+    }
 
     /**
      * Checks if any files matching the given glob patterns exist in the scan context.

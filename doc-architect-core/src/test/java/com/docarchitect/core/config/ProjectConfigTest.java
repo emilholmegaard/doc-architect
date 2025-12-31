@@ -45,7 +45,7 @@ class ProjectConfigTest {
 
     @Test
     void scannerConfig_isEnabled_returnsTrueWhenListIsEmpty() {
-        var scannerConfig = new ProjectConfig.ScannerConfig(List.of(), Map.of());
+        var scannerConfig = new ProjectConfig.ScannerConfig(null, List.of(), List.of(), Map.of());
 
         assertThat(scannerConfig.isEnabled("maven-dependencies")).isTrue();
         assertThat(scannerConfig.isEnabled("any-scanner")).isTrue();
@@ -53,7 +53,7 @@ class ProjectConfigTest {
 
     @Test
     void scannerConfig_isEnabled_returnsTrueWhenListIsNull() {
-        var scannerConfig = new ProjectConfig.ScannerConfig(null, Map.of());
+        var scannerConfig = new ProjectConfig.ScannerConfig(null, null, List.of(), Map.of());
 
         assertThat(scannerConfig.isEnabled("maven-dependencies")).isTrue();
         assertThat(scannerConfig.isEnabled("any-scanner")).isTrue();
@@ -62,7 +62,9 @@ class ProjectConfigTest {
     @Test
     void scannerConfig_isEnabled_returnsTrueForEnabledScanner() {
         var scannerConfig = new ProjectConfig.ScannerConfig(
+            null,
             List.of("maven-dependencies", "spring-rest-api", "jpa-entities"),
+            List.of(),
             Map.of()
         );
 
@@ -74,7 +76,9 @@ class ProjectConfigTest {
     @Test
     void scannerConfig_isEnabled_returnsFalseForDisabledScanner() {
         var scannerConfig = new ProjectConfig.ScannerConfig(
+            null,
             List.of("maven-dependencies", "spring-rest-api"),
+            List.of(),
             Map.of()
         );
 
@@ -116,7 +120,7 @@ class ProjectConfigTest {
         var config = new ProjectConfig(
             new ProjectConfig.ProjectInfo("TestProject", "1.0.0", "Test"),
             List.of(new ProjectConfig.RepositoryConfig("main", ".")),
-            new ProjectConfig.ScannerConfig(List.of("maven-dependencies"), Map.of()),
+            new ProjectConfig.ScannerConfig(null, List.of("maven-dependencies"), List.of(), Map.of()),
             new ProjectConfig.GeneratorConfigSettings("mermaid", List.of("mermaid")),
             new ProjectConfig.OutputConfig("./docs", true)
         );
