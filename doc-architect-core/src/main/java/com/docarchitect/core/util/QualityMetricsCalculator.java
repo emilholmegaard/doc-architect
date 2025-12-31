@@ -147,8 +147,8 @@ public final class QualityMetricsCalculator {
     ) {
         if (expectedFiles > 0 || scannedFiles > 0) {
             double percentage = expectedFiles > 0
-                ? (double) scannedFiles / expectedFiles * 100.0
-                : 100.0;
+                ? Math.min((double) scannedFiles / expectedFiles * 100.0, 100.0)
+                : (scannedFiles > 0 ? 100.0 : 0.0);
             coverage.put(componentType, new ArchitectureComponentMetrics(
                 componentType, expectedFiles, scannedFiles, percentage
             ));

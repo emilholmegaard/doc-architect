@@ -39,8 +39,8 @@ scanners:
   enabled:
     - maven-dependencies
     - kafka-messaging
+    - kafka-streams
     - spring-components
-    - java-components
 
 generators:
   default: mermaid
