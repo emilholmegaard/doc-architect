@@ -32,6 +32,8 @@ repositories:
   - name: "eshoponcontainers"
     path: "."
 
+scanners: auto
+
 generators:
   default: mermaid
   enabled:

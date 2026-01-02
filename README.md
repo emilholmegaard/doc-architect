@@ -70,6 +70,53 @@ docker run -v $(pwd):/workspace -v $(pwd)/docs:/output doc-architect scan
 └───────────────────────┴─────────────────────┴───────────────────────┘
 ```
 
+## Scanner Configuration Modes
+
+DocArchitect offers three flexible ways to configure which scanners analyze your codebase:
+
+### 1. AUTO Mode (Recommended for New Projects)
+
+Let DocArchitect automatically detect and enable all applicable scanners based on your project's structure and technologies. Scanners self-filter based on file presence and applicability.
+
+```yaml
+scanners: auto
+```
+
+**When to use**: Initial documentation generation, exploring a new codebase, or when you want comprehensive coverage without manual configuration.
+
+### 2. Groups Mode
+
+Enable scanners by technology group for targeted scanning of specific language ecosystems.
+
+```yaml
+scanners:
+  groups:
+    - java      # Maven, Gradle, Spring, JPA, Kafka Streams
+    - python    # pip/poetry, FastAPI, Flask, SQLAlchemy, Django
+    - dotnet    # NuGet, ASP.NET Core, Entity Framework
+    - javascript # npm, Express.js
+    - go        # go.mod dependencies
+```
+
+**When to use**: Multi-language monorepos where you want to focus on specific technology stacks.
+
+### 3. Explicit Mode
+
+Specify exact scanner IDs for fine-grained control.
+
+```yaml
+scanners:
+  enabled:
+    - maven-dependencies
+    - spring-rest-api
+    - jpa-entities
+    - kafka-messaging
+```
+
+**When to use**: Production CI/CD pipelines, when you need precise control over scanning behavior, or to optimize scan performance.
+
+**Available Scanner IDs**: See [Scanner Reference](docs/scanners.md) for complete list.
+
 ## Configuration
 
 Create a `docarchitect.yaml` in your project root:
@@ -92,13 +139,24 @@ repositories:
   #   branch: "main"
 
 scanners:
-  enabled:
-    - dependencies
-    - rest-api
-    - graphql
-    - kafka
-    - database
-  
+  # AUTO mode: Let DocArchitect automatically detect and enable scanners
+  # based on your project's technologies
+  auto
+
+  # OR use explicit mode: Specify which scanners to enable
+  # enabled:
+  #   - dependencies
+  #   - rest-api
+  #   - graphql
+  #   - kafka
+  #   - database
+
+  # OR use groups mode: Enable scanners by technology group
+  # groups:
+  #   - java
+  #   - python
+  #   - dotnet
+
 generators:
   default: mermaid
   enabled:
