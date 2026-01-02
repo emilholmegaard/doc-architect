@@ -196,8 +196,11 @@ fi
 echo "Checking index.md for message flow metrics..."
 cat "$INDEX_FILE" | grep -E "Message Flows|message" || true
 
-# Extract message flow count if available
-FLOW_COUNT=$(grep -E "Message Flows.*\|.*[0-9]+" "$INDEX_FILE" | grep -oE "[0-9]+" | head -1 || echo "0")
+# Extract message flow count from Architecture Statistics section (not coverage table)
+# The statistics section has format: | Message Flows | 8 |
+# The coverage table has format: | Message Flows | 0 | 8 | 100% ✅ |
+# We want the statistics value (8), not the coverage expected baseline (0)
+FLOW_COUNT=$(grep -E "^\| Message Flows \| [0-9]+ \|$" "$INDEX_FILE" | grep -oE "[0-9]+" | head -1 || echo "0")
 
 echo ""
 echo "Message flows detected: $FLOW_COUNT"
