@@ -35,6 +35,7 @@ repositories:
   - name: "camel-examples"
     path: "."
 
+scanners: auto
 
 generators:
   default: mermaid
