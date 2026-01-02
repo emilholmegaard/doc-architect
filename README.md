@@ -79,7 +79,8 @@ DocArchitect offers three flexible ways to configure which scanners analyze your
 Let DocArchitect automatically detect and enable all applicable scanners based on your project's structure and technologies. Scanners self-filter based on file presence and applicability.
 
 ```yaml
-scanners: auto
+scanners:
+  mode: auto
 ```
 
 **When to use**: Initial documentation generation, exploring a new codebase, or when you want comprehensive coverage without manual configuration.
@@ -141,7 +142,7 @@ repositories:
 scanners:
   # AUTO mode: Let DocArchitect automatically detect and enable scanners
   # based on your project's technologies
-  auto
+  mode: auto
 
   # OR use explicit mode: Specify which scanners to enable
   # enabled:
