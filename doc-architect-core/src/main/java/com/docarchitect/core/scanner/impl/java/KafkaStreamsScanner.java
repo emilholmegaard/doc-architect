@@ -139,7 +139,9 @@ public class KafkaStreamsScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasKafkaStreams());
+        return ApplicabilityStrategies.hasJavaFiles()
+            .and(ApplicabilityStrategies.hasKafkaStreams()
+                .or(ApplicabilityStrategies.hasFileContaining("org.apache.kafka.streams", "StreamsBuilder", "KStream")));
     }
 
     /**

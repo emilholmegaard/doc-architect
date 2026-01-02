@@ -231,7 +231,8 @@ public class ScanCommand implements Callable<Integer> {
                 }
 
                 // Step 2: Check if scanner applies to this project (applicability strategy)
-                if (scanner.appliesTo(context)) {
+                boolean applies = scanner.appliesTo(context);
+                if (applies) {
                     log.info("Running scanner: {} ({})", scanner.getDisplayName(), scanner.getId());
                     System.out.println("  → " + scanner.getDisplayName());
 
@@ -247,7 +248,13 @@ public class ScanCommand implements Callable<Integer> {
                             result.dataEntities().size());
                     }
                 } else {
-                    log.debug("Scanner {} does not apply to this project (applicability check)", scanner.getId());
+                    log.debug("Scanner {} does not apply to this project (applicability check failed)", scanner.getId());
+                    if (log.isTraceEnabled()) {
+                        log.trace("Scanner {} applicability details:", scanner.getId());
+                        log.trace("  - Supported file patterns: {}", scanner.getSupportedFilePatterns());
+                        log.trace("  - Has applicability strategy: {}", scanner.getApplicabilityStrategy() != null);
+                        log.trace("  - Previous scan results available: {}", !context.previousResults().isEmpty());
+                    }
                     notApplicableCount++;
                 }
             } catch (Exception e) {

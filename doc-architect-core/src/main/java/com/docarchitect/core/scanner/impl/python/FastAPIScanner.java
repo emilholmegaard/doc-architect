@@ -149,7 +149,9 @@ public class FastAPIScanner extends AbstractRegexScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasPythonFiles().and(ApplicabilityStrategies.hasFastAPI());
+        return ApplicabilityStrategies.hasPythonFiles()
+            .and(ApplicabilityStrategies.hasFastAPI()
+                .or(ApplicabilityStrategies.hasFileContaining("from fastapi", "import FastAPI", "@app.get", "@app.post")));
     }
 
     @Override

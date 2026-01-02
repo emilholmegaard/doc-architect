@@ -162,7 +162,9 @@ public class CeleryScanner extends AbstractRegexScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasPythonFiles().and(ApplicabilityStrategies.hasCelery());
+        return ApplicabilityStrategies.hasPythonFiles()
+            .and(ApplicabilityStrategies.hasCelery()
+                .or(ApplicabilityStrategies.hasFileContaining("from celery", "import Celery", "@task", "@shared_task")));
     }
 
     @Override

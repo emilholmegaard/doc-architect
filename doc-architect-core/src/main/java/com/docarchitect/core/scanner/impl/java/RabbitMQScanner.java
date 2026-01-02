@@ -97,7 +97,9 @@ public class RabbitMQScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasRabbitMQ());
+        return ApplicabilityStrategies.hasJavaFiles()
+            .and(ApplicabilityStrategies.hasRabbitMQ()
+                .or(ApplicabilityStrategies.hasFileContaining("org.springframework.amqp", "@RabbitListener", "RabbitTemplate")));
     }
 
     /**

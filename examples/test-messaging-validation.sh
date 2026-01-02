@@ -150,11 +150,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - kafka-messaging
-    - rabbitmq-messaging
-    - spring-components
+  mode: auto
 
 generators:
   default: mermaid

@@ -36,10 +36,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - rabbitmq-messaging
-    - spring-components
+  mode: auto
 
 generators:
   default: mermaid

@@ -33,11 +33,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - graphql-schema
-    - bundler-dependencies
-    - rails-api
-    - rails-route
+  mode: auto
 
 generators:
   default: mermaid

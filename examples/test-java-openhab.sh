@@ -33,11 +33,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - spring-components
-    - spring-rest-api
-    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
+  mode: auto
 
 generators:
   default: mermaid

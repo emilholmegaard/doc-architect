@@ -33,12 +33,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - nuget-dependencies
-    - dotnet-solution
-    - aspnetcore-rest
-    - entity-framework
-    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
+  mode: auto
 
 generators:
   default: mermaid

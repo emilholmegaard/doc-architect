@@ -129,7 +129,9 @@ public class MongoDbScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasMongoDB());
+        return ApplicabilityStrategies.hasJavaFiles()
+            .and(ApplicabilityStrategies.hasMongoDB()
+                .or(ApplicabilityStrategies.hasFileContaining("org.springframework.data.mongodb", "@Document", "@DBRef")));
     }
 
     @Override

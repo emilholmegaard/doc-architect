@@ -36,14 +36,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - spring-rest-api
-    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
-    - kafka-messaging
-    - rabbitmq-messaging
-    - jpa-entities
-    - spring-components
+  mode: auto
 
 generators:
   default: mermaid

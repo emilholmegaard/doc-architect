@@ -33,10 +33,7 @@ repositories:
     path: "server"
 
 scanners:
-  enabled:
-    - go-modules
-    - go-http-router
-    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
+  mode: auto
 
 generators:
   default: mermaid

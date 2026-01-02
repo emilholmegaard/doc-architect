@@ -262,7 +262,9 @@ public class AspNetCoreApiScanner extends AbstractAstScanner<DotNetAst.CSharpCla
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasCSharpFiles().and(ApplicabilityStrategies.hasAspNetCore());
+        return ApplicabilityStrategies.hasCSharpFiles()
+            .and(ApplicabilityStrategies.hasAspNetCore()
+                .or(ApplicabilityStrategies.hasFileContaining("Microsoft.AspNetCore", "[ApiController]", "[HttpGet]", "[HttpPost]")));
     }
 
     /**

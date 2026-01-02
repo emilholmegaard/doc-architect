@@ -104,7 +104,9 @@ public class JpaEntityScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasJpa());
+        return ApplicabilityStrategies.hasJavaFiles()
+            .and(ApplicabilityStrategies.hasJpa()
+                .or(ApplicabilityStrategies.hasFileContaining("javax.persistence", "jakarta.persistence", "@Entity")));
     }
 
     /**

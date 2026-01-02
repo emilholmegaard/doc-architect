@@ -33,12 +33,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - pip-poetry-dependencies
-    - django-apps
-    - graphql-schema
-    - django-orm
-    - celery-tasks
+  mode: auto
 
 generators:
   default: mermaid

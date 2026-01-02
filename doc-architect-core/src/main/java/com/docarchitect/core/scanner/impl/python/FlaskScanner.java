@@ -158,7 +158,9 @@ public class FlaskScanner extends AbstractRegexScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasPythonFiles().and(ApplicabilityStrategies.hasFlask());
+        return ApplicabilityStrategies.hasPythonFiles()
+            .and(ApplicabilityStrategies.hasFlask()
+                .or(ApplicabilityStrategies.hasFileContaining("from flask", "import Flask", "@app.route", "@app.get")));
     }
 
     @Override
