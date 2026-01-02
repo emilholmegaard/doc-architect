@@ -200,4 +200,84 @@ class ConfigLoaderTest {
         assertThat(config.scanners().config()).isNotEmpty();
         assertThat(config.scanners().config()).containsKey("maven");
     }
+
+    @Test
+    void load_withAutoModeLowerCase_parsesCorrectly() throws IOException {
+        Path configFile = tempDir.resolve("docarchitect.yaml");
+        Files.writeString(configFile, """
+            project:
+              name: "AutoModeProject"
+              version: "1.0.0"
+
+            scanners:
+              mode: auto
+            """);
+
+        ProjectConfig config = ConfigLoader.load(configFile);
+
+        assertThat(config).isNotNull();
+        assertThat(config.scanners().mode()).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+        assertThat(config.scanners().getEffectiveMode()).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+    }
+
+    @Test
+    void load_withAutoModeUpperCase_parsesCorrectly() throws IOException {
+        Path configFile = tempDir.resolve("docarchitect.yaml");
+        Files.writeString(configFile, """
+            project:
+              name: "AutoModeProject"
+              version: "1.0.0"
+
+            scanners:
+              mode: AUTO
+            """);
+
+        ProjectConfig config = ConfigLoader.load(configFile);
+
+        assertThat(config).isNotNull();
+        assertThat(config.scanners().mode()).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+    }
+
+    @Test
+    void load_withGroupsModeLowerCase_parsesCorrectly() throws IOException {
+        Path configFile = tempDir.resolve("docarchitect.yaml");
+        Files.writeString(configFile, """
+            project:
+              name: "GroupsModeProject"
+              version: "1.0.0"
+
+            scanners:
+              mode: groups
+              groups:
+                - java
+                - python
+            """);
+
+        ProjectConfig config = ConfigLoader.load(configFile);
+
+        assertThat(config).isNotNull();
+        assertThat(config.scanners().mode()).isEqualTo(ProjectConfig.ScannerMode.GROUPS);
+        assertThat(config.scanners().groups()).containsExactly("java", "python");
+    }
+
+    @Test
+    void load_withExplicitModeMixedCase_parsesCorrectly() throws IOException {
+        Path configFile = tempDir.resolve("docarchitect.yaml");
+        Files.writeString(configFile, """
+            project:
+              name: "ExplicitModeProject"
+              version: "1.0.0"
+
+            scanners:
+              mode: Explicit
+              enabled:
+                - maven-dependencies
+            """);
+
+        ProjectConfig config = ConfigLoader.load(configFile);
+
+        assertThat(config).isNotNull();
+        assertThat(config.scanners().mode()).isEqualTo(ProjectConfig.ScannerMode.EXPLICIT);
+        assertThat(config.scanners().enabled()).containsExactly("maven-dependencies");
+    }
 }

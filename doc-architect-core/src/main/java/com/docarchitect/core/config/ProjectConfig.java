@@ -1,10 +1,12 @@
 package com.docarchitect.core.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * Root configuration for DocArchitect projects.
@@ -99,7 +101,24 @@ public record ProjectConfig(
         /** Enable scanners by technology groups (java, python, etc.) */
         GROUPS,
         /** Explicitly list enabled scanner IDs (legacy mode) */
-        EXPLICIT
+        EXPLICIT;
+
+        /**
+         * Case-insensitive deserializer for scanner mode.
+         *
+         * <p>Allows both "AUTO" and "auto" (and mixed case) in YAML configuration.
+         *
+         * @param value the string value from YAML
+         * @return the corresponding scanner mode
+         * @throws IllegalArgumentException if value doesn't match any mode
+         */
+        @JsonCreator
+        public static ScannerMode fromString(String value) {
+            if (value == null) {
+                return AUTO;
+            }
+            return valueOf(value.toUpperCase(Locale.ROOT));
+        }
     }
 
     /**

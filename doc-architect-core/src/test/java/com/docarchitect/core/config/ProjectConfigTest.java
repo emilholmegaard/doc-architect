@@ -132,4 +132,30 @@ class ProjectConfigTest {
         assertThat(config.generators().defaultGenerator()).isEqualTo("mermaid");
         assertThat(config.output().directory()).isEqualTo("./docs");
     }
+
+    @Test
+    void scannerMode_fromString_handlesUpperCase() {
+        assertThat(ProjectConfig.ScannerMode.fromString("AUTO")).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+        assertThat(ProjectConfig.ScannerMode.fromString("GROUPS")).isEqualTo(ProjectConfig.ScannerMode.GROUPS);
+        assertThat(ProjectConfig.ScannerMode.fromString("EXPLICIT")).isEqualTo(ProjectConfig.ScannerMode.EXPLICIT);
+    }
+
+    @Test
+    void scannerMode_fromString_handlesLowerCase() {
+        assertThat(ProjectConfig.ScannerMode.fromString("auto")).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+        assertThat(ProjectConfig.ScannerMode.fromString("groups")).isEqualTo(ProjectConfig.ScannerMode.GROUPS);
+        assertThat(ProjectConfig.ScannerMode.fromString("explicit")).isEqualTo(ProjectConfig.ScannerMode.EXPLICIT);
+    }
+
+    @Test
+    void scannerMode_fromString_handlesMixedCase() {
+        assertThat(ProjectConfig.ScannerMode.fromString("Auto")).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+        assertThat(ProjectConfig.ScannerMode.fromString("Groups")).isEqualTo(ProjectConfig.ScannerMode.GROUPS);
+        assertThat(ProjectConfig.ScannerMode.fromString("Explicit")).isEqualTo(ProjectConfig.ScannerMode.EXPLICIT);
+    }
+
+    @Test
+    void scannerMode_fromString_handlesNull() {
+        assertThat(ProjectConfig.ScannerMode.fromString(null)).isEqualTo(ProjectConfig.ScannerMode.AUTO);
+    }
 }
