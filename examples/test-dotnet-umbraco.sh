@@ -32,7 +32,8 @@ repositories:
   - name: "umbraco"
     path: "."
 
-scanners: auto
+scanners:
+  mode: auto
 
 generators:
   default: mermaid
