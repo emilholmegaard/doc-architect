@@ -36,10 +36,7 @@ repositories:
     path: "examples"
 
 scanners:
-  enabled:
-    - pip-poetry-dependencies
-    - faust-streaming
-    - django-apps
+  mode: auto
 
 generators:
   default: mermaid

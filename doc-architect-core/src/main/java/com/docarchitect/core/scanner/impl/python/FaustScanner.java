@@ -109,7 +109,9 @@ public class FaustScanner extends AbstractRegexScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasPythonFiles().and(ApplicabilityStrategies.hasFaust());
+        return ApplicabilityStrategies.hasPythonFiles()
+            .and(ApplicabilityStrategies.hasFaust()
+                .or(ApplicabilityStrategies.hasFileContaining("import faust", "from faust", "app.topic", "@app.agent")));
     }
 
     @Override

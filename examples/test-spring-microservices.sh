@@ -33,15 +33,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - spring-rest-api
-    - jpa-entities
-    - mongodb  # PiggyMetrics uses MongoDB for data storage
-    # Note: rabbitmq-messaging enabled but will find 0 flows
-    # (RabbitMQ used only for Spring Cloud Bus infrastructure)
-    - rabbitmq-messaging
-    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
+  mode: auto
 
 generators:
   default: mermaid

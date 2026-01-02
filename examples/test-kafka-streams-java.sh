@@ -36,11 +36,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - kafka-messaging
-    - kafka-streams
-    - spring-components
+  mode: auto
 
 generators:
   default: mermaid

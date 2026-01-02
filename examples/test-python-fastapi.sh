@@ -33,12 +33,7 @@ repositories:
     path: "./backend/app"
 
 scanners:
-  enabled:
-    - pip-poetry-dependencies
-    - fastapi-rest
-    - sqlalchemy-entities
-    - celery-tasks
-    - rest-event-flow  # Detect REST-based event flows and CRUD patterns
+  mode: auto
 
 generators:
   default: mermaid

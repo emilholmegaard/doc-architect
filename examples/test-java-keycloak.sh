@@ -33,10 +33,7 @@ repositories:
     path: "."
 
 scanners:
-  enabled:
-    - maven-dependencies
-    - jaxrs-api
-    - jpa-entities
+  mode: auto
 
 generators:
   default: mermaid

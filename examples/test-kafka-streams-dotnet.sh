@@ -36,11 +36,7 @@ repositories:
     path: "examples"
 
 scanners:
-  enabled:
-    - nuget-dependencies
-    - dotnet-solution
-    - streamiz-kafka
-    - dotnet-kafka-messaging
+  mode: auto
 
 generators:
   default: mermaid

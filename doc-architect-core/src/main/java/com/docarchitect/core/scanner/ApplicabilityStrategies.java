@@ -275,6 +275,40 @@ public final class ApplicabilityStrategies {
         return context -> hasAnyFiles(context, patterns);
     }
 
+    /**
+     * Check if any file in the project contains any of the specified string patterns.
+     *
+     * <p>This is useful as a fallback when dependencies haven't been scanned yet,
+     * allowing scanners to check for framework usage via imports or annotations.</p>
+     *
+     * <p><b>Example usage:</b></p>
+     * <pre>{@code
+     * // Check for Kafka usage via imports or annotations
+     * ApplicabilityStrategies.hasFileContaining(
+     *     "org.springframework.kafka",
+     *     "@KafkaListener",
+     *     "KafkaTemplate"
+     * )
+     * }</pre>
+     *
+     * @param patterns string patterns to search for (case-sensitive substring match)
+     * @return strategy that tests if any file contains any of the patterns
+     */
+    public static ScannerApplicabilityStrategy hasFileContaining(String... patterns) {
+        return context -> {
+            // Search all files (use a broad pattern to check any text file)
+            return context.findFiles("**/*").anyMatch(file -> {
+                try {
+                    return java.nio.file.Files.lines(file)
+                        .anyMatch(line -> Arrays.stream(patterns)
+                            .anyMatch(line::contains));
+                } catch (Exception e) {
+                    return false;
+                }
+            });
+        };
+    }
+
     // ===== Composite Strategies =====
 
     /**

@@ -99,7 +99,9 @@ public class KafkaScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasKafka());
+        return ApplicabilityStrategies.hasJavaFiles()
+            .and(ApplicabilityStrategies.hasKafka()
+                .or(ApplicabilityStrategies.hasFileContaining("org.springframework.kafka", "@KafkaListener", "KafkaTemplate")));
     }
 
     /**

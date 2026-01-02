@@ -164,7 +164,9 @@ public class JaxRsApiScanner extends AbstractJavaParserScanner {
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasJavaFiles().and(ApplicabilityStrategies.hasJaxRs());
+        return ApplicabilityStrategies.hasJavaFiles()
+            .and(ApplicabilityStrategies.hasJaxRs()
+                .or(ApplicabilityStrategies.hasFileContaining("javax.ws.rs", "jakarta.ws.rs", "@Path")));
     }
 
     /**

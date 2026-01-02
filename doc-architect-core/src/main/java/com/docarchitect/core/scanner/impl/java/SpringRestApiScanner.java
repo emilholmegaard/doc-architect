@@ -138,7 +138,8 @@ public class SpringRestApiScanner extends AbstractJavaParserScanner {
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
         return ApplicabilityStrategies.hasJavaFiles()
-            .and(ApplicabilityStrategies.hasSpringFramework());
+            .and(ApplicabilityStrategies.hasSpringFramework()
+                .or(ApplicabilityStrategies.hasFileContaining("org.springframework.web", "@RestController", "@RequestMapping")));
     }
 
     /**

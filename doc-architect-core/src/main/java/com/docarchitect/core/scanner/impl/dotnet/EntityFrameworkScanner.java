@@ -169,7 +169,9 @@ public class EntityFrameworkScanner extends AbstractAstScanner<DotNetAst.CSharpC
 
     @Override
     public ScannerApplicabilityStrategy getApplicabilityStrategy() {
-        return ApplicabilityStrategies.hasCSharpFiles().and(ApplicabilityStrategies.hasEntityFramework());
+        return ApplicabilityStrategies.hasCSharpFiles()
+            .and(ApplicabilityStrategies.hasEntityFramework()
+                .or(ApplicabilityStrategies.hasFileContaining("Microsoft.EntityFrameworkCore", "DbContext", "DbSet<")));
     }
 
     @Override
