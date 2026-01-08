@@ -58,6 +58,12 @@ public class FileSystemRenderer implements OutputRenderer {
             Files.createDirectories(outputDir);
             logger.debug("Output directory created/verified: {}", outputDir);
 
+            // Verify directory is writable
+            if (!Files.isWritable(outputDir)) {
+                throw new IOException("Output directory is not writable: " + outputDir +
+                    ". Check permissions or run with appropriate user/group.");
+            }
+
             // Write each file
             for (GeneratedFile file : output.files()) {
                 writeFile(outputDir, file);
@@ -65,7 +71,8 @@ public class FileSystemRenderer implements OutputRenderer {
 
             logger.info("Successfully rendered {} files to filesystem", output.files().size());
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to create output directory: " + outputDir, e);
+            throw new IllegalStateException("Failed to create output directory: " + outputDir +
+                ". Ensure the directory exists and has write permissions.", e);
         }
     }
 
@@ -84,13 +91,24 @@ public class FileSystemRenderer implements OutputRenderer {
             Path parentDir = targetPath.getParent();
             if (parentDir != null) {
                 Files.createDirectories(parentDir);
+
+                // Verify parent directory is writable
+                if (!Files.isWritable(parentDir)) {
+                    throw new IOException("Parent directory is not writable: " + parentDir +
+                        ". Check directory permissions.");
+                }
             }
 
             // Write file content
             Files.writeString(targetPath, file.content());
             logger.info("Wrote file: {} ({} bytes)", file.relativePath(), file.content().length());
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to write file: " + file.relativePath(), e);
+            String errorMsg = String.format(
+                "Failed to write file: %s to %s. Error: %s. " +
+                "Ensure the output directory has write permissions (e.g., chmod 777 for Docker mounts).",
+                file.relativePath(), targetPath, e.getMessage()
+            );
+            throw new IllegalStateException(errorMsg, e);
         }
     }
 }

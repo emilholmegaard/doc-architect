@@ -50,10 +50,12 @@ EOF
 echo ""
 echo "Running DocArchitect on PiggyMetrics..."
 # Create output directory with correct permissions before Docker mount
-mkdir -p "$(pwd)/output/piggymetrics"
+OUTPUT_DIR="$(pwd)/output/piggymetrics"
+mkdir -p "$OUTPUT_DIR"
+chmod 777 "$OUTPUT_DIR"  # Ensure Docker container can write to it
 docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
-    -v "$(pwd)/output/piggymetrics:/output" \
+    -v "$OUTPUT_DIR:/output" \
     ghcr.io/emilholmegaard/doc-architect:latest \
     scan /workspace --config /workspace/docarchitect.yaml --output /output
 
