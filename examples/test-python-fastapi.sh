@@ -50,10 +50,12 @@ EOF
 echo ""
 echo "Running DocArchitect on FastAPI project..."
 # Create output directory with correct permissions before Docker mount
-mkdir -p "$(pwd)/output/fastapi"
+OUTPUT_DIR="$(pwd)/output/fastapi"
+mkdir -p "$OUTPUT_DIR"
+chmod 777 "$OUTPUT_DIR"  # Ensure Docker container can write to it
 docker run --rm \
     -v "$(pwd)/$PROJECT_DIR:/workspace:ro" \
-    -v "$(pwd)/output/fastapi:/output" \
+    -v "$OUTPUT_DIR:/output" \
     ghcr.io/emilholmegaard/doc-architect:latest \
     scan /workspace --config /workspace/docarchitect.yaml --output /output
 
