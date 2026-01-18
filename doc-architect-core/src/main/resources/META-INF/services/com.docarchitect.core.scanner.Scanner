@@ -43,6 +43,9 @@ com.docarchitect.core.scanner.impl.go.GoHttpRouterScanner
 com.docarchitect.core.scanner.impl.go.GoStructScanner
 com.docarchitect.core.scanner.impl.go.GrpcServiceScanner
 
+# PHP Scanners
+com.docarchitect.core.scanner.impl.php.ComposerDependencyScanner
+
 # Ruby Scanners
 com.docarchitect.core.scanner.impl.ruby.BundlerDependencyScanner
 com.docarchitect.core.scanner.impl.ruby.RailsApiScanner

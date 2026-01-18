@@ -55,6 +55,9 @@ public final class Technologies {
     /** Technology identifier for Node.js runtime. */
     public static final String NODE = "node";
 
+    /** Technology identifier for PHP. */
+    public static final String PHP = "php";
+
     private Technologies() {
         // Prevent instantiation
     }

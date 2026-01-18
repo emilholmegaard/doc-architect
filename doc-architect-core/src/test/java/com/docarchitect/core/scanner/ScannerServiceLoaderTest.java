@@ -28,12 +28,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>Duplicate scanner IDs</li>
  * </ul>
  *
- * <p>Expected scanner count: 42 scanners
+ * <p>Expected scanner count: 43 scanners
  * <ul>
  *   <li>12 Java/JVM scanners (Maven, Gradle, Spring Components, Spring REST, JAX-RS, JPA, MongoDB, Kafka, Kafka Streams, RabbitMQ, HTTP Client, gRPC Service)</li>
  *   <li>8 Python scanners (Pip/Poetry, Django Apps, FastAPI, Flask, SQLAlchemy, Django ORM, Celery, Faust)</li>
  *   <li>7 .NET scanners (NuGet, Solution File, ASP.NET Core, Entity Framework, Kafka, Streamiz Kafka, gRPC Service)</li>
  *   <li>4 Go scanners (Go Modules, Go HTTP Router, Go Struct/ORM, gRPC Service)</li>
+ *   <li>1 PHP scanner (Composer)</li>
  *   <li>4 Ruby scanners (Bundler, Rails API, Rails Route, Sidekiq)</li>
  *   <li>7 Schema & Cross-Cutting scanners (GraphQL, Avro, Protobuf, SQL, npm, Express, REST Event Flow)</li>
  * </ul>
@@ -48,7 +49,7 @@ class ScannerServiceLoaderTest {
      * Expected number of scanner implementations.
      * Update this constant when adding new scanners.
      */
-    private static final int EXPECTED_SCANNER_COUNT = 42;
+    private static final int EXPECTED_SCANNER_COUNT = 43;
 
     @Test
     void serviceLoader_discoversAllRegisteredScanners() {
@@ -144,6 +145,7 @@ class ScannerServiceLoaderTest {
                 "dotnet-kafka-messaging",
                 "streamiz-kafka",
                 "grpc-service-dotnet",
+                "composer-dependencies",
                 "bundler-dependencies",
                 "rails-api",
                 "rails-route",

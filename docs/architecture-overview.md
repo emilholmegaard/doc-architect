@@ -74,6 +74,7 @@ Plugin architecture using Java ServiceLoader for extensibility:
 - Maven (pom.xml), Gradle
 - npm/yarn, pip/poetry
 - NuGet (.csproj), Go modules
+- Composer (PHP)
 
 #### API Scanners
 
@@ -136,7 +137,7 @@ docs/architecture/
 
 ### 2. **Multi-Language Support**
 
-- Support for 6+ languages/ecosystems (Java, Kotlin, Python, C#/.NET, Node.js, Go)
+- Support for 7+ languages/ecosystems (Java, Kotlin, Python, C#/.NET, Node.js, Go, PHP)
 - **Strategy**: Language-specific scanner implementations
 
 ### 3. **Multi-Diagram Format Support**
