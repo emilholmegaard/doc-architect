@@ -78,7 +78,7 @@ Plugin architecture using Java ServiceLoader for extensibility:
 
 #### API Scanners
 
-- REST: Spring MVC, JAX-RS, FastAPI, Flask, ASP.NET Core, Express.js
+- REST: Spring MVC, JAX-RS, FastAPI, Flask, ASP.NET Core, Express.js, Laravel, Symfony
 - GraphQL, gRPC/Protobuf
 
 #### Database Scanners
