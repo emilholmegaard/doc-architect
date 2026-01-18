@@ -66,6 +66,7 @@ run_test ".NET Modular CMS (OrchardCore)" "./examples/test-dotnet-orchardcore.sh
 run_test "Java OSGi Home Automation (openHAB)" "./examples/test-java-openhab.sh"
 run_test "Ruby Rails DevOps (GitLab)" "./examples/test-ruby-gitlab.sh"
 run_test "Go Collaboration Platform (Mattermost)" "./examples/test-go-mattermost.sh"
+run_test "PHP Laravel E-Commerce (Bagisto)" "./examples/test-php-bagisto.sh"
 
 # Summary
 echo ""
@@ -111,6 +112,7 @@ echo "  - output/orchardcore/         (.NET Modular CMS)"
 echo "  - output/openhab/             (Java OSGi Home Automation)"
 echo "  - output/gitlab/              (Ruby Rails DevOps)"
 echo "  - output/mattermost/          (Go Collaboration)"
+echo "  - output/bagisto/             (PHP Laravel E-Commerce)"
 echo ""
 echo "Verify each output contains:"
 echo "  - index.md with navigation"

@@ -4,13 +4,14 @@ This guide explains how to test DocArchitect against real-world open source proj
 
 ## Overview
 
-DocArchitect includes test scripts for three production-grade open source projects representing different technology stacks:
+DocArchitect includes test scripts for production-grade open source projects representing different technology stacks:
 
 | Project | Technology | Architecture | Key Features |
 |---------|-----------|--------------|--------------|
 | **PiggyMetrics** | Spring Boot | 7 microservices | REST APIs, MongoDB, RabbitMQ, Docker |
 | **eShopOnWeb** | .NET Core | Clean Architecture | ASP.NET Core, EF Core, SQL Server |
 | **Full-Stack FastAPI** | Python | API + Database | FastAPI, SQLAlchemy, PostgreSQL, Celery |
+| **Bagisto** | PHP/Laravel | E-Commerce | Eloquent ORM, REST APIs, Multi-vendor |
 
 These tests validate that DocArchitect can accurately scan and document complex, multi-module production codebases.
 
@@ -37,6 +38,9 @@ bash examples/test-dotnet-solution.sh
 
 # Python FastAPI
 bash examples/test-python-fastapi.sh
+
+# PHP Laravel
+bash examples/test-php-bagisto.sh
 ```
 
 ## Test Projects
@@ -168,6 +172,56 @@ ls output/fastapi/
 
 ---
 
+### 4. Bagisto (PHP/Laravel)
+
+**Repository:** [bagisto/bagisto](https://github.com/bagisto/bagisto)
+
+**Architecture:**
+
+- Laravel 10+ PHP framework
+- Vue.js frontend
+- Eloquent ORM with MySQL/PostgreSQL
+- Multi-vendor marketplace support
+- Modular package architecture (`packages/Webkul`)
+- Docker Compose deployment
+
+**What DocArchitect Tests:**
+
+- ✅ Composer dependency scanning (`composer.json`)
+- ✅ Laravel route endpoint detection (`Route::get`, `Route::resource`)
+- ✅ Eloquent model relationships (`belongsTo`, `hasMany`, `morphTo`)
+- ✅ PHP internal dependencies (class inheritance, traits, interfaces)
+- ✅ Service container bindings (DI patterns)
+
+**Expected Output:**
+
+- 50+ Eloquent models (Product, Category, Customer, Order, Cart, etc.)
+- 100+ REST API endpoints (shop, admin, API routes)
+- Database entity relationships (e-commerce domain model)
+- Internal PHP class dependencies
+
+**Success Criteria:**
+
+```bash
+# After running test
+ls output/bagisto/
+# Should contain:
+#   - index.md (overview)
+#   - dependencies/ (Composer packages)
+#   - api/ (Laravel endpoints)
+#   - data/ (Eloquent entities)
+#   - architecture.md (PHP architecture)
+```
+
+**PHP Scanners Tested:**
+
+- `composer-dependencies` - Composer package manager
+- `laravel-api` - Laravel route definitions
+- `eloquent-models` - Eloquent ORM entities
+- `php-internal-dependencies` - Class dependencies, DI, traits
+
+---
+
 ## Validation Process
 
 The `validate-outputs.sh` script performs comprehensive quality checks:
@@ -288,6 +342,7 @@ After workflow completion:
 | PiggyMetrics | 7 | 10 | 5 |
 | eShopOnWeb | 5 | 10 | 15 |
 | FastAPI | 1 | 15 | 3 |
+| Bagisto | 1 | 50 | 30 |
 
 ### Quality Criteria
 
@@ -455,6 +510,7 @@ test-new-project:
 
 ### Future Enhancements
 
+- [x] Add PHP Laravel test project (Bagisto e-commerce)
 - [ ] Add Ruby on Rails test project
 - [ ] Add Go microservices test project
 - [ ] Add Rust project with Cargo
