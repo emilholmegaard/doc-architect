@@ -49,6 +49,7 @@ com.docarchitect.core.scanner.impl.php.LaravelApiScanner
 com.docarchitect.core.scanner.impl.php.SymfonyApiScanner
 com.docarchitect.core.scanner.impl.php.EloquentModelScanner
 com.docarchitect.core.scanner.impl.php.DoctrineEntityScanner
+com.docarchitect.core.scanner.impl.php.PhpInternalDependencyScanner
 
 # Ruby Scanners
 com.docarchitect.core.scanner.impl.ruby.BundlerDependencyScanner
