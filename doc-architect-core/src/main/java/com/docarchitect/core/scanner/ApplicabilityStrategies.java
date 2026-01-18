@@ -243,6 +243,44 @@ public final class ApplicabilityStrategies {
         return hasDependency("sqlalchemy");
     }
 
+    // ===== PHP Framework Checks =====
+
+    /**
+     * Check if project contains PHP files ({@code **\/*.php}).
+     *
+     * @return strategy that tests for PHP files
+     */
+    public static ScannerApplicabilityStrategy hasPhpFiles() {
+        return context -> hasAnyFiles(context, "**/*.php");
+    }
+
+    /**
+     * Check if project uses Laravel framework.
+     *
+     * @return strategy that tests for {@code laravel} dependency
+     */
+    public static ScannerApplicabilityStrategy hasLaravel() {
+        return hasDependency("laravel");
+    }
+
+    /**
+     * Check if project uses Symfony framework.
+     *
+     * @return strategy that tests for {@code symfony} dependency
+     */
+    public static ScannerApplicabilityStrategy hasSymfony() {
+        return hasDependency("symfony");
+    }
+
+    /**
+     * Check if project uses Doctrine ORM.
+     *
+     * @return strategy that tests for {@code doctrine} dependency
+     */
+    public static ScannerApplicabilityStrategy hasDoctrine() {
+        return hasDependency("doctrine");
+    }
+
     // ===== .NET Framework Checks =====
 
     /**

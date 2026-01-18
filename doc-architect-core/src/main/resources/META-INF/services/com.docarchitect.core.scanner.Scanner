@@ -45,6 +45,8 @@ com.docarchitect.core.scanner.impl.go.GrpcServiceScanner
 
 # PHP Scanners
 com.docarchitect.core.scanner.impl.php.ComposerDependencyScanner
+com.docarchitect.core.scanner.impl.php.LaravelApiScanner
+com.docarchitect.core.scanner.impl.php.SymfonyApiScanner
 
 # Ruby Scanners
 com.docarchitect.core.scanner.impl.ruby.BundlerDependencyScanner
