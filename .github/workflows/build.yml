@@ -57,7 +57,7 @@ jobs:
         run: ./mvnw package -DskipTests
       
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: application-jar
           path: |
@@ -67,7 +67,7 @@ jobs:
       
       - name: Upload test results
         if: inputs.run-tests && always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: |

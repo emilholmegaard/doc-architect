@@ -120,7 +120,7 @@ jobs:
           echo "Index page created"
 
       - name: Upload Sokrates reports as workflow artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: sokrates-reports
           path: sokrates-reports/
