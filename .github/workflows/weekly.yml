@@ -154,7 +154,7 @@ jobs:
       
       - name: Generate SBOM
         run: |
-          trivy image --format cyclonedx-json --output sbom.json ${{ env.DOCKER_IMAGE }}:weekly
+          syft ${{ env.DOCKER_IMAGE }}:weekly -o json > sbom.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v7
