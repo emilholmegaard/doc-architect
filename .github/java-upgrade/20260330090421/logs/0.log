@@ -1,0 +1,249 @@
+2026-03-30T09:04:21.176Z [INFO] ----------------------invoke appmod-list-jdks----------------------
+2026-03-30T09:04:21.176Z [INFO] [Tool.invoke]({name: appmod-list-jdks, input: {
+  "projectPath": "/Users/emil/git/doc-architect"
+}}).
+2026-03-30T09:04:21.176Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:04:21.221Z [INFO] [Tool.invoke]({result: {
+  "message": "We found following jdks in your system:\n\n1. Java 1.8.0_131\n   📁 Path: /Library/Java/JavaVirtualMachines/jdk1.8.0_131.jdk/Contents/Home/bin\n   🏷️ Source: others\n\n2. Java 21.0.9\n   📁 Path: /opt/local/Library/Java/JavaVirtualMachines/jdk-21-oracle-java-se.jdk/Contents/Home/bin\n   🏷️ Source: others\n\nTotal: 2 JDK installation(s) found"
+}}).
+2026-03-30T09:04:21.221Z [INFO] ----------------------invoked appmod-list-jdks----------------------
+2026-03-30T09:04:32.131Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:04:32.131Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "projectPath": "/Users/emil/git/doc-architect",
+  "event": "precheckCompleted",
+  "phase": "precheck",
+  "status": "succeeded"
+}}).
+2026-03-30T09:04:32.131Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:04:32.134Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'precheckCompleted' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:04:32.134Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:05:21.200Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:05:21.200Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "sessionId": "20260330090421",
+  "event": "planInitialized",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "status": "succeeded"
+}}).
+2026-03-30T09:05:21.202Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:05:21.202Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:05:21.202Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:05:21.204Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:05:21.205Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "sessionId": "20260330090421",
+  "event": "planInitialized",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "status": "succeeded"
+}}).
+2026-03-30T09:05:21.205Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:05:21.206Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planInitialized' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:05:21.206Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:08:59.154Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:08:59.155Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "environmentAnalyzed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:08:59.155Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:08:59.156Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:08:59.156Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:08:59.158Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:08:59.159Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "environmentAnalyzed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:08:59.159Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:08:59.160Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'environmentAnalyzed' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:08:59.160Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:09:04.197Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:09:04.197Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "dependenciesAnalyzed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:09:04.197Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:09:04.198Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:09:04.198Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:09:04.202Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:09:04.202Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "dependenciesAnalyzed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:09:04.202Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:09:04.203Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'dependenciesAnalyzed' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:09:04.203Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:09:09.498Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:09:09.499Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "upgradePathDesigned",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:09:09.499Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:09:09.500Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:09:09.500Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:09:09.511Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:09:09.512Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "upgradePathDesigned",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:09:09.512Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:09:09.513Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradePathDesigned' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:09:09.513Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:09:16.191Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:09:16.192Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planReviewed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:09:16.192Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:09:16.192Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:09:16.192Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:09:16.195Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:09:16.195Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planReviewed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:09:16.195Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:09:16.196Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planReviewed' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:09:16.196Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:09:21.447Z [INFO] ---------------------prepare appmod-confirm-upgrade-plan----------------------
+2026-03-30T09:09:21.447Z [INFO] [Tool.prepareInvocation]({name: appmod-confirm-upgrade-plan, input: {
+  "sessionId": "20260330090421"
+}}).
+2026-03-30T09:09:21.448Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:09:21.448Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Review [upgrade plan](/Users/emil/git/doc-architect/.github/java-upgrade/20260330090421/plan.md)",
+  "confirmationMessages": {
+    "title": "Plan generated",
+    "message": "Please review the generated plan and make any necessary adjustments before proceeding. You can modify the generated [`plan.md`](/Users/emil/git/doc-architect/.github/java-upgrade/20260330090421/plan.md) directly."
+  }
+}}).
+2026-03-30T09:09:21.448Z [INFO] ----------------------prepared appmod-confirm-upgrade-plan----------------------
+2026-03-30T09:14:01.366Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:14:01.368Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planConfirmed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:14:01.368Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:14:01.368Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:14:01.369Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:14:01.371Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:14:01.371Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planConfirmed",
+  "phase": "plan",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:14:01.371Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:14:01.372Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planConfirmed' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:14:01.372Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:14:56.065Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:14:56.066Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "planExecutionStarted",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:14:56.067Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:14:56.067Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:14:56.067Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:14:56.070Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:14:56.070Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "planExecutionStarted",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:14:56.071Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:14:56.110Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'planExecutionStarted' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:14:56.110Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:15:08.613Z [INFO] ---------------------prepare appmod-install-jdk----------------------
+2026-03-30T09:15:08.613Z [INFO] [Tool.prepareInvocation]({name: appmod-install-jdk, input: {
+  "version": "25",
+  "sessionId": "20260330090421"
+}}).
+2026-03-30T09:15:08.615Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:15:08.865Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Download and install JDK",
+  "confirmationMessages": {
+    "title": "Download and install JDK",
+    "message": "\nThis tool will download and install JDK 25 from Adoptium with below settings.\n- **Version**: 25\n- **Vendor**: Adoptium\n- **Url**: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jdk_x64_mac_hotspot_25.0.2_10.tar.gz\n- **Destination**: `/Users/emil/.jdk`\n- **Checksum**: SHA256: 7caddeb2d1d06a21487fdf55198349f122ba7b24bfc613b8923a42a133a92dc5\n- **Signature**: https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jdk_x64_mac_hotspot_25.0.2_10.tar.gz.sig\n- **Public Key**: https://packages.adoptium.net/artifactory/api/gpg/key/public\n"
+  }
+}}).
+2026-03-30T09:15:08.865Z [INFO] ----------------------prepared appmod-install-jdk----------------------
+2026-03-30T09:15:23.754Z [INFO] ----------------------invoke appmod-install-jdk----------------------
+2026-03-30T09:15:23.755Z [INFO] [Tool.invoke]({name: appmod-install-jdk, input: {
+  "version": "25",
+  "sessionId": "20260330090421"
+}}).
+2026-03-30T09:15:23.756Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:15:48.380Z [INFO] [Tool.invoke]({result: {
+  "result": {
+    "name": "java",
+    "path": "/Users/emil/.jdk/jdk-25/Contents/Home/bin",
+    "version": "25"
+  },
+  "message": "JDK 25 is installed at /Users/emil/.jdk/jdk-25/Contents/Home/bin",
+  "telemetry": {
+    "tool": "JDK",
+    "version": "25"
+  }
+}}).
+2026-03-30T09:15:48.380Z [INFO] ----------------------invoked appmod-install-jdk----------------------
