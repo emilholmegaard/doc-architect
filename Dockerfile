@@ -3,8 +3,10 @@
 FROM maven:3-eclipse-temurin-25-alpine AS build
 
 # Update all Alpine packages to latest versions (security hardening)
+# Fixes CVE-2026-32767 (CRITICAL, libexpat), CVE-2026-25646 (HIGH, libpng), CVE-2026-22184 (HIGH, zlib)
 RUN apk update && \
     apk upgrade --no-cache && \
+    apk add --upgrade --no-cache libexpat libpng zlib && \
     rm -rf /var/cache/apk/*
 
 WORKDIR /app
@@ -32,10 +34,12 @@ LABEL org.opencontainers.image.source="https://github.com/emilholmegaard/doc-arc
 LABEL org.opencontainers.image.description="Automated Architecture Documentation Generator"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Update all Alpine packages to latest versions (fixes CVE-2025-30258, CVE-2025-64505, CVE-2025-64506)
-# See: https://github.com/emilholmegaard/doc-architect/issues/95
+# Update all Alpine packages to latest versions
+# Fixes CVE-2025-30258, CVE-2025-64505, CVE-2025-64506 (see: issue #95)
+# Fixes CVE-2026-32767 (CRITICAL, libexpat), CVE-2026-25646 (HIGH, libpng), CVE-2026-22184 (HIGH, zlib)
 RUN apk update && \
     apk upgrade --no-cache && \
+    apk add --upgrade --no-cache libexpat libpng zlib && \
     rm -rf /var/cache/apk/*
 
 # Install runtime dependencies
