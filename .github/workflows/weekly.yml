@@ -154,11 +154,7 @@ jobs:
       
       - name: Generate SBOM
         run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            anchore/syft:latest \
-            ${{ env.DOCKER_IMAGE }}:weekly \
-            -o json > sbom.json
+          syft ${{ env.DOCKER_IMAGE }}:weekly -o json > sbom.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v7
@@ -170,14 +166,12 @@ jobs:
       - name: Check for critical vulnerabilities
         id: vuln-check
         run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy image \
+          trivy image \
             --format json \
             --exit-code 0 \
             --severity CRITICAL,HIGH \
             ${{ env.DOCKER_IMAGE }}:weekly > scan-results.json
-          
+
           CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' scan-results.json)
           HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' scan-results.json)
           
