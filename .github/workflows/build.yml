@@ -6,7 +6,7 @@ on:
       java-version:
         required: false
         type: string
-        default: '21'
+        default: '25'
       run-tests:
         required: false
         type: boolean
