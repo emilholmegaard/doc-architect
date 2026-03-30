@@ -14,7 +14,7 @@
 
 **Build Tools**
 - Maven 3.9.12: /opt/local/share/java/maven3/bin/mvn (system Maven)
-- Maven Wrapper: 3.8.6 → **<TO_BE_UPGRADED>** to 4.0.0 (Maven 4.0+ required for Java 25)
+- Maven Wrapper: 3.8.6 → **<TO_BE_UPGRADED>** to 3.9.14 (Maven 4.0 GA not yet released; 3.9.14 is latest stable, supports Java 25)
 
 ## Guidelines
 
@@ -34,7 +34,7 @@
 | Technology/Dependency | Current | Min Compatible | Why Incompatible |
 | --------------------- | ------- | -------------- | ---------------- |
 | Java                   | 21      | 25             | User requested — Java 25 is the latest LTS (released September 2025) |
-| Maven Wrapper          | 3.8.6   | 4.0.0          | Maven 4.0+ required for Java 25 |
+| Maven Wrapper          | 3.8.6   | 3.9.x          | Maven 4.0 GA not released; 3.9.14 is latest stable and supports Java 25 |
 | maven-compiler-plugin  | 3.15.0  | 3.11.0+        | Already compatible (3.15.0 supports Java 25) |
 | maven-surefire-plugin  | 3.5.5   | 3.1.0+         | Already compatible |
 | JUnit Jupiter          | 6.0.3   | 5.10.0+        | Already compatible |
@@ -78,7 +78,7 @@
 - **Step 3: Upgrade to Java 25**
   - **Rationale**: Core upgrade — update Maven wrapper to 4.0.0 (required for Java 25) and update all Java version properties in pom.xml to 25.
   - **Changes to Make**:
-    - [ ] Update `.mvn/wrapper/maven-wrapper.properties`: set `distributionUrl` to Maven 4.0.0 and `wrapperVersion` to latest compatible
+    - [ ] Update `.mvn/wrapper/maven-wrapper.properties`: set `distributionUrl` to Maven 3.9.14
     - [ ] Update root `pom.xml`: change `java.version`, `maven.compiler.source`, `maven.compiler.target` from `21` to `25`
     - [ ] Update root `pom.xml`: change `<release>21</release>` to `<release>25</release>` in `maven-compiler-plugin` configuration
   - **Verification**:

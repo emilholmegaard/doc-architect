@@ -247,3 +247,198 @@
   }
 }}).
 2026-03-30T09:15:48.380Z [INFO] ----------------------invoked appmod-install-jdk----------------------
+2026-03-30T09:16:32.483Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:16:32.483Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "environmentSetup",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded",
+  "details": {
+    "jdkPath": "/Users/emil/.jdk/jdk-25/Contents/Home",
+    "buildToolPath": "."
+  }
+}}).
+2026-03-30T09:16:32.485Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:16:32.485Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:16:32.485Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:16:32.490Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:16:32.490Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "environmentSetup",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded",
+  "details": {
+    "jdkPath": "/Users/emil/.jdk/jdk-25/Contents/Home",
+    "buildToolPath": "."
+  }
+}}).
+2026-03-30T09:16:32.490Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:16:32.491Z [INFO] Project /Users/emil/git/doc-architect is a maven project, try to get java version from pom.xml
+2026-03-30T09:16:32.493Z [INFO] Project java version: 21
+2026-03-30T09:16:32.494Z [INFO] Maven project detected.
+2026-03-30T09:16:32.494Z [INFO] Build tool type: mvnw
+2026-03-30T09:16:32.494Z [INFO] JDK: {
+  "name": "java",
+  "path": "/Users/emil/.jdk/jdk-25/Contents/Home/bin",
+  "version": "21"
+}
+2026-03-30T09:16:32.494Z [INFO] Build tool: {
+  "name": "mvnw",
+  "path": ".",
+  "version": ""
+}
+2026-03-30T09:16:32.495Z [INFO] Project config: {
+  "buildTool": {
+    "path": ".",
+    "name": "mvnw",
+    "version": ""
+  },
+  "jdk": {
+    "path": "/Users/emil/.jdk/jdk-25/Contents/Home/bin",
+    "name": "java",
+    "version": "21"
+  },
+  "name": "doc-architect",
+  "dir": "/Users/emil/git/doc-architect"
+}
+2026-03-30T09:17:09.505Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'environmentSetup' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:17:09.506Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:26:23.430Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:26:23.432Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "baselineSetup",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded",
+  "message": "Baseline: 1209 tests, 0 failures, BUILD SUCCESS with JDK 21"
+}}).
+2026-03-30T09:26:23.432Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:26:23.433Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:26:23.433Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:26:23.435Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:26:23.436Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "baselineSetup",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded",
+  "message": "Baseline: 1209 tests, 0 failures, BUILD SUCCESS with JDK 21"
+}}).
+2026-03-30T09:26:23.436Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:26:23.437Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'baselineSetup' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:26:23.437Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:26:31.084Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:26:31.084Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 3,
+    "stepTitle": "Upgrade to Java 25"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:26:31.086Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:26:31.086Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:26:31.086Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:26:31.089Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:26:31.090Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "details": {
+    "stepNumber": 3,
+    "stepTitle": "Upgrade to Java 25"
+  },
+  "event": "upgradeStepStarted",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:26:31.090Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:26:31.091Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'upgradeStepStarted' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:26:31.091Z [INFO] ----------------------invoked appmod-report-event----------------------
+2026-03-30T09:36:31.498Z [INFO] ---------------------prepare appmod-report-event----------------------
+2026-03-30T09:36:31.498Z [INFO] [Tool.prepareInvocation]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "message": "test-compile BUILD SUCCESS with Java 25 / Maven 3.9.14",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:36:31.498Z [INFO] [Tool.prepareInvocation] do prepare invocation.
+2026-03-30T09:36:31.499Z [INFO] [Tool.prepareInvocation]({result: {
+  "invocationMessage": "Report upgrade event"
+}}).
+2026-03-30T09:36:31.499Z [INFO] ----------------------prepared appmod-report-event----------------------
+2026-03-30T09:36:31.501Z [INFO] ----------------------invoke appmod-report-event----------------------
+2026-03-30T09:36:31.501Z [INFO] [Tool.invoke]({name: appmod-report-event, input: {
+  "event": "buildCompleted",
+  "message": "test-compile BUILD SUCCESS with Java 25 / Maven 3.9.14",
+  "phase": "execute",
+  "projectPath": "/Users/emil/git/doc-architect",
+  "sessionId": "20260330090421",
+  "status": "succeeded"
+}}).
+2026-03-30T09:36:31.501Z [INFO] [Tool.invoke] do invoke.
+2026-03-30T09:36:31.502Z [INFO] Project /Users/emil/git/doc-architect is a maven project, try to get java version from pom.xml
+2026-03-30T09:36:31.504Z [INFO] Project java version: 25
+2026-03-30T09:36:31.504Z [INFO] Maven project detected.
+2026-03-30T09:36:31.505Z [INFO] Build tool type: mvnw
+2026-03-30T09:36:31.618Z [INFO] JDK: {
+  "name": "java",
+  "path": "/Users/emil/.jdk/jdk-25/Contents/Home/bin",
+  "version": "25"
+}
+2026-03-30T09:36:31.618Z [INFO] Build tool: {
+  "name": "mvnw",
+  "path": ".",
+  "version": ""
+}
+2026-03-30T09:36:31.618Z [INFO] Project config: {
+  "buildTool": {
+    "path": ".",
+    "name": "mvnw",
+    "version": ""
+  },
+  "jdk": {
+    "path": "/Users/emil/.jdk/jdk-25/Contents/Home/bin",
+    "name": "java",
+    "version": "25"
+  },
+  "name": "doc-architect",
+  "dir": "/Users/emil/git/doc-architect"
+}
+2026-03-30T09:36:31.620Z [INFO] [MavenBuildTool] Getting all module coordinates of /Users/emil/git/doc-architect
+2026-03-30T09:36:31.620Z [INFO] [MavenBuildTool] Getting effective POMs of /Users/emil/git/doc-architect
+2026-03-30T09:36:31.621Z [INFO] [Environment] Running command (Java undefined): mvnw help:effective-pom -Doutput=effective-pom-698cde92-bb9f-44e7-8cd5-f37d52518469.log
+/bin/sh: mvnw: command not found
+2026-03-30T09:36:31.628Z [INFO] [MavenBuildTool] Failed to get effective POMs: Error: ENOENT: no such file or directory, open '/Users/emil/git/doc-architect/effective-pom-698cde92-bb9f-44e7-8cd5-f37d52518469.log'
+2026-03-30T09:36:31.629Z [INFO] [BaseBuildTool] Found 0 modules: 
+2026-03-30T09:36:31.629Z [INFO] [BaseBuildTool] Finish counting Java and class files
+2026-03-30T09:36:31.629Z [INFO] [MavenBuildTool] Cleaning /Users/emil/git/doc-architect using Maven
+2026-03-30T09:36:31.629Z [INFO] [Environment] Running command (Java undefined): mvnw clean -q -B -fn
+/bin/sh: mvnw: command not found
+2026-03-30T09:36:31.635Z [INFO] [MavenBuildTool] Getting all module coordinates of /Users/emil/git/doc-architect
+2026-03-30T09:36:31.635Z [INFO] [MavenBuildTool] Getting effective POMs of /Users/emil/git/doc-architect
+2026-03-30T09:36:31.636Z [INFO] [Environment] Running command (Java undefined): mvnw help:effective-pom -Doutput=effective-pom-ed7b6b50-ca4e-4d04-bdee-3f9d8e3aa1d8.log
+/bin/sh: mvnw: command not found
+2026-03-30T09:36:31.645Z [INFO] [MavenBuildTool] Failed to get effective POMs: Error: ENOENT: no such file or directory, open '/Users/emil/git/doc-architect/effective-pom-ed7b6b50-ca4e-4d04-bdee-3f9d8e3aa1d8.log'
+2026-03-30T09:36:31.646Z [INFO] [Tool.invoke]({result: {
+  "message": "Event 'buildCompleted' reported!\nSession ID: 20260330090421,\nSession Dir: /Users/emil/git/doc-architect/.github/java-upgrade/20260330090421"
+}}).
+2026-03-30T09:36:31.646Z [INFO] ----------------------invoked appmod-report-event----------------------
