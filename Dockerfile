@@ -1,6 +1,6 @@
 # Multi-stage Docker build for DocArchitect
 # Stage 1: Build the application
-FROM maven:3-eclipse-temurin-25-alpine AS build
+FROM maven:3-eclipse-temurin-26-alpine AS build
 
 # Update all Alpine packages to latest versions (security hardening)
 # Fixes CVE-2026-32767 (CRITICAL, libexpat), CVE-2026-25646 (HIGH, libpng), CVE-2026-22184 (HIGH, zlib)
