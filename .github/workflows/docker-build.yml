@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # NOTE: Dockerfile uses multi-stage build (maven:3-eclipse-temurin-25-alpine)
       # that compiles from source. No need to download artifacts here.
